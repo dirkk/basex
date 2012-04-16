@@ -64,8 +64,7 @@ final class BXDocBuilder extends DocumentBuilder {
 
   @Override
   public Document newDocument() {
-    Util.notimplemented();
-    return null;
+    throw Util.notimplemented();
   }
 
   @Override
@@ -73,8 +72,8 @@ final class BXDocBuilder extends DocumentBuilder {
     final String id = is.getSystemId();
     final SAXSource ss = new SAXSource(parser, is);
     final SAXWrapper sw = new SAXWrapper(ss, ctx.prop);
-    final Data data = MemBuilder.build(id == null ? "" : id, sw, ctx.prop);
-    return new BXDoc(new DBNode(data, 0));
+    final Data data = MemBuilder.build(id == null ? "" : id, sw);
+    return new BXDoc(new DBNode(data));
   }
 
   @Override

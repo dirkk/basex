@@ -24,7 +24,7 @@ import org.basex.query.item.SeqType;
 import org.basex.query.item.Str;
 import org.basex.query.item.Type;
 import org.basex.query.item.Value;
-import org.basex.query.iter.ItemCache;
+import org.basex.query.iter.ValueBuilder;
 import org.basex.query.iter.ValueIter;
 import org.basex.util.InputInfo;
 import org.basex.util.Token;
@@ -146,8 +146,7 @@ public final class Map extends FItem {
    * @return updated map if changed, {@code this} otherwise
    * @throws QueryException query exception
    */
-  public Map addAll(final Map other, final InputInfo ii)
-      throws QueryException {
+  public Map addAll(final Map other, final InputInfo ii) throws QueryException {
     if(other == EMPTY) return this;
     final TrieNode upd = root.addAll(other.root, 0, ii);
     return upd == other.root ? other : new Map(upd);
@@ -166,9 +165,8 @@ public final class Map extends FItem {
   @Override
   public Map coerceTo(final FuncType ft, final QueryContext ctx,
       final InputInfo ii) throws QueryException {
-    if(!(ft instanceof MapType) || !hasType((MapType) ft))
-      throw cast(ii, ft, this);
 
+    if(!(ft instanceof MapType) || !hasType((MapType) ft)) cast(ii, ft, this);
     return this;
   }
 
@@ -182,9 +180,9 @@ public final class Map extends FItem {
    */
   public Map insert(final Item k, final Value v, final InputInfo ii)
       throws QueryException {
+
     final Item key = key(k, ii);
     if(key == null) return this;
-
     final TrieNode ins = root.insert(key.hash(ii), key, v, 0, ii);
     return ins == root ? this : new Map(ins);
   }
@@ -204,7 +202,7 @@ public final class Map extends FItem {
    */
   public Value keys() {
     if(keys == null) {
-      final ItemCache res = new ItemCache(root.size);
+      final ValueBuilder res = new ValueBuilder(root.size);
       root.keys(res);
       keys = res.value();
     }
@@ -236,9 +234,7 @@ public final class Map extends FItem {
    * @return token map
    * @throws QueryException query exception
    */
-  public TokenObjMap<Object> tokenJavaMap(final InputInfo ii)
-      throws QueryException {
-
+  public TokenObjMap<Object> tokenJavaMap(final InputInfo ii) throws QueryException {
     final TokenObjMap<Object> tm = new TokenObjMap<Object>();
     final ValueIter vi = keys().iter();
     for(Item k; (k = vi.next()) != null;) {

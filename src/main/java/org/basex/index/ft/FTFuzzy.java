@@ -4,21 +4,16 @@ import static org.basex.core.Text.*;
 import static org.basex.data.DataText.*;
 import static org.basex.util.Token.*;
 import static org.basex.util.ft.FTFlag.*;
-import java.io.IOException;
-import org.basex.core.Prop;
-import org.basex.data.Data;
-import org.basex.data.DataText;
-import org.basex.index.IndexIterator;
-import org.basex.index.IndexStats;
-import org.basex.index.IndexToken;
-import org.basex.io.random.DataAccess;
-import org.basex.util.Levenshtein;
-import org.basex.util.Num;
-import org.basex.util.Performance;
-import org.basex.util.TokenBuilder;
-import org.basex.util.Util;
-import org.basex.util.ft.FTLexer;
-import org.basex.util.hash.TokenIntMap;
+
+import java.io.*;
+
+import org.basex.core.*;
+import org.basex.data.*;
+import org.basex.index.*;
+import org.basex.index.IndexCache.CacheEntry;
+import org.basex.io.random.*;
+import org.basex.util.*;
+import org.basex.util.ft.*;
 
 /**
  * <p>This class provides access to a fuzzy full-text index structure
@@ -52,7 +47,7 @@ final class FTFuzzy extends FTIndex {
   /** Entry size. */
   private static final int ENTRY = 9;
   /** Token positions. */
-  private final int[] tp;
+  final int[] tp;
   /** Levenshtein reference. */
   private final Levenshtein ls = new Levenshtein();
 
@@ -60,9 +55,9 @@ final class FTFuzzy extends FTIndex {
    * on the first token with this length. */
   private final DataAccess inX;
   /** Index storing each token, its data size and pointer on the data. */
-  private final DataAccess inY;
+  final DataAccess inY;
   /** Storing pre and pos values for each token. */
-  private final DataAccess inZ;
+  final DataAccess inZ;
 
   /**
    * Constructor, initializing the index structure.
@@ -82,13 +77,13 @@ final class FTFuzzy extends FTIndex {
     while(--is >= 0) {
       int p = inX.readNum();
       final int r;
-      // legacy issue (7.0.2 -> 7.1)
-      if(p >= 4096) {
+      if(p < tp.length) {
+        r = inX.read4();
+      } else {
+        // legacy issue (7.0.2 -> 7.1)
         r = p << 24 | (inX.read1() & 0xFF) << 16 |
             (inX.read1() & 0xFF) << 8 | inX.read1() & 0xFF;
         p = p >> 8 | 0x40;
-      } else {
-        r = inX.read4();
       }
       tp[p] = r;
     }
@@ -104,8 +99,8 @@ final class FTFuzzy extends FTIndex {
     if(lex.ftOpt().is(FZ)) return Math.max(1, data.meta.size / 10);
 
     final byte[] tok = lex.get();
-    final int id = cache.id(tok);
-    if(id > 0) return cache.size(id);
+    final CacheEntry e = cache.get(tok);
+    if(e != null) return e.size;
 
     int s = 0;
     long poi = 0;
@@ -130,42 +125,84 @@ final class FTFuzzy extends FTIndex {
     }
 
     // return cached or new result
-    final int id = cache.id(tok);
-    if(id == 0) {
-      final int p = token(tok);
-      return p > -1 ? iter(pointer(p, tok.length),
-          size(p, tok.length), inZ, false) : FTIndexIterator.FTEMPTY;
-    }
-    return iter(cache.pointer(id), cache.size(id), inZ, false);
+    final CacheEntry e = cache.get(tok);
+    if(e != null) return iter(e.pointer, e.size, inZ, false);
+
+    final int p = token(tok);
+    return p > -1 ? iter(pointer(p, tok.length),
+        size(p, tok.length), inZ, false) : FTIndexIterator.FTEMPTY;
   }
 
   @Override
-  public TokenIntMap entries(final byte[] prefix) {
-    final TokenIntMap tim = new TokenIntMap();
+  public EntryIterator entries(final byte[] prefix) {
+    return new EntryIterator() {
+      int ti = prefix.length - 1, i, e, nr;
+      boolean inner;
 
-    for(int s = prefix.length; s < tp.length - 1; s++) {
-      int p = tp[s];
-      if(p == -1) continue;
-      int i = s + 1;
-      int r;
-      do r = tp[i++]; while(r == -1);
-      inY.cursor(p);
-      boolean f = false;
-      while(p < r) {
-        final byte[] tok = inY.readBytes(s);
-        final long poi = inY.read5();
-        final int size = inY.read4();
-        cache.add(tok, size, poi);
-        if(startsWith(tok, prefix)) {
-          tim.add(tok, size);
-          f = true;
-        } else if(f) {
-          break;
+      @Override
+      public synchronized byte[] next() {
+        if(inner) {
+          // loop through all entries with the same character length
+          if(i < e) {
+            final byte[] entry = inY.readBytes(i, ti);
+            if(startsWith(entry, prefix)) {
+              final long poi = inY.read5();
+              nr = inY.read4();
+              if(prefix.length != 0) cache.add(entry, nr, poi);
+              i += ti + ENTRY;
+              return entry;
+            }
+          }
         }
-        p += s + ENTRY;
+        // find next available entry group
+        while(++ti < tp.length - 1) {
+          i = tp[ti];
+          if(i != -1) {
+            int c = ti + 1;
+            do e = tp[c++]; while(e == -1);
+            nr = 0;
+            inner = true;
+            i = find(prefix, i, e, ti);
+            // jump to inner loop
+            final byte[] n = next();
+            if(n != null) return n;
+          }
+        }
+        // all entries processed: return null
+        return null;
       }
+      @Override
+      public int count() {
+        return nr;
+      }
+    };
+  }
+
+  /**
+   * Binary search.
+   * @param key key to be found
+   * @param i start position
+   * @param e end position
+   * @param ti entry length
+   * @return position where the key was found, or would have been found
+   */
+  int find(final byte[] key, final int i, final int e, final int ti) {
+    final int tl = ti + ENTRY;
+    int l = 0, h = (e - i) / tl;
+    while(l <= h) {
+      final int m = l + h >>> 1;
+      final int p = i + m * tl;
+      byte[] txt = ctext.get(p);
+      if(txt == null) {
+        txt = inY.readBytes(p, ti);
+        ctext.add(p, txt);
+      }
+      final int d = diff(txt, key);
+      if(d == 0) return i + m + tl;
+      if(d < 0) l = m + 1;
+      else h = m - 1;
     }
-    return tim;
+    return i + l * tl;
   }
 
   @Override
@@ -187,7 +224,7 @@ final class FTFuzzy extends FTIndex {
   }
 
   @Override
-  public synchronized void close() throws IOException {
+  public synchronized void close() {
     inX.close();
     inY.close();
     inZ.close();

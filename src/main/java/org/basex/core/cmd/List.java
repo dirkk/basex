@@ -3,19 +3,15 @@ package org.basex.core.cmd;
 import static org.basex.core.Text.*;
 import static org.basex.data.DataText.*;
 
-import java.io.IOException;
-import java.util.regex.Pattern;
+import java.io.*;
+import java.util.regex.*;
 
-import org.basex.core.Context;
-import org.basex.core.Command;
-import org.basex.core.User;
-import org.basex.data.MetaData;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
+import org.basex.core.*;
+import org.basex.data.*;
+import org.basex.io.*;
 import org.basex.io.in.DataInput;
-import org.basex.util.Table;
-import org.basex.util.list.StringList;
-import org.basex.util.list.TokenList;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'list' command and shows all available databases.
@@ -32,7 +28,7 @@ public final class List extends Command {
    * Default constructor.
    */
   public List() {
-    super(STANDARD);
+    super(Perm.NONE);
   }
 
   @Override
@@ -40,13 +36,13 @@ public final class List extends Command {
     final Table table = new Table();
     table.description = DATABASES;
 
-    final boolean create = context.user.perm(User.CREATE);
+    final boolean create = context.user.has(Perm.CREATE);
     table.header.add(T_NAME);
     table.header.add(RESOURCES);
     table.header.add(SIZE);
     if(create) table.header.add(INPUT_PATH);
 
-    for(final String name : list(context)) {
+    for(final String name : context.databases().listDBs()) {
       DataInput di = null;
       String file = null;
       long size = 0;
@@ -57,7 +53,7 @@ public final class List extends Command {
         meta.read(di);
         size = meta.dbsize();
         docs = meta.ndocs;
-        if(context.perm(User.READ, meta)) file = meta.original;
+        if(context.perm(Perm.READ, meta)) file = meta.original;
       } catch(final IOException ex) {
         file = ERROR;
       } finally {

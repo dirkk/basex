@@ -1,65 +1,19 @@
-package org.basex.test.server;
+package org.basex.test.core;
 
 import static org.basex.util.Token.*;
 import static org.junit.Assert.*;
 
-import java.io.IOException;
+import java.io.*;
 
-import org.basex.core.Command;
+import org.basex.core.*;
 import org.basex.core.Commands.CmdIndex;
-import org.basex.core.Context;
-import org.basex.core.MainProp;
-import org.basex.core.Prop;
-import org.basex.core.Text;
-import org.basex.core.cmd.Add;
-import org.basex.core.cmd.AlterDB;
-import org.basex.core.cmd.AlterUser;
-import org.basex.core.cmd.Close;
-import org.basex.core.cmd.CreateBackup;
-import org.basex.core.cmd.CreateDB;
-import org.basex.core.cmd.CreateIndex;
-import org.basex.core.cmd.CreateUser;
-import org.basex.core.cmd.Cs;
-import org.basex.core.cmd.Delete;
-import org.basex.core.cmd.DropBackup;
-import org.basex.core.cmd.DropDB;
-import org.basex.core.cmd.DropIndex;
-import org.basex.core.cmd.DropUser;
-import org.basex.core.cmd.Export;
-import org.basex.core.cmd.Find;
-import org.basex.core.cmd.Flush;
-import org.basex.core.cmd.Get;
-import org.basex.core.cmd.Grant;
-import org.basex.core.cmd.Help;
-import org.basex.core.cmd.Info;
-import org.basex.core.cmd.InfoDB;
-import org.basex.core.cmd.InfoIndex;
-import org.basex.core.cmd.InfoStorage;
-import org.basex.core.cmd.List;
-import org.basex.core.cmd.ListDB;
-import org.basex.core.cmd.Open;
-import org.basex.core.cmd.Optimize;
-import org.basex.core.cmd.OptimizeAll;
-import org.basex.core.cmd.Password;
-import org.basex.core.cmd.Rename;
-import org.basex.core.cmd.Replace;
-import org.basex.core.cmd.Restore;
-import org.basex.core.cmd.Retrieve;
-import org.basex.core.cmd.Run;
-import org.basex.core.cmd.Set;
-import org.basex.core.cmd.ShowBackups;
-import org.basex.core.cmd.ShowUsers;
-import org.basex.core.cmd.Store;
-import org.basex.core.cmd.XQuery;
-import org.basex.data.Nodes;
-import org.basex.io.IOFile;
-import org.basex.server.LocalSession;
-import org.basex.server.Session;
-import org.basex.util.Util;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.basex.core.cmd.*;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.server.*;
+import org.basex.test.*;
+import org.basex.util.*;
+import org.junit.*;
 
 /**
  * This class tests the database commands.
@@ -67,17 +21,13 @@ import org.junit.Test;
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
  */
-public class CommandTest {
-  /** Database context. */
-  static final Context CONTEXT = new Context();
+public class CommandTest extends SandboxTest {
   /** Test file name. */
   private static final String FN = "input.xml";
   /** Test folder. */
   private static final String FLDR = "src/test/resources";
   /** Test file. */
   private static final String FILE = FLDR + '/' + FN;
-  /** Test name. */
-  private static final String NAME = Util.name(CommandTest.class);
   /** Test name. */
   static final String NAME2 = NAME + '2';
   /** Socket reference. */
@@ -88,8 +38,7 @@ public class CommandTest {
   */
   @BeforeClass
   public static void start() throws IOException {
-    CONTEXT.mprop.set(MainProp.DBPATH, sandbox().path());
-    session = new LocalSession(CONTEXT);
+    session = new LocalSession(context);
     cleanUp();
   }
 
@@ -108,31 +57,12 @@ public class CommandTest {
   }
 
   /**
-   * Removes test databases and closes the database context.
-   * @throws IOException I/O exception
-   */
-  @AfterClass
-  @SuppressWarnings("unused")
-  public static void finish() throws IOException {
-    assertTrue(sandbox().delete());
-    CONTEXT.close();
-  }
-
-  /**
    * Creates the database.
    * @throws IOException I/O exception
    */
   @After
   public final void after() throws IOException {
     cleanUp();
-  }
-
-  /**
-   * Returns the temporary database path.
-   * @return database path
-   */
-  static IOFile sandbox() {
-    return new IOFile(Prop.TMP, NAME);
   }
 
   /** Command test. */
@@ -241,11 +171,11 @@ public class CommandTest {
     no(new Cs("//li"));
     ok(new CreateDB(NAME, FILE));
     ok(new Cs("//  li"));
-    ok(CONTEXT.current(), 2);
+    ok(context.current(), 2);
     ok(new Cs("."));
-    ok(CONTEXT.current(), 2);
+    ok(context.current(), 2);
     ok(new Cs("/"));
-    ok(CONTEXT.current(), 1);
+    ok(context.current(), 1);
   }
 
   /** Command test. */
@@ -511,11 +441,6 @@ public class CommandTest {
     no(new Restore("test"));
     ok(new DropBackup("test-1"));
     ok(new DropDB("test-1"));
-    // deleting a backup passing the exact backup name as argument
-    ok(new CreateDB(NAME));
-    ok(new CreateBackup(NAME));
-    ok(new DropBackup(ShowBackups.list(NAME, false, CONTEXT).get(0)));
-    assertEquals(0, ShowBackups.list(NAME, false, CONTEXT).size());
   }
 
   /**
@@ -528,24 +453,14 @@ public class CommandTest {
     ok(new CreateBackup(NAME));
     ok(new DropBackup(NAME));
 
-    // dropping a specific backup (database name + time stamp)
-    // how to get my hands on the created backup name?
-    ok(new CreateDB(NAME));
-    ok(new CreateBackup(NAME));
-    final String[] b = ShowBackups.list(NAME, false, CONTEXT).toArray();
-    ok(new DropBackup(b[0]));
-    assertEquals(0, ShowBackups.list(NAME, false, CONTEXT).size());
-
     /* Creates 2 dbs: one with a short name (1), the other with a
      * longer name (2). (1) is a prefix of (2). Tests then, whether
-     * backups of both dbs are deleted, when we drop backups of (1).
-     */
+     * backups of both dbs are deleted, when we drop backups of (1). */
     ok(new CreateDB(NAME));
     ok(new CreateDB(NAME2));
     ok(new CreateBackup(NAME));
     ok(new CreateBackup(NAME2));
     ok(new DropBackup(NAME));
-    assertEquals(1, ShowBackups.list(NAME2, false, CONTEXT).size());
   }
 
   /** Retrieves raw data. */

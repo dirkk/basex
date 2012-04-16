@@ -51,8 +51,6 @@ public final class SAXWrapper extends SingleParser {
   private final SAXSource saxs;
   /** File length. */
   private long length;
-  /** Properties. */
-  private final Prop prop;
 
   /**
    * Constructor.
@@ -60,35 +58,29 @@ public final class SAXWrapper extends SingleParser {
    * @param pr Properties
    */
   public SAXWrapper(final SAXSource source, final Prop pr) {
-    this(source, "", "", pr);
+    this(source, "", pr);
   }
 
   /**
    * Constructor.
    * @param source sax source
    * @param name name
-   * @param path target path
    * @param pr Properties
    */
-  public SAXWrapper(final SAXSource source, final String name,
-      final String path, final Prop pr) {
-
-    super(IO.get(source.getSystemId()), path);
+  public SAXWrapper(final SAXSource source, final String name, final Prop pr) {
+    super(IO.get(source.getSystemId()), pr);
     if(!name.isEmpty()) src.name(name);
     saxs = source;
-    prop = pr;
   }
 
   /**
    * Constructor.
    * @param source sax source
-   * @param path target path
    * @param pr Properties
    */
-  public SAXWrapper(final IO source, final String path, final Prop pr) {
-    super(source, path);
+  public SAXWrapper(final IO source, final Prop pr) {
+    super(source, pr);
     saxs = new SAXSource(source.inputSource());
-    prop = pr;
   }
 
   @Override
@@ -108,7 +100,7 @@ public final class SAXWrapper extends SingleParser {
         r = f.newSAXParser().getXMLReader();
       }
 
-      saxh = new SAXHandler(builder);
+      saxh = new SAXHandler(builder, prop.is(Prop.CHOP));
       final String cat = prop.get(Prop.CATFILE);
       if(!cat.isEmpty()) CatalogWrapper.set(r, cat);
 
@@ -207,7 +199,7 @@ public final class SAXWrapper extends SingleParser {
 
   @Override
   public double prog() {
-    return length == 0 ? saxh == null ? 0 : saxh.nodes / 3000000d % 1
-        : (double) counter / length;
+    return length == 0 ? saxh == null ? 0 : saxh.nodes / 3000000d % 1 :
+      (double) counter / length;
   }
 }

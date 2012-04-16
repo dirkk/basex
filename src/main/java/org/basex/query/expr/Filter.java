@@ -10,7 +10,7 @@ import org.basex.query.item.SeqType;
 import org.basex.query.item.SeqType.Occ;
 import org.basex.query.item.Value;
 import org.basex.query.iter.Iter;
-import org.basex.query.iter.ItemCache;
+import org.basex.query.iter.ValueBuilder;
 import org.basex.query.path.AxisPath;
 import org.basex.query.util.Var;
 import org.basex.util.Array;
@@ -75,7 +75,7 @@ public class Filter extends Preds {
       if(size == 0) return optPre(null, ctx);
       type = SeqType.get(t.type, size);
     } else {
-      type = SeqType.get(t.type, t.zeroOrOne() ? Occ.ZO : Occ.ZM);
+      type = SeqType.get(t.type, t.zeroOrOne() ? Occ.ZERO_ONE : Occ.ZERO_MORE);
     }
 
     // no numeric predicates.. use simple iterator
@@ -96,7 +96,7 @@ public class Filter extends Preds {
       final Expr p = preds[0];
       final SeqType st = p.type();
       off = st.type.isNumber() && st.zeroOrOne() && !p.uses(Use.CTX) && !p.uses(Use.NDT);
-      if(off) type = SeqType.get(type.type, Occ.ZO);
+      if(off) type = SeqType.get(type.type, Occ.ZERO_ONE);
     }
 
     // iterator for simple numeric predicate
@@ -112,23 +112,23 @@ public class Filter extends Preds {
 
     try {
       // cache results to support last() function
-      final ItemCache ic = new ItemCache();
-      for(Item i; (i = iter.next()) != null;) ic.add(i);
+      final ValueBuilder vb = new ValueBuilder();
+      for(Item i; (i = iter.next()) != null;) vb.add(i);
 
       // evaluate predicates
       for(final Expr p : preds) {
-        final long is = ic.size();
+        final long is = vb.size();
         ctx.size = is;
         ctx.pos = 1;
         int c = 0;
         for(int s = 0; s < is; ++s) {
-          ctx.value = ic.get(s);
-          if(p.test(ctx, input) != null) ic.set(ic.get(s), c++);
+          ctx.value = vb.get(s);
+          if(p.test(ctx, info) != null) vb.set(vb.get(s), c++);
           ctx.pos++;
         }
-        ic.size(c);
+        vb.size(c);
       }
-      return ic;
+      return vb;
     } finally {
       ctx.value = cv;
       ctx.size = cs;

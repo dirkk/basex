@@ -86,7 +86,7 @@ public final class FNSeq extends StandardFunc {
       if(outer) {
         // skip the subtree of the last added node
         nc.size(0);
-        final DBNode dummy = new DBNode(fst.data, 0);
+        final DBNode dummy = new DBNode(fst.data);
         final NodeCache src = new NodeCache(nodes, len);
         for(int next = 0, p; next < len; next = p < 0 ? -p - 1 : p) {
           final DBNode nd = (DBNode) nodes[next];
@@ -136,12 +136,12 @@ public final class FNSeq extends StandardFunc {
 
     // all other types will return existing types
     final Type t = expr[0].type().type;
-    Occ o = Occ.ZM;
+    Occ o = Occ.ZERO_MORE;
     // at most one returned item
-    if(sig == Function.SUBSEQUENCE && expr[0].type().one()) o = Occ.ZO;
+    if(sig == Function.SUBSEQUENCE && expr[0].type().one()) o = Occ.ZERO_ONE;
 
     // head will return at most one item
-    else if(sig == Function.HEAD) o = Occ.ZO;
+    else if(sig == Function.HEAD) o = Occ.ZERO_ONE;
     type = SeqType.get(t, o);
 
     // pre-evaluate distinct values
@@ -175,12 +175,12 @@ public final class FNSeq extends StandardFunc {
       // check if distinct values are available
       if(pn.stats.type != StatsType.CATEGORY) return this;
       // if yes, add them to the item set
-      for(final byte[] c : pn.stats.cats) is.index(input, new Atm(c));
+      for(final byte[] c : pn.stats.cats) is.index(info, new Atm(c));
     }
     // return resulting sequence
-    final ItemCache ic = new ItemCache(is.size());
-    for(final Item i : is) ic.add(i);
-    return ic.value();
+    final ValueBuilder vb = new ValueBuilder(is.size());
+    for(final Item i : is) vb.add(i);
+    return vb.value();
   }
 
   /**
@@ -191,7 +191,7 @@ public final class FNSeq extends StandardFunc {
    */
   private Item head(final QueryContext ctx) throws QueryException {
     final Expr e = expr[0];
-    return e.type().zeroOrOne() ? e.item(ctx, input) : e.iter(ctx).next();
+    return e.type().zeroOrOne() ? e.item(ctx, info) : e.iter(ctx).next();
   }
 
   /**
@@ -235,7 +235,7 @@ public final class FNSeq extends StandardFunc {
           final Item i = ir.next();
           if(i == null) return null;
           ++c;
-          if(i.comparable(it) && OpV.EQ.eval(input, i, it)) return Int.get(c);
+          if(i.comparable(it) && OpV.EQ.eval(info, i, it)) return Int.get(c);
         }
       }
     };
@@ -260,8 +260,8 @@ public final class FNSeq extends StandardFunc {
           Item i = ir.next();
           if(i == null) return null;
           ctx.checkStop();
-          i = atom(i);
-          if(map.index(input, i)) return i;
+          i = atom(i, info);
+          if(map.index(info, i)) return i;
         }
       }
     };

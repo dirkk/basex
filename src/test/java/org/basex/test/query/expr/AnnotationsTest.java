@@ -1,8 +1,8 @@
 package org.basex.test.query.expr;
 
-import org.basex.query.util.Err;
-import org.basex.test.query.AdvancedQueryTest;
-import org.junit.Test;
+import org.basex.query.util.*;
+import org.basex.test.query.*;
+import org.junit.*;
 
 /**
  * Annotations tests.
@@ -40,7 +40,14 @@ public final class AnnotationsTest extends AdvancedQueryTest {
     error("declare namespace a='a';declare %a:a() variable $x:=1; $x", Err.ANNVALUE);
     error("declare %unknown local:x() { 1 }; local:x(); $x", Err.ANNRES);
     error("declare %pfff:public variable $x := 1; $x", Err.NOURI);
-    error("declare %public %public variable $x := 1; $x", Err.ANNVIS);
+    error("declare %public %public variable $x := 1; $x", Err.DUPLVIS);
+    error("declare %public %private variable $x := 1; $x", Err.DUPLVIS);
+    error("declare %updating variable $x := 1; $x", Err.UPDATINGVAR);
+    error("declare %updating function local:x() { 1 }; local:x()", Err.UPEXPECTF);
+    error("declare %updating updating function local:x() " +
+        "{ insert node <a/> into <b/> }; local:x()", Err.DUPLUPD);
+    error("declare updating %updating function local:x() " +
+        "{ insert node <a/> into <b/> }; local:x()", Err.DUPLUPD);
   }
 
   /**  Test for empty-sequence() as function item. */

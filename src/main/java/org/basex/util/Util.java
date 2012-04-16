@@ -2,20 +2,14 @@ package org.basex.util;
 
 import static org.basex.core.Text.*;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.BindException;
-import java.net.ConnectException;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
-import java.security.ProtectionDomain;
-import java.util.Scanner;
+import java.io.*;
+import java.net.*;
+import java.text.*;
+import java.util.*;
 
-import org.basex.core.Prop;
-import org.basex.io.IO;
-import org.basex.server.LoginException;
-import org.basex.util.list.StringList;
+import org.basex.core.*;
+import org.basex.server.*;
+import org.basex.util.list.*;
 
 /**
  * This class contains static methods, which are used throughout the project.
@@ -28,12 +22,6 @@ import org.basex.util.list.StringList;
 public final class Util {
   /** Flag for using default standard input. */
   private static final boolean NOCONSOLE = System.console() == null;
-  /** Language (applied after restart). */
-  public static String language = Prop.LANG;
-  /** Flag for showing language keys. */
-  public static boolean langkeys;
-  /** Debug mode. */
-  public static boolean debug;
 
   /** Hidden constructor. */
   private Util() { }
@@ -62,9 +50,9 @@ public final class Util {
    * @return runtime exception (indicates that an error is raised)
    */
   public static RuntimeException notexpected(final Object... ext) {
-    final TokenBuilder tb = new TokenBuilder("Not expected");
-    if(ext.length != 0) tb.addExt(": %", ext);
-    throw new RuntimeException(tb.add('.').toString());
+    final TokenBuilder tb = new TokenBuilder();
+    tb.addExt("%", ext.length == 0 ? "Not Expected." : ext[0]);
+    throw new RuntimeException(tb.toString());
   }
 
   /**
@@ -75,7 +63,7 @@ public final class Util {
   public static RuntimeException notimplemented(final Object... ext) {
     final TokenBuilder tb = new TokenBuilder("Not Implemented");
     if(ext.length != 0) tb.addExt(" (%)", ext);
-    throw new RuntimeException(tb.add('.').toString());
+    throw new UnsupportedOperationException(tb.add('.').toString());
   }
 
   /**
@@ -166,14 +154,14 @@ public final class Util {
    * @return error message
    */
   public static String message(final Throwable ex) {
-    debug(ex);
     final String msg = ex.getMessage();
     if(ex instanceof BindException) return SRV_RUNNING;
+    else if(ex instanceof FileNotFoundException) return info(RESOURCE_NOT_FOUND_X, msg);
     else if(ex instanceof LoginException) return ACCESS_DENIED;
     else if(ex instanceof ConnectException) return CONNECTION_ERROR;
     else if(ex instanceof SocketTimeoutException) return TIMEOUT_EXCEEDED;
     else if(ex instanceof SocketException) return CONNECTION_ERROR;
-    else if(ex instanceof UnknownHostException) return info(UNKNOWN_HOST, msg);
+    else if(ex instanceof UnknownHostException) return info(UNKNOWN_HOST_X, msg);
     return msg != null && !msg.isEmpty() ? msg : ex.toString();
   }
 
@@ -183,7 +171,7 @@ public final class Util {
    * @return always false
    */
   public static boolean debug(final Throwable ex) {
-    if(debug && ex != null) stack(ex);
+    if(Prop.debug && ex != null) stack(ex);
     return false;
   }
 
@@ -193,7 +181,7 @@ public final class Util {
    * @param ext text optional extensions
    */
   public static void debug(final Object str, final Object... ext) {
-    if(debug) errln(str, ext);
+    if(Prop.debug) errln(str, ext);
   }
 
   /**
@@ -201,7 +189,7 @@ public final class Util {
    * @param perf performance reference
    */
   public static void memory(final Performance perf) {
-    if(!debug) return;
+    if(!Prop.debug) return;
     errln(" " + perf + " (" + Performance.getMemory() + ')');
   }
 
@@ -270,90 +258,21 @@ public final class Util {
   }
 
   /**
-   * <p>Determines the project's home directory for storing property files
-   * and directories. The directory is chosen as follows:</p>
-   * <ol>
-   * <li>First, the <b>system property</b> {@code "org.basex.path"} is checked.
-   *   If it contains a value, it is chosen as directory path.</li>
-   * <li>If not, the <b>current user directory</b> (defined by the system
-   *   property {@code "user.dir"}) is chosen if the {@code .basex}
-   *   configuration file is found in this directory.</li>
-   * <li>Otherwise, the configuration file is searched in the <b>application
-   *   directory</b> (the folder in which the project is located).</li>
-   * <li>In all other cases, the <b>user's home directory</b> (defined in
-   *   {@code "user.home"}) is chosen.</li>
-   * </ol>
-   * @return home directory
-   */
-  public static String homeDir() {
-    // check user specific property
-    String path = System.getProperty("org.basex.path");
-    if(path != null) return path + File.separator;
-
-    // check working directory for property file
-    path = System.getProperty("user.dir");
-    File config = new File(path, IO.BASEXSUFFIX);
-    if(config.exists()) return config.getParent() + File.separator;
-
-    // not found; check application directory
-    path = applicationPath();
-    if(path != null) {
-      final File app = new File(path);
-      final String dir = app.isFile() ? app.getParent() : app.getPath();
-      config = new File(dir, IO.BASEXSUFFIX);
-      if(config.exists()) return config.getParent() + File.separator;
-    }
-
-    // not found; choose user home directory as default
-    return Prop.USERHOME;
-  }
-
-  /**
-   * Returns the absolute path to this application, or {@code null} if the
-   * path cannot be evaluated.
-   * @return application path.
-   */
-  private static String applicationPath() {
-    final ProtectionDomain pd = Util.class.getProtectionDomain();
-    if(pd == null) return null;
-    // raw application path
-    final String path = pd.getCodeSource().getLocation().getPath();
-    // decode path; URLDecode returns wrong results
-    final TokenBuilder tb = new TokenBuilder();
-    final int pl = path.length();
-    for(int p = 0; p < pl; ++p) {
-      final char ch = path.charAt(p);
-      if(ch == '%' && p + 2 < pl) {
-        tb.addByte((byte) Integer.parseInt(path.substring(p + 1, p + 3), 16));
-        p += 2;
-      } else {
-        tb.add(ch);
-      }
-    }
-    try {
-      // return path, using the correct encoding
-      return new String(tb.finish(), Prop.ENCODING);
-    } catch(final Exception ex) {
-      // use default path; not expected to occur
-      stack(ex);
-      return tb.toString();
-    }
-  }
-
-  /**
    * Starts the specified class in a separate process.
    * @param clz class to start
    * @param args command-line arguments
+   * @return reference to a {@link Process} instance representing the started process
    */
-  public static void start(final Class<?> clz, final String... args) {
+  public static Process start(final Class<?> clz, final String... args) {
     final String[] largs = { "java", "-Xmx" + Runtime.getRuntime().maxMemory(),
         "-cp", System.getProperty("java.class.path"), clz.getName(), "-D", };
     final StringList sl = new StringList().add(largs).add(args);
 
     try {
-      new ProcessBuilder(sl.toArray()).start();
+      return new ProcessBuilder(sl.toArray()).start();
     } catch(final IOException ex) {
       notexpected(ex);
+      return null;
     }
   }
 
@@ -382,5 +301,27 @@ public final class Util {
    */
   public static String flag(final boolean flag) {
     return flag ? INFOON : INFOOFF;
+  }
+
+  /**
+   * Thread-safe method to create a string from a given date in a given format.
+   * @param format date format
+   * @param date date
+   * @return string with the formatted date
+   */
+  public static String formatDate(final Date date, final DateFormat format) {
+    synchronized(format) { return format.format(date); }
+  }
+
+  /**
+   * Thread-safe method to parse a date from a string in a given format.
+   * @param date string represnting a date
+   * @param format date format
+   * @return parsed date
+   * @throws ParseException if the string cannot be parsed
+   */
+  public static Date parseDate(final String date, final DateFormat format)
+      throws ParseException {
+    synchronized(format) { return format.parse(date); }
   }
 }

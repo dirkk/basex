@@ -1,18 +1,17 @@
 package org.basex.build.file;
 
-import static org.basex.util.Token.*;
 import static org.basex.core.Text.*;
-import java.io.IOException;
-import java.util.Locale;
+import static org.basex.util.Token.*;
 
-import org.basex.build.SingleParser;
-import org.basex.core.BaseXException;
-import org.basex.core.Prop;
-import org.basex.io.IO;
-import org.basex.io.in.NewlineInput;
-import org.basex.util.TokenBuilder;
-import org.basex.util.XMLToken;
-import org.basex.util.list.TokenList;
+import java.io.*;
+import java.util.*;
+
+import org.basex.build.*;
+import org.basex.core.*;
+import org.basex.io.*;
+import org.basex.io.in.*;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * This class parses files in the CSV format
@@ -79,25 +78,23 @@ public final class CSVParser extends SingleParser {
   /**
    * Constructor.
    * @param source document source
-   * @param target target path
-   * @param prop database properties
+   * @param pr database properties
    * @throws IOException I/O exception
    */
-  public CSVParser(final IO source, final String target, final Prop prop)
-      throws IOException {
-
-    super(source, target);
+  public CSVParser(final IO source, final Prop pr) throws IOException {
+    super(source, pr);
 
     // set parser properties
-    final ParserProp props = new ParserProp(prop.get(Prop.PARSEROPT));
+    final ParserProp props = new ParserProp(pr.get(Prop.PARSEROPT));
     row = props.is(ParserProp.HEADER) ? 0 : 1;
 
     // set separator
     String s = props.get(ParserProp.SEPARATOR).toLowerCase(Locale.ENGLISH);
     separator = s.equals(SEPARATORS[0]) ? ',' : s.equals(SEPARATORS[1]) ? ';' :
       s.equals(SEPARATORS[2]) ? '\t' : -1;
-    if(separator == -1) throw new BaseXException(
-        INVALID_VALUE_X_X, ParserProp.SEPARATOR[0], s);
+
+    if(separator == -1) throw new BaseXException(INVALID_VALUE_X_X,
+        ParserProp.SEPARATOR[0], s);
 
     // set XML format
     s = props.get(ParserProp.FORMAT).toLowerCase(Locale.ENGLISH);
@@ -112,7 +109,7 @@ public final class CSVParser extends SingleParser {
     builder.startElem(CSV, atts);
 
     final TokenBuilder tb = new TokenBuilder();
-    final NewlineInput nli = new NewlineInput(src, encoding);
+    final NewlineInput nli = new NewlineInput(src).encoding(encoding);
 
     boolean quoted = false, open = true;
     int ch = -1;
@@ -168,11 +165,9 @@ public final class CSVParser extends SingleParser {
    * @param open open flag
    * @throws IOException I/O exception
    */
-  private void finish(final TokenBuilder tb, final boolean open)
-      throws IOException {
-
+  private void finish(final TokenBuilder tb, final boolean open) throws IOException {
     boolean close = !open;
-    if(open && tb.size() != 0) {
+    if(open && !tb.isEmpty()) {
       open();
       close = true;
     }
@@ -204,7 +199,7 @@ public final class CSVParser extends SingleParser {
       t = headers.get(col);
     }
 
-    if(tb.size() != 0 || simple) {
+    if(!tb.isEmpty() || simple) {
       builder.startElem(t, atts);
       builder.text(tb.finish());
       builder.endElem();
@@ -226,7 +221,7 @@ public final class CSVParser extends SingleParser {
         XMLToken.isNCChar(cp)) ? cp : '_');
     }
     // no valid characters found: add default column name
-    if(nm.size() == 0) nm.add(COLUMN);
+    if(nm.isEmpty()) nm.add(COLUMN);
 
     // tag exists: attach enumerator
     byte[] fb = nm.finish();

@@ -51,14 +51,14 @@ public final class Cast extends Single {
       if(e != this) optPre(e, ctx);
     }
     // adopt occurrence of argument
-    if(e == this && t.one()) type = SeqType.get(type.type, Occ.O);
+    if(e == this && t.one()) type = SeqType.get(type.type, Occ.ONE);
     return e;
   }
 
   @Override
   public Item item(final QueryContext ctx, final InputInfo ii)
       throws QueryException {
-    return type.cast(expr.item(ctx, ii), this, true, ctx, ii);
+    return type.cast(expr.item(ctx, ii), true, ctx, ii, this);
   }
 
   @Override

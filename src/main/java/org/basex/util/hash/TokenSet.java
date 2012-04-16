@@ -8,6 +8,7 @@ import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
 import org.basex.util.TokenBuilder;
 import org.basex.util.Util;
+import org.basex.util.list.*;
 
 /**
  * This is an efficient hash set, storing keys in byte arrays.
@@ -18,11 +19,11 @@ import org.basex.util.Util;
  */
 public class TokenSet implements Iterable<byte[]> {
   /** Initial hash capacity. */
-  protected static final int CAP = 1 << 3;
+  protected static final int CAP = ElementList.CAP;
   /** Hash entries. Note: actual number of entries is {@code size - 1}. */
-  protected int size = 1;
+  public int size = 1;
   /** Hashed keys. */
-  protected byte[][] keys;
+  public byte[][] keys;
 
   /** Pointers to the next token. */
   private int[] next;
@@ -36,6 +37,15 @@ public class TokenSet implements Iterable<byte[]> {
     keys = new byte[CAP][];
     next = new int[CAP];
     bucket = new int[CAP];
+  }
+
+  /**
+   * Constructor.
+   * @param token initial token
+   */
+  public TokenSet(final byte[] token) {
+    this();
+    add(token);
   }
 
   /**
@@ -123,6 +133,15 @@ public class TokenSet implements Iterable<byte[]> {
   }
 
   /**
+   * Checks if the set contains the specified key.
+   * @param key key to be found
+   * @return result of check
+   */
+  public final boolean contains(final byte[] key) {
+    return id(key) != 0;
+  }
+
+  /**
    * Returns the id of the specified key or 0 if the key does not exist.
    * @param key key to be found
    * @return id or 0 if nothing was found
@@ -163,6 +182,14 @@ public class TokenSet implements Iterable<byte[]> {
   }
 
   /**
+   * Tests is the container has no elements.
+   * @return result of check
+   */
+  public final boolean isEmpty() {
+    return size == 1;
+  }
+
+  /**
    * Resizes the hash table.
    */
   protected void rehash() {
@@ -170,7 +197,7 @@ public class TokenSet implements Iterable<byte[]> {
     final int[] tmp = new int[s];
 
     final int l = bucket.length;
-    for(int i = 0; i != l; ++i) {
+    for(int i = 0; i < l; ++i) {
       int id = bucket[i];
       while(id != 0) {
         final int p = hash(keys[id]) & s - 1;

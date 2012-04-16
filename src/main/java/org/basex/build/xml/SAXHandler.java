@@ -3,7 +3,7 @@ package org.basex.build.xml;
 import static org.basex.util.Token.*;
 import java.io.IOException;
 import org.basex.build.Builder;
-import org.basex.util.Atts;
+import org.basex.util.*;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.ext.LexicalHandler;
@@ -22,6 +22,8 @@ final class SAXHandler extends DefaultHandler implements LexicalHandler {
   private final Builder builder;
   /** DTD flag. */
   private boolean dtd;
+  /** Whitespace chopping. */
+  private final boolean chop;
   /** Element counter. */
   int nodes;
 
@@ -35,9 +37,11 @@ final class SAXHandler extends DefaultHandler implements LexicalHandler {
   /**
    * Constructor.
    * @param build builder reference
+   * @param ch chopping flag
    */
-  SAXHandler(final Builder build) {
+  SAXHandler(final Builder build, final boolean ch) {
     builder = build;
+    chop = ch;
   }
 
   @Override
@@ -89,9 +93,7 @@ final class SAXHandler extends DefaultHandler implements LexicalHandler {
   }
 
   @Override
-  public void comment(final char[] ch, final int s, final int l)
-      throws SAXException {
-
+  public void comment(final char[] ch, final int s, final int l) throws SAXException {
     if(dtd) return;
     try {
       finishText();
@@ -101,9 +103,6 @@ final class SAXHandler extends DefaultHandler implements LexicalHandler {
     }
   }
 
-  /** Temporary token builder.
-  private final TokenBuilder tb = new TokenBuilder();
-   */
   /** Temporary string builder for high surrogates. */
   private final StringBuilder sb = new StringBuilder();
   /** Temporary namespaces. */
@@ -114,9 +113,9 @@ final class SAXHandler extends DefaultHandler implements LexicalHandler {
    * @throws IOException I/O exception
    */
   private void finishText() throws IOException {
-    final boolean sur = sb.length() != 0;
-    if(sb.length() != 0 || sur) {
-      builder.text(token(sb.toString()));
+    if(sb.length() != 0) {
+      final String s = sb.toString();
+      builder.text(token(chop ? s.trim() : s));
       sb.setLength(0);
     }
     for(int i = 0; i < ns.size(); ++i) {
@@ -131,7 +130,7 @@ final class SAXHandler extends DefaultHandler implements LexicalHandler {
    * @throws SAXException SAX exception
    */
   private static void error(final IOException ex) throws SAXException {
-    final SAXException ioe = new SAXException(ex.getMessage());
+    final SAXException ioe = new SAXException(Util.message(ex));
     ioe.setStackTrace(ex.getStackTrace());
     throw ioe;
   }

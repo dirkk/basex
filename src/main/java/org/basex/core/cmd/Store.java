@@ -2,19 +2,14 @@ package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
+import java.io.*;
 
-import org.basex.core.CommandBuilder;
-import org.basex.core.User;
-import org.basex.data.MetaData;
-import org.basex.io.IO;
-import org.basex.io.IOContent;
-import org.basex.io.IOFile;
-import org.basex.io.in.BufferInput;
-import org.basex.io.out.PrintOutput;
-import org.xml.sax.InputSource;
+import org.basex.core.*;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.io.in.*;
+import org.basex.io.out.*;
+import org.xml.sax.*;
 
 /**
  * Evaluates the 'store' command and stores binary content into the database.
@@ -37,20 +32,19 @@ public final class Store extends ACreate {
    * @param input input file
    */
   public Store(final String path, final String input) {
-    super(DATAREF | User.WRITE, path == null ? "" : path, input);
+    super(Perm.WRITE, true, path == null ? "" : path, input);
   }
 
   @Override
   protected boolean run() {
-    final boolean create = context.user.perm(User.CREATE);
+    final boolean create = context.user.has(Perm.CREATE);
     String path = MetaData.normPath(args[0]);
-    if(path == null || path.endsWith("."))
-      return error(NAME_INVALID_X, args[0]);
+    if(path == null || path.endsWith(".")) return error(NAME_INVALID_X, args[0]);
 
     if(in == null) {
       final IO io = IO.get(args[1]);
       if(!io.exists() || io.isDir())
-        return error(FILE_NOT_FOUND_X, create ? io : args[1]);
+        return error(RESOURCE_NOT_FOUND_X, create ? io : args[1]);
       in = io.inputSource();
       // set/add name of document
       if((path.isEmpty() || path.endsWith("/")) && !(io instanceof IOContent))
@@ -61,19 +55,22 @@ public final class Store extends ACreate {
     if(path.isEmpty()) return error(NAME_INVALID_X, path);
 
     // ensure that the name is not empty and contains no trailing dots
-    final IOFile file = context.data().meta.binary(path);
+    final Data data = context.data();
+    final IOFile file = data.meta.binary(path);
     if(path.isEmpty() || path.endsWith(".") || file == null || file.isDir())
       return error(NAME_INVALID_X, create ? path : args[0]);
 
-    // add directory if it does not exist anyway
-    new IOFile(file.dir()).md();
+    // start update
+    if(!data.startUpdate()) return error(DB_PINNED_X, data.meta.name);
 
     try {
       store(in, file);
+      return info(QUERY_EXECUTED_X, perf);
     } catch(final IOException ex) {
       return error(FILE_NOT_STORED_X, ex.getMessage());
+    } finally {
+      data.finishUpdate();
     }
-    return info(QUERY_EXECUTED_X, perf);
   }
 
   /**
@@ -82,9 +79,7 @@ public final class Store extends ACreate {
    * @param file target file
    * @throws IOException I/O exception
    */
-  public static void store(final InputSource in, final IOFile file)
-      throws IOException {
-
+  public static void store(final InputSource in, final IOFile file) throws IOException {
     // add directory if it does not exist anyway
     new IOFile(file.dir()).md();
 
@@ -98,7 +93,7 @@ public final class Store extends ACreate {
       } else if(is != null) {
         for(int b; (b = is.read()) != -1;) po.write(b);
       } else if(id != null) {
-        final BufferInput bi = IO.get(id).inputStream();
+        final BufferInput bi = new BufferInput(IO.get(id));
         try {
           for(int b; (b = bi.read()) != -1;) po.write(b);
         } finally {
@@ -112,6 +107,6 @@ public final class Store extends ACreate {
 
   @Override
   public void build(final CommandBuilder cb) {
-    cb.init().arg(TO, 0).arg(1);
+    cb.init().arg(C_TO, 0).arg(1);
   }
 }

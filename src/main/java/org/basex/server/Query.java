@@ -21,7 +21,7 @@ import org.basex.util.list.TokenList;
  */
 public abstract class Query {
   /** Client output stream. */
-  OutputStream out;
+  protected OutputStream out;
   /** Cached results. */
   protected TokenList cache;
   /** Cache pointer. */
@@ -41,11 +41,28 @@ public abstract class Query {
    * Binds a value with an optional type to an external variable.
    * @param n name of variable
    * @param v value to be bound
-   * @param t data type
+   * @param t data type (may be {@code null})
    * @throws IOException I/O exception
    */
   public abstract void bind(final String n, final Object v, final String t)
       throws IOException;
+
+  /**
+   * Binds a value to the context item.
+   * @param v value to be bound
+   * @throws IOException I/O exception
+   */
+  public final void context(final Object v) throws IOException {
+    context(v, "");
+  }
+
+  /**
+   * Binds a value with an optional type to an external variable.
+   * @param v value to be bound
+   * @param t data type (may be {@code null})
+   * @throws IOException I/O exception
+   */
+  public abstract void context(final Object v, final String t) throws IOException;
 
   /**
    * Returns {@code true} if more items are available.
@@ -106,6 +123,13 @@ public abstract class Query {
    * @throws IOException I/O exception
    */
   public abstract String options() throws IOException;
+
+  /**
+   * Returns {@code true} if the query may perform updates.
+   * @return updating flag
+   * @throws IOException I/O exception
+   */
+  public abstract boolean updating() throws IOException;
 
   /**
    * Returns query info.

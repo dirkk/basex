@@ -1,24 +1,19 @@
 package org.basex.build;
 
 import static org.basex.data.DataText.*;
-import java.io.IOException;
 
-import org.basex.core.Context;
-import org.basex.core.MainProp;
-import org.basex.core.cmd.DropDB;
-import org.basex.data.Data;
-import org.basex.data.DiskData;
-import org.basex.data.MetaData;
-import org.basex.index.Names;
-import org.basex.io.IO;
+import java.io.*;
+
+import org.basex.core.*;
+import org.basex.core.cmd.*;
+import org.basex.data.*;
+import org.basex.index.*;
+import org.basex.io.*;
 import org.basex.io.in.DataInput;
+import org.basex.io.out.*;
 import org.basex.io.out.DataOutput;
-import org.basex.io.out.TableOutput;
-import org.basex.io.random.TableAccess;
-import org.basex.io.random.TableDiskAccess;
-import org.basex.util.Compress;
-import org.basex.util.Token;
-import org.basex.util.Util;
+import org.basex.io.random.*;
+import org.basex.util.*;
 
 /**
  * This class creates a database instance on disk.
@@ -37,8 +32,8 @@ public final class DiskBuilder extends Builder {
   /** Output stream for temporary values. */
   private DataOutput sout;
 
-  /** Admin properties. */
-  private final MainProp mprop;
+  /** Database context. */
+  final Context context;
   /** Text compressor. */
   private final Compress comp;
 
@@ -49,18 +44,15 @@ public final class DiskBuilder extends Builder {
    * @param ctx database context
    */
   public DiskBuilder(final String nm, final Parser parse, final Context ctx) {
-    super(nm, parse, ctx.prop);
+    super(nm, parse);
     comp = new Compress();
-    mprop = ctx.mprop;
+    context = ctx;
   }
 
   @Override
   public DiskData build() throws IOException {
-    DropDB.drop(name, mprop);
-    mprop.dbpath(name).md();
-
     final IO file = parser.src;
-    final MetaData md = new MetaData(name, prop, mprop);
+    final MetaData md = new MetaData(name, context);
     md.original = file != null ? file.path() : "";
     md.filesize = file != null ? file.length() : 0;
     md.time = file != null ? file.timeStamp() : System.currentTimeMillis();
@@ -71,6 +63,10 @@ public final class DiskBuilder extends Builder {
     int bs = (int) Math.min(md.filesize, Math.min(1 << 22,
         rt.maxMemory() - rt.freeMemory() >> 2));
     bs = Math.max(IO.BLOCKSIZE, bs - bs % IO.BLOCKSIZE);
+
+    // drop old database (if available) and create new one
+    DropDB.drop(name, context);
+    context.mprop.dbpath(name).md();
 
     tout = new DataOutput(new TableOutput(md, DATATBL));
     xout = new DataOutput(md.dbfile(DATATXT), bs);
@@ -83,7 +79,7 @@ public final class DiskBuilder extends Builder {
     close();
 
     // copy temporary values into database table
-    final TableAccess ta = new TableDiskAccess(md, DATATBL);
+    final TableAccess ta = new TableDiskAccess(md, true);
     final DataInput in = new DataInput(md.dbfile(DATATMP));
     for(; spos < ssize; ++spos) ta.write4(in.readNum(), 8, in.readNum());
     ta.close();
@@ -91,7 +87,9 @@ public final class DiskBuilder extends Builder {
     md.dbfile(DATATMP).delete();
 
     // return database instance
-    return new DiskData(md, tags, atts, path, ns);
+    final DiskData data = new DiskData(md, tags, atts, path, ns);
+    data.finishUpdate();
+    return data;
   }
 
   @Override
@@ -101,7 +99,7 @@ public final class DiskBuilder extends Builder {
     } catch(final IOException ex) {
       Util.debug(ex);
     }
-    if(meta != null) DropDB.drop(meta.name, mprop);
+    if(meta != null) DropDB.drop(meta.name, context);
   }
 
   @Override

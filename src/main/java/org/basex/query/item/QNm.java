@@ -11,6 +11,7 @@ import org.basex.util.InputInfo;
 import org.basex.util.Token;
 import org.basex.util.TokenBuilder;
 import org.basex.util.Util;
+import org.basex.util.list.*;
 
 /**
  * QName item.
@@ -47,11 +48,37 @@ public final class QNm extends Item {
   /**
    * Constructor.
    * @param n name
+   */
+  public QNm(final String n) {
+    this(token(n));
+  }
+
+  /**
+   * Constructor.
+   * @param n name
    * @param u namespace URI
    */
   public QNm(final byte[] n, final byte[] u) {
     this(n);
     uri(u);
+  }
+
+  /**
+   * Constructor.
+   * @param n name
+   * @param u namespace URI
+   */
+  public QNm(final String n, final byte[] u) {
+    this(token(n), u);
+  }
+
+  /**
+   * Constructor.
+   * @param n name
+   * @param u namespace URI
+   */
+  public QNm(final String n, final String u) {
+    this(token(n), token(u));
   }
 
   /**
@@ -128,8 +155,7 @@ public final class QNm extends Item {
    * @return result of check
    */
   public boolean eq(final QNm n) {
-    return n == this || Token.eq(local(), n.local()) &&
-        Token.eq(uri(), n.uri());
+    return n == this || Token.eq(local(), n.local()) && Token.eq(uri(), n.uri());
   }
 
   @Override
@@ -175,8 +201,7 @@ public final class QNm extends Item {
 
   @Override
   public QName toJava() {
-    return new QName(Token.string(uri()), Token.string(local()),
-        Token.string(prefix()));
+    return new QName(Token.string(uri()), Token.string(local()), Token.string(prefix()));
   }
 
   /**
@@ -190,6 +215,11 @@ public final class QNm extends Item {
   @Override
   public int hash(final InputInfo ii) throws QueryException {
     return Token.hash(local());
+  }
+
+  @Override
+  public byte[] xdmInfo() {
+    return new ByteList().add(super.xdmInfo()).add(uri()).add(0).toArray();
   }
 
   @Override

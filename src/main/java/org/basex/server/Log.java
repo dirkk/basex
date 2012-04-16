@@ -6,7 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.*;
 
 import org.basex.core.Context;
 import org.basex.core.Prop;
@@ -48,6 +48,15 @@ public final class Log {
   }
 
   /**
+   * Writes an error to the log file.
+   * @param th throwable
+   */
+  public synchronized void error(final Throwable th) {
+    Util.stack(th);
+    if(!quiet) write(Util.bug(th));
+  }
+
+  /**
    * Writes an entry to the log file.
    * @param str strings to be written
    */
@@ -82,9 +91,9 @@ public final class Log {
    * Creates a log file.
    * @param d date, used for file name
    */
-  private synchronized void create(final Date d) {
+  private void create(final Date d) {
     dir.md();
-    start = DATE.format(d);
+    synchronized(DATE) { start = DATE.format(d); }
     try {
       fos = new FileOutputStream(new IOFile(dir, start + ".log").file(), true);
     } catch(final IOException ex) {
@@ -95,10 +104,10 @@ public final class Log {
   /**
    * Closes the log file.
    */
-  public synchronized void close() {
-    if(quiet) return;
+  private void close() {
     try {
       fos.close();
+      fos = null;
     } catch(final IOException ex) {
       Util.stack(ex);
     }

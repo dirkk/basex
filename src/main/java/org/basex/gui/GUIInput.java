@@ -195,15 +195,15 @@ public final class GUIInput extends BaseXTextField {
    */
   private void queryPopup(final String query) {
     final Data data = gui.context.data();
-    if(data == null || !data.meta.pathindex) return;
+    if(data == null) return;
 
     StringList sl;
     try {
       final QuerySuggest qs = new QuerySuggest(query,
           new QueryContext(gui.context), data);
-      qs.parse(null, null);
+      qs.parse(null);
       sl = qs.complete();
-      pre = query.substring(0, qs.qm);
+      pre = query.substring(0, qs.im);
     } catch(final QueryException ex) {
       sl = ex.suggest();
       pre = query.substring(0, ex.col() - (ex.col() == 1 ? 1 : 0));
@@ -217,7 +217,7 @@ public final class GUIInput extends BaseXTextField {
    * @param sl strings to be added
    */
   private void createCombo(final StringList sl) {
-    if(sl == null || sl.size() == 0) {
+    if(sl == null || sl.isEmpty()) {
       pop.setVisible(false);
       return;
     }

@@ -37,12 +37,9 @@ public final class FNNode extends StandardFunc {
   }
 
   @Override
-  public Item item(final QueryContext ctx, final InputInfo ii)
-      throws QueryException {
-
+  public Item item(final QueryContext ctx, final InputInfo ii) throws QueryException {
     // functions have 0 or 1 arguments...
-    final Item it = (expr.length != 0 ? expr[0] :
-      checkCtx(ctx)).item(ctx, input);
+    final Item it = (expr.length != 0 ? expr[0] : checkCtx(ctx)).item(ctx, info);
 
     switch(sig) {
       case NODE_NAME:
@@ -56,13 +53,12 @@ public final class FNNode extends StandardFunc {
         return uri.length == 0 ? null : Uri.uri(uri, false);
       case NILLED:
         // always false, as no schema information is given
-        return it == null || checkNode(it).type != NodeType.ELM ? null :
-          Bln.FALSE;
+        return it == null || checkNode(it).type != NodeType.ELM ? null : Bln.FALSE;
       case BASE_URI:
         if(it == null) return null;
         ANode n = checkNode(it);
-        if(n.type != NodeType.ELM && n.type != NodeType.DOC &&
-            n.parent() == null) return null;
+        if(n.type != NodeType.ELM && n.type != NodeType.DOC && n.parent() == null)
+          return null;
         Uri base = Uri.EMPTY;
         while(!base.isAbsolute()) {
           if(n == null) {
@@ -115,13 +111,14 @@ public final class FNNode extends StandardFunc {
         tb.add('@');
         final QNm qnm = n.qname();
         final byte[] uri = qnm.uri();
-        if(uri.length != 0) tb.add('"').add(uri).add("\":");
+        if(uri.length != 0) tb.add("Q{").add(qnm.uri()).add('}');
         tb.add(qnm.local());
       } else if(n.type == NodeType.ELM) {
         final QNm qnm = n.qname();
         final AxisIter ai = n.precedingSibling();
         for(ANode fs; (fs = ai.next()) != null;) if(fs.qname().eq(qnm)) i++;
-        tb.addExt("\"%\":%[%]", qnm.uri(), qnm.local(), i);
+        tb.add("Q{").add(qnm.uri()).add('}').add(qnm.local());
+        tb.add('[').add(Integer.toString(i)).add(']');
       } else if(n.type == NodeType.COM || n.type == NodeType.TXT) {
         final AxisIter ai = n.precedingSibling();
         for(ANode fs; (fs = ai.next()) != null;) if(fs.type == n.type) i++;
@@ -132,16 +129,17 @@ public final class FNNode extends StandardFunc {
         for(ANode fs; (fs = ai.next()) != null;) {
           if(fs.type == n.type && fs.qname().eq(qnm)) i++;
         }
-        tb.addExt("%(\"%\")[%]", n.type.string(), qnm.local(), i);
+        tb.add(n.type.string()).add("(\"").add(qnm.local());
+        tb.add("\")[").add(Integer.toString(i)).add(']');
       }
       tl.add(tb.finish());
       n = n.parent();
     }
-    if(n.type != NodeType.DOC) IDDOC.thrw(input);
+    if(n.type != NodeType.DOC) IDDOC.thrw(info);
 
     final TokenBuilder tb = new TokenBuilder();
     for(int i = tl.size() - 1; i >= 0; --i) tb.add('/').add(tl.get(i));
-    return Str.get(tb.size() == 0 ? Token.SLASH : tb.finish());
+    return Str.get(tb.isEmpty() ? Token.SLASH : tb.finish());
   }
 
   @Override

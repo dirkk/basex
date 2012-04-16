@@ -1,20 +1,18 @@
 package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
+import static org.basex.util.Util.*;
 
-import java.io.IOException;
-import java.util.Date;
+import java.io.*;
+import java.util.*;
 
-import org.basex.core.Command;
-import org.basex.core.CommandBuilder;
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdCreate;
-import org.basex.core.User;
-import org.basex.data.MetaData;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
-import org.basex.io.Zip;
-import org.basex.util.Util;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'backup' command and creates a backup of a database.
@@ -29,17 +27,17 @@ public final class CreateBackup extends Command {
    * @param arg optional argument
    */
   public CreateBackup(final String arg) {
-    super(User.CREATE, arg);
+    super(Perm.CREATE, arg);
   }
 
   @Override
   protected boolean run() {
-    if(!MetaData.validName(args[0], true))
-      return error(NAME_INVALID_X, args[0]);
+    final String name = args[0];
+    if(!MetaData.validName(name, true)) return error(NAME_INVALID_X, name);
 
     // retrieve all databases
-    final String[] dbs = databases(args[0]);
-    if(dbs.length == 0) return error(DB_NOT_FOUND_X, args[0]);
+    final StringList dbs = context.databases().listDBs(name);
+    if(dbs.size() == 0) return error(DB_NOT_FOUND_X, name);
 
     // loop through all databases
     boolean ok = true;
@@ -58,17 +56,17 @@ public final class CreateBackup extends Command {
 
   /**
    * Backups the specified database.
-   * @param db database name
+   * @param db name of the database
    * @return success flag
    */
   private boolean backup(final String db) {
-    try {
-      final IOFile path = mprop.dbpath(db);
-      final IOFile file = mprop.dbpath(db + '-' +
-      IO.DATE.format(new Date()) + IO.ZIPSUFFIX);
+    final String backup = db + '-' + formatDate(new Date(), IO.DATE) + IO.ZIPSUFFIX;
+    final IOFile zf = mprop.dbpath(backup);
+    final Zip zip = progress(new Zip(zf));
 
-      final Zip zip = progress(new Zip(file));
-      zip.zip(path);
+    try {
+      zip.zip(mprop.dbpath(db), Databases.FILES);
+      context.databases().add(db, true);
       return true;
     } catch(final IOException ex) {
       Util.debug(ex);

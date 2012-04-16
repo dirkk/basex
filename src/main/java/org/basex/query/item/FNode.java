@@ -9,7 +9,7 @@ import org.basex.util.Token;
 import org.basex.util.TokenBuilder;
 
 /**
- * Node type.
+ * Main memory based node fragments.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
@@ -30,7 +30,7 @@ public abstract class FNode extends ANode {
   }
 
   @Override
-  public QNm update(final QNm nm) {
+  public QNm qname(final QNm nm) {
     return qname();
   }
 

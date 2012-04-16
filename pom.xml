@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.basex</groupId>
   <artifactId>basex</artifactId>
-  <version>7.1.2-SNAPSHOT</version>
+  <version>7.2.1-SNAPSHOT</version>
   <name>BaseX</name>
   <properties>
     <compileSource>1.6</compileSource>
@@ -97,10 +97,33 @@
     	<scope>runtime</scope>
     	<optional>true</optional>
     </dependency>
+    <dependency>
+    	<groupId>jline</groupId>
+    	<artifactId>jline</artifactId>
+    	<version>1.0</version>
+    	<scope>runtime</scope>
+    	<optional>true</optional>
+    </dependency>
   </dependencies>
   <build>
     <finalName>${project.artifactId}-${project.version}</finalName>
     <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>javacc-maven-plugin</artifactId>
+        <version>2.6</version>
+        <executions>
+          <execution>
+            <id>javacc</id>
+            <goals>
+              <goal>javacc</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <outputDirectory>src/main/java</outputDirectory>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -215,7 +238,8 @@
         </executions>
         <configuration>
           <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
+            <descriptorRef>src</descriptorRef>
+            <!--<descriptorRef>jar-with-dependencies</descriptorRef>-->
           </descriptorRefs>
           <archive>
             <manifest>
@@ -223,6 +247,28 @@
               <packageName>org.basex</packageName>
             </manifest>
           </archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>2.9.1</version>
+        <executions>
+          <execution>
+            <phase>test</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <configLocation>.settings/checkstyle.xml</configLocation>
+          <failsOnError>true</failsOnError>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+          <excludes>org/basex/query/regex/parse/**.java</excludes>
+          <linkXRef>false</linkXRef>
+          <consoleOutput>true</consoleOutput>
+          <violationSeverity>warning</violationSeverity>
         </configuration>
       </plugin>
     </plugins>
@@ -244,6 +290,19 @@
                    <versionRange>[2.0,)</versionRange>
                    <goals>
                      <goal>copy-dependencies</goal>
+                   </goals>
+                 </pluginExecutionFilter>
+                 <action>
+                   <ignore />
+                 </action>
+               </pluginExecution>
+               <pluginExecution>
+                 <pluginExecutionFilter>
+                   <groupId>org.codehaus.mojo</groupId>
+                   <artifactId>javacc-maven-plugin</artifactId>
+                   <versionRange>[2.6,)</versionRange>
+                   <goals>
+                     <goal>javacc</goal>
                    </goals>
                  </pluginExecutionFilter>
                  <action>

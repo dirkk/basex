@@ -2,14 +2,10 @@ package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
 
-import org.basex.core.MainProp;
-import org.basex.core.CommandBuilder;
-import org.basex.core.Command;
-import org.basex.core.Context;
-import org.basex.core.User;
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdAlter;
-import org.basex.data.MetaData;
+import org.basex.data.*;
 
 /**
  * Evaluates the 'alter database' command and renames a database.
@@ -17,8 +13,8 @@ import org.basex.data.MetaData;
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
  */
-public final class AlterDB extends Command {
-  /** States if current database was closed. */
+public final class AlterDB extends ACreate {
+  /** Indicates if current database was closed. */
   private boolean closed;
 
   /**
@@ -27,42 +23,47 @@ public final class AlterDB extends Command {
    * @param name new name
    */
   public AlterDB(final String db, final String name) {
-    super(User.CREATE, db, name);
+    super(db, name);
   }
 
   @Override
   protected boolean run() {
-    final String db = args[0];
-    final String name = args[1];
+    final String src = args[0];
+    final String trg = args[1];
     // check if names are valid
-    if(!MetaData.validName(db, false)) return error(NAME_INVALID_X, db);
-    if(!MetaData.validName(name, false)) return error(NAME_INVALID_X, name);
+    if(!MetaData.validName(src, false)) return error(NAME_INVALID_X, src);
+    if(!MetaData.validName(trg, false)) return error(NAME_INVALID_X, trg);
 
     // database does not exist
-    if(!mprop.dbexists(db)) return error(DB_NOT_FOUND_X, db);
-    // target database exists already
-    if(mprop.dbexists(name)) return error(DB_EXISTS_X, name);
+    if(!mprop.dbexists(src)) return error(DB_NOT_FOUND_X, src);
+    // target database already exists
+    if(mprop.dbexists(trg)) return error(DB_EXISTS_X, trg);
 
     // close database if it's currently opened and not opened by others
-    if(!closed) closed = close(context, db);
-    // check if database is still pinned
-    if(context.pinned(db)) return error(DB_PINNED_X, db);
+    if(!closed) closed = close(context, src);
+    // check if source database is still opened
+    if(context.pinned(src)) return error(DB_PINNED_X, src);
 
     // try to alter database
-    return alter(db, name, mprop) && (!closed || new Open(name).run(context)) ?
-      info(DB_RENAMED_X, db, name) : error(DB_NOT_RENAMED_X, db);
+    return alter(src, trg, context) && (!closed || new Open(trg).run(context)) ?
+        info(DB_RENAMED_X, src, trg) : error(DB_NOT_RENAMED_X, src);
   }
 
   /**
    * Renames the specified database.
-   * @param db database name
-   * @param dbnew new database name
-   * @param pr database properties
+   * @param source name of the existing database
+   * @param target new database name
+   * @param ctx database context
    * @return success flag
    */
-  public static synchronized boolean alter(final String db,
-      final String dbnew, final MainProp pr) {
-    return pr.dbpath(db).rename(pr.dbpath(dbnew));
+  public static synchronized boolean alter(final String source, final String target,
+      final Context ctx) {
+
+    if(ctx.mprop.dbpath(source).rename(ctx.mprop.dbpath(target))) {
+      ctx.databases().alter(source, target);
+      return true;
+    }
+    return false;
   }
 
   @Override

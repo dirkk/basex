@@ -2,16 +2,11 @@ package org.basex.query;
 
 import static org.basex.core.Text.*;
 
-import org.basex.core.BaseXException;
-import org.basex.io.IO;
-import org.basex.query.item.Empty;
-import org.basex.query.item.QNm;
-import org.basex.query.item.Value;
-import org.basex.query.util.Err;
-import org.basex.util.InputInfo;
-import org.basex.util.InputParser;
-import org.basex.util.TokenBuilder;
-import org.basex.util.list.StringList;
+import org.basex.core.*;
+import org.basex.query.item.*;
+import org.basex.query.util.*;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * This class indicates exceptions during the parsing or evaluation of a query.
@@ -27,13 +22,22 @@ public final class QueryException extends Exception {
   /** Error reference. */
   private Err err;
   /** File reference. */
-  private IO file;
+  private String file;
   /** Code suggestions. */
   private StringList suggest;
   /** Error line and column. */
   private int[] lineCol;
   /** Marked error column. */
   private int markedCol;
+
+  /**
+   * Constructor, specifying a simple error message. {@link Err#JAVACALL} will be set
+   * as error code.
+   * @param msg error message
+   */
+  public QueryException(final String msg) {
+    this(null, Err.JAVACALL, msg);
+  }
 
   /**
    * Default constructor.
@@ -89,7 +93,7 @@ public final class QueryException extends Exception {
    * Returns the file.
    * @return error line
    */
-  public IO file() {
+  public String file() {
     return file;
   }
 
@@ -139,12 +143,12 @@ public final class QueryException extends Exception {
    * @param parser parser
    */
   void pos(final InputParser parser) {
-    markedCol = parser.qm;
-    // check if information has already been added
+    markedCol = parser.im;
+    // check if line/column information has already been added
     if(lineCol != null) return;
 
     file = parser.file;
-    lineCol = InputInfo.lineCol(parser.query, Math.min(parser.qm, parser.ql));
+    lineCol = InputInfo.lineCol(parser.input, Math.min(parser.im, parser.il));
   }
 
   /**

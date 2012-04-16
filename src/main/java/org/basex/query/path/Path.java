@@ -2,6 +2,7 @@ package org.basex.query.path;
 
 import static org.basex.query.QueryText.*;
 import static org.basex.query.path.Axis.*;
+import static org.basex.query.util.Err.*;
 
 import java.io.*;
 import java.util.*;
@@ -12,7 +13,7 @@ import org.basex.io.serial.*;
 import org.basex.query.*;
 import org.basex.query.expr.*;
 import org.basex.query.item.*;
-import org.basex.query.path.Test.Name;
+import org.basex.query.path.Test.Mode;
 import org.basex.query.util.*;
 import org.basex.util.*;
 
@@ -47,15 +48,11 @@ public abstract class Path extends ParseExpr {
    * @param path path steps
    * @return class instance
    */
-  public static Path get(final InputInfo ii, final Expr r,
-      final Expr... path) {
-
+  public static Path get(final InputInfo ii, final Expr r, final Expr... path) {
     // check if all steps are axis steps
     boolean axes = true;
     for(final Expr p : path) axes &= p instanceof AxisStep;
-    return axes ?
-        new AxisPath(ii, r, path).finish(null) :
-        new MixedPath(ii, r, path);
+    return axes ? new AxisPath(ii, r, path).finish(null) : new MixedPath(ii, r, path);
   }
 
   @Override
@@ -144,7 +141,7 @@ public abstract class Path extends ParseExpr {
     // set atomic type for single attribute steps to speedup predicate tests
     if(root == null && st.length == 1 && st[0] instanceof AxisStep) {
       final AxisStep curr = (AxisStep) st[0];
-      if(curr.axis == ATTR && curr.test.test == Name.STD)
+      if(curr.axis == ATTR && curr.test.mode == Mode.STD)
         curr.type = SeqType.NOD_ZO;
     }
     steps = st;
@@ -158,7 +155,7 @@ public abstract class Path extends ParseExpr {
   long size(final QueryContext ctx) {
     final Value rt = root(ctx);
     final Data data = rt != null && rt.type == NodeType.DOC ? rt.data() : null;
-    if(data == null || !data.meta.pathindex || !data.meta.uptodate) return -1;
+    if(data == null || !data.meta.uptodate) return -1;
 
     ArrayList<PathNode> nodes = data.paths.root();
     long m = 1;
@@ -184,20 +181,22 @@ public abstract class Path extends ParseExpr {
    * Checks if the location path contains steps that will never yield results.
    * @param stps step array
    * @return empty step, or {@code null}
+   * @throws QueryException query exception
    */
-  AxisStep voidStep(final Expr[] stps) {
+  AxisStep voidStep(final Expr[] stps) throws QueryException {
     for(int l = 0; l < stps.length; ++l) {
       final AxisStep s = axisStep(l);
       if(s == null) continue;
       final Axis sa = s.axis;
       if(l == 0) {
         if(root instanceof CAttr) {
-          if(sa == CHILD || sa == DESC) return s;
+          // @.../child:: / @.../descendant::
+          if(sa == CHILD || sa == DESC) ATTDESC.thrw(info, root);
         } else if(root instanceof Root || root instanceof Value &&
             ((Value) root).type == NodeType.DOC || root instanceof CDoc) {
           if(sa != CHILD && sa != DESC && sa != DESCORSELF &&
             (sa != SELF && sa != ANCORSELF ||
-             s.test != Test.NOD && s.test != Test.DOC)) return s;
+            s.test != Test.NOD && s.test != Test.DOC)) DOCAXES.thrw(info, root, sa);
         }
       } else {
         final AxisStep ls = axisStep(l - 1);
@@ -223,7 +222,7 @@ public abstract class Path extends ParseExpr {
         } else if(sa == DESC || sa == CHILD || sa == ATTR) {
           // .../descendant:: / .../child:: / .../attribute::
           if(lsa == ATTR || ls.test == Test.TXT || ls.test == Test.COM ||
-             ls.test == Test.PI) return s;
+              ls.test == Test.PI) return s;
         } else if(sa == PARENT || sa == ANC) {
           // .../parent:: / .../ancestor::
           if(ls.test == Test.DOC) return s;
@@ -241,8 +240,7 @@ public abstract class Path extends ParseExpr {
    */
   Expr children(final QueryContext ctx, final Data data) {
     // skip path check if no path index exists, or if it is out-of-dated
-    if(!data.meta.pathindex || !data.meta.uptodate ||
-        data.nspaces.globalNS() == null) return this;
+    if(!data.meta.uptodate || data.nspaces.globalNS() == null) return this;
 
     Path path = this;
     for(int s = 0; s < steps.length; ++s) {
@@ -280,11 +278,11 @@ public abstract class Path extends ParseExpr {
             ((AxisStep) steps[s]).preds : new Expr[0];
         final QNm nm = qnm.get(ts - t - 1);
         final NameTest nt = nm == null ? new NameTest(false) :
-          new NameTest(nm, Name.NAME, false);
-        stps[t] = AxisStep.get(input, CHILD, nt, preds);
+          new NameTest(nm, Mode.NAME, false);
+        stps[t] = AxisStep.get(info, CHILD, nt, preds);
       }
       while(++s < steps.length) stps[ts++] = steps[s];
-      path = get(input, root, stps);
+      path = get(info, root, stps);
       break;
     }
 
@@ -295,8 +293,8 @@ public abstract class Path extends ParseExpr {
         // only verify child steps; ignore namespaces
         final AxisStep st = path.axisStep(s);
         if(st == null || st.axis != CHILD) break;
-        if(st.test.test == Name.ALL || st.test.test == null) continue;
-        if(st.test.test != Name.NAME) break;
+        if(st.test.mode == Mode.ALL || st.test.mode == null) continue;
+        if(st.test.mode != Mode.NAME) break;
 
         // check if one of the addressed nodes is on the correct level
         final int name = data.tagindex.id(st.test.name.local());
@@ -329,14 +327,14 @@ public abstract class Path extends ParseExpr {
    */
   ArrayList<PathNode> pathNodes(final Data data, final int l) {
     // skip request if no path index exists or might be out-of-date
-    if(!data.meta.pathindex || !data.meta.uptodate) return null;
+    if(!data.meta.uptodate) return null;
 
     ArrayList<PathNode> in = data.paths.root();
     for(int s = 0; s <= l; ++s) {
       final AxisStep curr = axisStep(s);
       if(curr == null) return null;
       final boolean desc = curr.axis == DESC;
-      if(!desc && curr.axis != CHILD || curr.test.test != Name.NAME)
+      if(!desc && curr.axis != CHILD || curr.test.mode != Mode.NAME)
         return null;
 
       final int name = data.tagindex.id(curr.test.name.local());
@@ -345,7 +343,7 @@ public abstract class Path extends ParseExpr {
       for(final PathNode pn : PathSummary.desc(in, desc)) {
         if(pn.kind == Data.ELEM && name == pn.name) {
           // skip test if a tag is found on different levels
-          if(al.size() != 0 && al.get(0).level() != pn.level()) return null;
+          if(!al.isEmpty() && al.get(0).level() != pn.level()) return null;
           al.add(pn);
         }
       }
@@ -362,7 +360,7 @@ public abstract class Path extends ParseExpr {
    */
   public final Path addPreds(final Expr... pred) {
     steps[steps.length - 1] = axisStep(steps.length - 1).addPreds(pred);
-    return get(input, root, steps);
+    return get(info, root, steps);
   }
 
   @Override

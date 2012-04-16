@@ -1,10 +1,8 @@
 package org.basex.util;
 
 import static org.basex.util.Token.*;
-import java.util.Arrays;
-
-import org.basex.util.list.ByteList;
-import org.basex.util.list.ElementList;
+import java.util.*;
+import org.basex.util.list.*;
 
 /**
  * This class serves as an efficient constructor for byte arrays.
@@ -25,7 +23,7 @@ public final class TokenBuilder {
   /** New line. */
   public static final byte NLINE = 0x0a;
 
-  /** Character array. */
+  /** Byte (code point) array. */
   private byte[] chars;
   /** Current token size. */
   private int size;
@@ -63,19 +61,27 @@ public final class TokenBuilder {
   }
 
   /**
-   * Returns the number of entries.
-   * @return number of entries
+   * Returns the number of bytes.
+   * @return number of bytes
    */
   public int size() {
     return size;
   }
 
   /**
-   * Sets the number of entries.
-   * @param s number of entries
+   * Sets the number of bytes. Note that no bound check are performed by this method.
+   * @param s number of bytes
    */
   public void size(final int s) {
     size = s;
+  }
+
+  /**
+   * Tests if the token is empty.
+   * @return result of check
+   */
+  public boolean isEmpty() {
+    return size == 0;
   }
 
   /**
@@ -303,7 +309,8 @@ public final class TokenBuilder {
    */
   public TokenBuilder addExt(final Object str, final Object... ext) {
     final byte[] t = str instanceof byte[] ? (byte[]) str :
-      token(str == null ? "null" : str.toString());
+      token(str instanceof Throwable ? Util.message((Throwable) str) :
+          str == null ? "null" : str.toString());
 
     for(int i = 0, e = 0; i < t.length; ++i) {
       if(t[i] != '%' || e == ext.length) {

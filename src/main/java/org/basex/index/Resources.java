@@ -1,24 +1,16 @@
 package org.basex.index;
 
-import java.io.IOException;
+import java.io.*;
 
-import org.basex.data.Data;
+import org.basex.data.*;
 import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
-import org.basex.util.Token;
-import org.basex.util.Util;
-import org.basex.util.hash.TokenBoolMap;
-import org.basex.util.hash.TokenIntMap;
-import org.basex.util.list.IntList;
-import org.basex.util.list.TokenList;
+import org.basex.util.*;
+import org.basex.util.hash.*;
+import org.basex.util.list.*;
 
 /**
- * <p>This index organizes all database resources.</p>
- *
- * <p>If updates are performed, the path order is discarded, as its continuous
- * update would be more expensive in some cases (e.g. when bulk insertions of
- * new documents are performed). A tree structure could be introduced to
- * offer better general performance.</p>
+ * <p>This index organizes the resources of a database (XML documents and raw files).</p>
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
@@ -197,7 +189,7 @@ public final class Resources implements Index {
   }
 
   @Override
-  public TokenIntMap entries(final byte[] prefix) {
+  public EntryIterator entries(final byte[] prefix) {
     throw Util.notexpected();
   }
 }

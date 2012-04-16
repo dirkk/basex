@@ -4,9 +4,7 @@ import static org.basex.core.Text.*;
 import java.io.IOException;
 import java.util.regex.Pattern;
 
-import org.basex.core.Command;
-import org.basex.core.Context;
-import org.basex.core.User;
+import org.basex.core.*;
 import org.basex.data.MetaData;
 import org.basex.io.IO;
 import org.basex.io.IOFile;
@@ -29,7 +27,7 @@ public final class Restore extends Command {
    * @param arg optional argument
    */
   public Restore(final String arg) {
-    super(User.CREATE, arg);
+    super(Perm.CREATE, arg);
   }
 
   @Override
@@ -40,12 +38,11 @@ public final class Restore extends Command {
     // find backup file with or without date suffix
     IOFile file = mprop.dbpath(db + IO.ZIPSUFFIX);
     if(!file.exists()) {
-      final StringList list = ShowBackups.list(db, true, context);
-      if(list.size() != 0) file = new IOFile(list.get(0));
+      final StringList list = Databases.backupPaths(db, context);
+      if(!list.isEmpty()) file = new IOFile(list.get(0));
     } else {
       // db is already the name of a backup -> extract db name
-      final Pattern pa = Pattern.compile(IO.DATEPATTERN + '$');
-      db = pa.split(db)[0];
+      db = Pattern.compile(IO.DATEPATTERN + '$').split(db)[0];
     }
     if(!file.exists()) return error(BACKUP_NOT_FOUND_X, db);
 
@@ -55,19 +52,20 @@ public final class Restore extends Command {
     if(context.pinned(db)) return error(DB_PINNED_X, db);
 
     // try to restore database
-    return restore(file) && (!closed || new Open(db).run(context)) ?
-        info(DB_RESTORED_X, file.name(), perf) :
-          error(DB_NOT_RESTORED_X, db);
+    return restore(file, db) && (!closed || new Open(db).run(context)) ?
+        info(DB_RESTORED_X, file.name(), perf) : error(DB_NOT_RESTORED_X, db);
   }
 
   /**
    * Restores the specified database.
    * @param file file
+   * @param db name of the database
    * @return success flag
    */
-  private boolean restore(final IOFile file) {
+  private boolean restore(final IOFile file, final String db) {
     try {
       progress(new Zip(file)).unzip(mprop.dbpath());
+      context.databases().add(db);
       return true;
     } catch(final IOException ex) {
       Util.debug(ex);

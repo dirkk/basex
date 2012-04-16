@@ -1,16 +1,13 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Commands.*;
 import static org.basex.core.Text.*;
 
-import org.basex.core.Command;
-import org.basex.core.CommandBuilder;
-import org.basex.core.Context;
-import org.basex.core.User;
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
-import org.basex.data.MetaData;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
+import org.basex.core.Commands.CmdDrop;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'drop backup' command and deletes backups of a database.
@@ -24,24 +21,24 @@ public final class DropBackup extends Command {
    * @param name name of database
    */
   public DropBackup(final String name) {
-    super(User.CREATE, name);
+    super(Perm.CREATE, name);
   }
 
   @Override
   protected boolean run() {
-    if(!MetaData.validName(args[0], true))
-      return error(NAME_INVALID_X, args[0]);
+    final String name = args[0];
+    if(!MetaData.validName(name, true)) return error(NAME_INVALID_X, name);
 
-    final String[] dbs = databases(args[0]);
+    // retrieve all databases
+    final StringList dbs = context.databases().listDBs(name);
     // loop through all databases and drop backups
-    for(final String db : dbs) {
-      drop(db.contains("-") ? db : db + '-', context);
-    }
+    for(final String db : dbs) drop(db.contains("-") ? db : db + '-', context);
+
     // if the given argument is not a database name, it could be the name
     // of a backup file
-    if(dbs.length == 0) drop(args[0], context);
+    if(dbs.size() == 0) drop(name, context);
 
-    return info(BACKUP_DROPPED_X, args[0] + '*' + IO.ZIPSUFFIX);
+    return info(BACKUP_DROPPED_X, name + '*' + IO.ZIPSUFFIX);
   }
 
   /**
@@ -55,8 +52,10 @@ public final class DropBackup extends Command {
     int c = 0;
     for(final IOFile f : dir.children()) {
       final String n = f.name();
-      if(n.startsWith(db) && n.endsWith(IO.ZIPSUFFIX)) {
-        if(f.delete()) c++;
+      if(n.startsWith(db) && n.endsWith(IO.ZIPSUFFIX) && f.delete()) {
+        c++;
+        final int dl = db.length() - 1;
+        ctx.databases().delete(db.charAt(dl) == '-' ? db.substring(0, dl) : db, true);
       }
     }
     return c;

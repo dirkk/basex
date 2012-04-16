@@ -77,7 +77,7 @@ public class StringList extends ElementList implements Iterable<String> {
    * Deletes the specified element.
    * @param i element to be deleted
    */
-  public final void delete(final int i) {
+  public final void deleteAt(final int i) {
     Array.move(list, i + 1, -1, --size - i);
   }
 
@@ -120,5 +120,19 @@ public class StringList extends ElementList implements Iterable<String> {
       @Override
       public void remove() { Util.notexpected(); }
     };
+  }
+
+  /**
+   * Returns a new list without duplicates. The existing list must be sorted.
+   * @return unique sorted list
+   */
+  public StringList unique() {
+    final StringList sl = new StringList(size);
+    if(size != 0) sl.add(list[0]);
+    for(int s = 1; s < size(); s++) {
+      final String l = list[s];
+      if(!l.equals(list[s - 1])) sl.add(l);
+    }
+    return sl;
   }
 }

@@ -6,22 +6,17 @@ import static org.basex.io.serial.SerializerProp.*;
 import static org.basex.query.util.Err.*;
 import static org.basex.util.Token.*;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.io.*;
+import java.nio.charset.*;
 
-import org.basex.data.FTPos;
-import org.basex.io.MimeTypes;
-import org.basex.io.out.PrintOutput;
-import org.basex.query.QueryException;
-import org.basex.query.item.Item;
-import org.basex.query.item.StrStream;
-import org.basex.util.TokenBuilder;
-import org.basex.util.ft.FTLexer;
-import org.basex.util.ft.FTSpan;
-import org.basex.util.hash.TokenSet;
-import org.basex.util.list.TokenList;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.io.out.*;
+import org.basex.query.*;
+import org.basex.query.item.*;
+import org.basex.util.*;
+import org.basex.util.ft.*;
+import org.basex.util.hash.*;
 
 /**
  * This class serializes data to an output stream.
@@ -30,19 +25,14 @@ import org.basex.util.list.TokenList;
  * @author Christian Gruen
  */
 public abstract class OutputSerializer extends Serializer {
-  /** (X)HTML: elements with an empty content model. */
-  static final TokenList EMPTIES = new TokenList();
-  /** (X)HTML: URI attributes. */
-  static final TokenSet URIS = new TokenSet();
-
   /** System document type. */
   private String docsys;
   /** Public document type. */
   private String docpub;
   /** Flag for printing content type. */
   int ct;
-  /** Indentation flag (used for formatting). */
-  boolean ind;
+  /** Separator flag (used for formatting). */
+  boolean sep;
   /** Item flag (used for formatting). */
   private boolean item;
   /** Script flag. */
@@ -51,9 +41,9 @@ public abstract class OutputSerializer extends Serializer {
   /** URI escape flag. */
   final boolean escape;
   /** CData elements. */
-  private final TokenList cdata = new TokenList();
+  private final TokenSet cdata = new TokenSet();
   /** Suppress indentation elements. */
-  private final TokenList suppress = new TokenList();
+  private final TokenSet suppress = new TokenSet();
   /** Indentation flag. */
   final boolean indent;
   /** Include content type flag. */
@@ -62,6 +52,8 @@ public abstract class OutputSerializer extends Serializer {
   private final String media;
   /** Charset. */
   private final Charset encoding;
+  /** Item separator. */
+  private final byte[] separator;
   /** New line. */
   final byte[] nl;
   /** Output stream. */
@@ -95,8 +87,8 @@ public abstract class OutputSerializer extends Serializer {
       final String... versions) throws IOException {
 
     final SerializerProp p = props == null ? PROPS : props;
-    final String ver = p.get(S_VERSION).isEmpty() ?
-        versions.length > 0 ? versions[0] : "" : p.check(S_VERSION, versions);
+    final String ver = versions.length == 0 ? "" :
+        p.get(S_VERSION).isEmpty() ? versions[0] : p.check(S_VERSION, versions);
 
     final boolean decl = !p.yes(S_OMIT_XML_DECLARATION);
     final boolean bom  = p.yes(S_BYTE_ORDER_MARK);
@@ -117,11 +109,10 @@ public abstract class OutputSerializer extends Serializer {
     format  = p.yes(S_FORMAT);
     tab     = p.yes(S_TABULATOR) ? '\t' : ' ';
     wPre    = token(p.get(S_WRAP_PREFIX));
-    /* URI for wrapped results. */
-    final byte[] wUri = token(p.get(S_WRAP_URI));
     wrap    = wPre.length != 0;
     final String eol = p.check(S_NEWLINE, S_NL, S_CR, S_CRNL);
     nl = utf8(token(eol.equals(S_NL) ? "\n" : eol.equals(S_CR) ? "\r" : "\r\n"), enc);
+    separator = token(p.get(S_SEPARATOR).replaceAll("\\\\n", "\n"));
 
     docsys  = p.get(S_DOCTYPE_SYSTEM);
     docpub  = p.get(S_DOCTYPE_PUBLIC);
@@ -182,7 +173,7 @@ public abstract class OutputSerializer extends Serializer {
         }
         print(ATT2);
         print(PI_C);
-        ind = indent;
+        sep = true;
       } else if(!sa.equals(OMIT) || !ver.equals(V10) && docsys != null) {
         SERSTAND.thrwSerial();
       }
@@ -190,15 +181,14 @@ public abstract class OutputSerializer extends Serializer {
 
     // open results element
     if(wrap) {
-      openElement(wPre.length != 0 ?
-          concat(wPre, COLON, T_RESULTS) : T_RESULTS);
-      namespace(wPre, wUri);
+      openElement(concat(wPre, COLON, T_RESULTS));
+      namespace(wPre, token(p.get(S_WRAP_URI)));
     }
   }
 
   @Override
   public final void reset() {
-    ind = false;
+    sep = false;
     item = false;
   }
 
@@ -210,10 +200,7 @@ public abstract class OutputSerializer extends Serializer {
 
   @Override
   public void openResult() throws IOException {
-    if(wrap) {
-      openElement(wPre.length != 0 ? concat(wPre, COLON, T_RESULT) : T_RESULT);
-      ind = false;
-    }
+    if(wrap) openElement(wPre.length != 0 ? concat(wPre, COLON, T_RESULT) : T_RESULT);
   }
 
   @Override
@@ -263,7 +250,7 @@ public abstract class OutputSerializer extends Serializer {
       }
       print(CDATA_C);
     }
-    ind = false;
+    sep = false;
   }
 
   @Override
@@ -271,35 +258,44 @@ public abstract class OutputSerializer extends Serializer {
     final FTLexer lex = new FTLexer().sc().init(b);
     while(lex.hasNext()) {
       final FTSpan span = lex.next();
-      if(!span.special && ftp.contains(span.pos))
-        print((char) TokenBuilder.MARK);
+      if(!span.special && ftp.contains(span.pos)) print((char) TokenBuilder.MARK);
       final byte[] t = span.text;
       for(int k = 0; k < t.length; k += cl(t, k)) code(cp(t, k));
     }
-    ind = false;
+    sep = false;
   }
 
   @Override
   public void finishComment(final byte[] n) throws IOException {
-    if(ind) indent();
+    if(sep) indent();
     print(COMM_O);
     print(n);
     print(COMM_C);
+    sep = true;
   }
 
   @Override
   public void finishPi(final byte[] n, final byte[] v) throws IOException {
-    if(ind) indent();
+    if(sep) indent();
     print(PI_O);
     print(n);
     print(' ');
     print(v);
     print(PI_C);
+    sep = true;
   }
 
   @Override
   public void finishAtomic(final Item it) throws IOException {
-    if(ind) print(' ');
+    if(sep && item) {
+      final byte[] sp = separator;
+      final int sl = sp.length;
+      if(sl == 1) {
+        printChar(sp[0]);
+      } else {
+        for(int s = 0; s < sl; s += cl(sp, s)) printChar(cp(sp, s));
+      }
+    }
 
     try {
       if(it instanceof StrStream) {
@@ -316,17 +312,54 @@ public abstract class OutputSerializer extends Serializer {
     } catch(final QueryException ex) {
       throw new SerializerException(ex);
     }
-
-    ind = format;
+    sep = true;
     item = true;
   }
 
+  @Override
+  public void openDoc(final byte[] n) throws IOException {
+    sep = false;
+  }
+
+  @Override
+  public final boolean finished() {
+    return out.finished();
+  }
+
+  @Override
+  protected void startOpen(final byte[] t) throws IOException {
+    doctype(t);
+    if(sep) indent();
+    print(ELEM_O);
+    print(t);
+    sep = true;
+  }
+
+  @Override
+  protected void finishOpen() throws IOException {
+    print(ELEM_C);
+  }
+
+  @Override
+  protected void finishEmpty() throws IOException {
+    print(ELEM_SC);
+  }
+
+  @Override
+  protected void finishClose() throws IOException {
+    if(sep) indent();
+    print(ELEM_OS);
+    print(tag);
+    print(ELEM_C);
+    sep = true;
+  }
+
   /**
-   * Encode the specified character before printing it.
+   * Encodes the specified character before printing it.
    * @param ch character to be encoded and printed
    * @throws IOException I/O exception
    */
-  void code(final int ch) throws IOException {
+  protected void code(final int ch) throws IOException {
     if(!format) {
       printChar(ch);
     } else if(ch < ' ' && ch != '\n' && ch != '\t' || ch > 0x7F && ch < 0xA0) {
@@ -342,28 +375,14 @@ public abstract class OutputSerializer extends Serializer {
     }
   }
 
-  @Override
-  public final boolean finished() {
-    return out.finished();
-  }
-
-  @Override
-  protected void startOpen(final byte[] t) throws IOException {
-    doctype(t);
-    if(ind) indent();
-    print(ELEM_O);
-    print(t);
-    ind = indent;
-  }
-
   /**
    * Prints the document type declaration.
    * @param dt document type, or {@code null} for html type
    * @throws IOException I/O exception
    */
-  void doctype(final byte[] dt) throws IOException {
+  protected void doctype(final byte[] dt) throws IOException {
     if(level != 0 || docsys == null) return;
-    if(ind) indent();
+    if(sep) indent();
     print(DOCTYPE);
     if(dt == null) print(M_HTML);
     else print(dt);
@@ -376,40 +395,20 @@ public abstract class OutputSerializer extends Serializer {
     print(ELEM_C);
     print(nl);
     docsys = null;
-  }
-
-  @Override
-  protected void finishOpen() throws IOException {
-    print(ELEM_C);
-  }
-
-  @Override
-  protected void finishEmpty() throws IOException {
-    print(ELEM_SC);
-  }
-
-  @Override
-  protected void finishClose() throws IOException {
-    if(ind) indent();
-    print(ELEM_OS);
-    print(tag);
-    print(ELEM_C);
-    ind = indent;
+    sep = true;
   }
 
   /**
    * Indents the next text.
    * @throws IOException I/O exception
    */
-  final void indent() throws IOException {
-    if(!indent) return;
-
+  protected final void indent() throws IOException {
     if(item) {
       item = false;
-    } else {
+    } else if(indent) {
       if(!suppress.isEmpty() && !tags.isEmpty()) {
-        for(final byte[] s : suppress) {
-          if(tags.contains(s)) return;
+        for(final byte[] t : tags) {
+          if(suppress.contains(t)) return;
         }
       }
       print(nl);
@@ -423,7 +422,7 @@ public abstract class OutputSerializer extends Serializer {
    * @param ch character
    * @throws IOException I/O exception
    */
-  final void hex(final int ch) throws IOException {
+  protected final void hex(final int ch) throws IOException {
     print("&#x");
     print(HEX[ch >> 4]);
     print(HEX[ch & 15]);
@@ -436,7 +435,7 @@ public abstract class OutputSerializer extends Serializer {
    * @param ch character to be printed
    * @throws IOException I/O exception
    */
-  final void printChar(final int ch) throws IOException {
+  protected final void printChar(final int ch) throws IOException {
     if(ch == '\n') out.write(nl);
     else print(ch);
   }
@@ -446,7 +445,7 @@ public abstract class OutputSerializer extends Serializer {
    * @param ch character to be printed
    * @throws IOException I/O exception
    */
-  void print(final int ch) throws IOException {
+  protected void print(final int ch) throws IOException {
     // comparison by reference
     if(utf8) out.utf8(ch);
     else out.write(new TokenBuilder(4).add(ch).toString().getBytes(encoding));
@@ -457,7 +456,7 @@ public abstract class OutputSerializer extends Serializer {
    * @param token token to be printed
    * @throws IOException I/O exception
    */
-  final void print(final byte[] token) throws IOException {
+  protected final void print(final byte[] token) throws IOException {
     // comparison by reference
     if(utf8) {
       for(final byte b : token) out.write(b);
@@ -471,7 +470,7 @@ public abstract class OutputSerializer extends Serializer {
    * @param s string to be printed
    * @throws IOException I/O exception
    */
-  final void print(final String s) throws IOException {
+  protected final void print(final String s) throws IOException {
     // comparison by reference
     if(utf8) {
       for(final byte b : token(s)) out.write(b);
@@ -487,15 +486,13 @@ public abstract class OutputSerializer extends Serializer {
    * @return {@code true} if declaration was printed
    * @throws IOException I/O exception
    */
-  boolean ct(final boolean empty, final boolean html)
-      throws IOException {
-
+  protected boolean ct(final boolean empty, final boolean html) throws IOException {
     if(ct != 1) return false;
     ct++;
     if(empty) finishOpen();
     level++;
     startOpen(META);
-    attribute(HTTPEQUIV, token(CONTENT_TYPE));
+    attribute(HTTPEQUIV, token(MimeTypes.CONTENT_TYPE));
     attribute(CONTENT, new TokenBuilder(media.isEmpty() ? MimeTypes.TEXT_HTML :
       media).add(CHARSET).addExt(encoding).finish());
     if(html) {
@@ -507,61 +504,5 @@ public abstract class OutputSerializer extends Serializer {
     level--;
     if(empty) finishClose();
     return true;
-  }
-
-  // HTML Serializer: cache elements
-  static {
-    // elements with an empty content model
-    EMPTIES.add(token("area"));
-    EMPTIES.add(token("base"));
-    EMPTIES.add(token("br"));
-    EMPTIES.add(token("col"));
-    EMPTIES.add(token("hr"));
-    EMPTIES.add(token("img"));
-    EMPTIES.add(token("input"));
-    EMPTIES.add(token("link"));
-    EMPTIES.add(token("meta"));
-    EMPTIES.add(token("basefont"));
-    EMPTIES.add(token("frame"));
-    EMPTIES.add(token("isindex"));
-    EMPTIES.add(token("param"));
-    // URI attributes
-    URIS.add(token("a:href"));
-    URIS.add(token("a:name"));
-    URIS.add(token("applet:codebase"));
-    URIS.add(token("area:href"));
-    URIS.add(token("base:href"));
-    URIS.add(token("blockquote:cite"));
-    URIS.add(token("body:background"));
-    URIS.add(token("button:datasrc"));
-    URIS.add(token("del:cite"));
-    URIS.add(token("div:datasrc"));
-    URIS.add(token("form:action"));
-    URIS.add(token("frame:longdesc"));
-    URIS.add(token("frame:src"));
-    URIS.add(token("head:profile"));
-    URIS.add(token("iframe:longdesc"));
-    URIS.add(token("iframe:src"));
-    URIS.add(token("img:longdesc"));
-    URIS.add(token("img:src"));
-    URIS.add(token("img:usemap"));
-    URIS.add(token("input:datasrc"));
-    URIS.add(token("input:src"));
-    URIS.add(token("input:usemap"));
-    URIS.add(token("ins:cite"));
-    URIS.add(token("link:href"));
-    URIS.add(token("object:archive"));
-    URIS.add(token("object:classid"));
-    URIS.add(token("object:codebase"));
-    URIS.add(token("object:data"));
-    URIS.add(token("object:datasrc"));
-    URIS.add(token("object:usemap"));
-    URIS.add(token("q:cite"));
-    URIS.add(token("script:for"));
-    URIS.add(token("script:src"));
-    URIS.add(token("select:datasrc"));
-    URIS.add(token("span:datasrc"));
-    URIS.add(token("table:datasrc"));
-    URIS.add(token("textarea:datasrc"));
   }
 }

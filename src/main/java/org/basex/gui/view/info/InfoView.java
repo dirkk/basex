@@ -150,7 +150,7 @@ public final class InfoView extends View {
       } else if(line.startsWith(RESULT_C)) {
         res = line.substring(s + 1).trim();
       } else if(line.startsWith(EVALUATING_C)) {
-        while(split[++i].startsWith(QUERYSEP)) eval.add(split[i]);
+        while(++i < split.length && split[i].startsWith(QUERYSEP)) eval.add(split[i]);
         --i;
       } else if(!ok) {
         err += line + NL;
@@ -179,12 +179,12 @@ public final class InfoView extends View {
         add(QUERY_PLAN_C, plan);
         add(ERROR_C, err.replaceAll(STOPPED_AT + ".*\\r?\\n", ""));
       }
-    } else if(sl.size() != 0) {
+    } else if(!sl.isEmpty()) {
       text.reset();
       add(EVALUATING_C, eval);
       add(QUERY_C + ' ', qu);
       add(COMPILING_C, comp);
-      if(comp.size() != 0) add(RESULT_C, res);
+      if(!comp.isEmpty()) add(RESULT_C, res);
       add(TIMING_C, sl);
       add(RESULT_C, stats);
       add(QUERY_PLAN_C, plan);
@@ -211,7 +211,7 @@ public final class InfoView extends View {
    */
   private void add(final String head, final StringList list) {
     final int runs = Math.max(1, gui.context.prop.num(Prop.RUNS));
-    if(list.size() == 0) return;
+    if(list.isEmpty()) return;
     text.bold().add(head).norm().nline();
     final int is = list.size();
     for(int i = 0; i < is; ++i) {

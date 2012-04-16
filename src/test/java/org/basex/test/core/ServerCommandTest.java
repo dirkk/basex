@@ -1,23 +1,16 @@
-package org.basex.test.server;
+package org.basex.test.core;
 
 import static org.basex.core.Text.*;
-
-import java.io.IOException;
-
-import org.basex.BaseXServer;
-import org.basex.core.MainProp;
-import org.basex.core.Prop;
-import org.basex.core.cmd.CreateUser;
-import org.basex.core.cmd.Kill;
-import org.basex.server.ClientSession;
-import org.basex.util.Performance;
-import org.basex.util.Token;
-import org.basex.util.Util;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
 import static org.junit.Assert.*;
+
+import java.io.*;
+
+import org.basex.*;
+import org.basex.core.*;
+import org.basex.core.cmd.*;
+import org.basex.server.*;
+import org.basex.util.*;
+import org.junit.*;
 
 /**
  * This class tests the database commands with the client/server
@@ -36,9 +29,8 @@ public final class ServerCommandTest extends CommandTest {
    */
   @BeforeClass
   public static void start() throws IOException {
-    CONTEXT.mprop.set(MainProp.DBPATH, sandbox().path());
-    server = new BaseXServer(CONTEXT, "-z", "-p9999", "-e9998");
-    session = new ClientSession(LOCALHOST, 9999, ADMIN, ADMIN);
+    server = createServer();
+    session = createClient();
     cleanUp();
   }
 
@@ -55,9 +47,6 @@ public final class ServerCommandTest extends CommandTest {
     }
     // stop server instance
     if(server != null) server.stop();
-
-    assertTrue(sandbox().delete());
-    CONTEXT.close();
   }
 
   /**
@@ -69,8 +58,8 @@ public final class ServerCommandTest extends CommandTest {
     ok(new Kill(ADMIN));
     ok(new Kill(ADMIN + '2'));
     ok(new Kill(Prop.NAME + '*'));
-    ok(new CreateUser(NAME2, Token.md5("test")));
-    final ClientSession cs = new ClientSession(LOCALHOST, 9999, NAME2, "test");
+    ok(new CreateUser(NAME2, Token.md5(NAME2)));
+    final ClientSession cs = createClient(NAME2, NAME2);
     ok(new Kill(NAME2));
     ok(new Kill(NAME2 + '?'));
     cs.close();

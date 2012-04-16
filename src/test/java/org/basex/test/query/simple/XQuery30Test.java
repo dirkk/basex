@@ -1,6 +1,6 @@
 package org.basex.test.query.simple;
 
-import org.basex.test.query.QueryTest;
+import org.basex.test.query.*;
 
 /**
  * XQuery 3.0 tests (former: 1.1).
@@ -57,6 +57,14 @@ public final class XQuery30Test extends QueryTest {
       { "FLWOR 13", itr(2), "for $a in 1 let $a:=$a+1 group by $a return $a" },
       { "FLWOR 14", itr(1, 2),
           "for $i as xs:integer in (1,2) let $j := 42 group by $j return $i" },
+      { "FLWOR 15", itr(2, 4, 1, 3), "for $i in 1 to 4 group by $g := $i mod 2 " +
+          "order by $g return $i" },
+      { "FLWOR 16", itr(1, 2, 3, 4), "for $i in 1 to 4 group by $g := 5 return $i" },
+      { "FLWOR 17", itr(2, 4, 1, 3), "for $i in 1 to 4 " +
+          "group by $g as xs:integer := $i mod 2 order by $g return $i" },
+      { "FLWOR 18", itr(1, 2), "for $i in 1 to 2 group by $g as item() := 5 return $i" },
+      { "FLWOR 19", "for $i in 1 to 2 group by $g as node() := 5 return $i" },
+      { "FLWOR 19", "for $i in 1 to 2 let $g := $i group by $i as xs:integer return $i" },
 
       { "Concat 1", str("ab"), "'a'||'b'" },
       { "Concat 2", str("ab"), "'a' || 'b'" },
@@ -66,6 +74,15 @@ public final class XQuery30Test extends QueryTest {
       { "Try/catch 1", str("X"), "try { 1+'a' } catch * { 'X' }" },
       { "Try/catch 2", str("X"), "try { for $i in (42,0)" +
           "return 1 idiv $i } catch * {'X'}" },
+      { "Try/catch 3", itr(42), "try { error(xs:QName('local:error')) } " +
+          "catch local:error { 42 }" },
+      { "Try/catch 4", itr(42), "try { error(xs:QName('local:error')) } " +
+          "catch Q{http://www.w3.org/2005/xquery-local-functions}error { 42 }" },
+      { "Try/catch 5", itr(42), "try { error() } catch err:FOER0000 { 42 }" },
+      { "Try/catch 6", itr(42),
+          "declare function local:a($n) { try { local:b() } catch * { $n } };" +
+          "declare function local:b() { (: fails at compile-time :) xs:QName('b:b') };" +
+          "local:a(42)" },
     };
   }
 }

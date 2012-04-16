@@ -32,11 +32,11 @@ public interface QueryText {
   /** Parser token. */
   String ATTRIBUTE = "attribute";
   /** Parser token. */
-  String BASEURI = "base-uri";
+  String BASE_URI = "base-uri";
   /** Parser token. */
   String BEFORE = "before";
   /** Parser token. */
-  String BOUNDARY = "boundary-space";
+  String BOUNDARY_SPACE = "boundary-space";
   /** Parser token. */
   String BY = "by";
   /** Parser token. */
@@ -62,9 +62,9 @@ public interface QueryText {
   /** Parser token. */
   String COPY = "copy";
   /** Parser token. */
-  String COPYNS = "copy-namespaces";
+  String COPY_NAMESPACES = "copy-namespaces";
   /** Parser token. */
-  String DECFORMAT = "decimal-format";
+  String DECIMAL_FORMAT = "decimal-format";
   /** Parser token. */
   String DECLARE = "declare";
   /** Parser token. */
@@ -110,7 +110,7 @@ public interface QueryText {
   /** Parser token. */
   String FROM = "from";
   /** Parser token. */
-  String FTOPTION = "ft-option";
+  String FT_OPTION = "ft-option";
   /** Parser token. */
   String FTAND = "ftand";
   /** Parser token. */
@@ -174,9 +174,9 @@ public interface QueryText {
   /** Parser token. */
   String NSPACE = "namespace";
   /** Parser token. */
-  String NOINHERIT = "no-inherit";
+  String NO_INHERIT = "no-inherit";
   /** Parser token. */
-  String NOPRESERVE = "no-preserve";
+  String NO_PRESERVE = "no-preserve";
   /** Parser token. */
   String NODE = "node";
   /** Parser token. */
@@ -230,9 +230,9 @@ public interface QueryText {
   /** Parser token. */
   String SCHEMA = "schema";
   /** Parser token. */
-  String SCHEMAATTRIBUTE = "schema-attribute";
+  String SCHEMA_ATTRIBUTE = "schema-attribute";
   /** Parser token. */
-  String SCHEMAELEMENT = "schema-element";
+  String SCHEMA_ELEMENT = "schema-element";
   /** Parser token. */
   String SCORE = "score";
   /** Parser token. */
@@ -314,6 +314,8 @@ public interface QueryText {
   /** Parser token. */
   String WORDS = "words";
   /** Parser token. */
+  String XMLSTR = "xml";
+  /** Parser token. */
   String XQUERY = "xquery";
 
   /** Parser token. */
@@ -355,6 +357,8 @@ public interface QueryText {
   String BR1 = "[";
   /** Parser token. */
   String BR2 = "]";
+  /** Parser token. */
+  String EQNAME = "Q{";
   /** Parser token. */
   String BRACE1 = "{";
   /** Parser token. */
@@ -463,6 +467,8 @@ public interface QueryText {
   byte[] CRYPTO = token("crytpo");
   /** Repo token. */
   byte[] REPO = token("repo");
+  /** Rest token. */
+  byte[] REST = token("rest");
 
   /** Language attribute. */
   byte[] LANG = token("xml:lang");
@@ -496,8 +502,8 @@ public interface QueryText {
 
   /** EXQuery URI. */
   String EXQUERY = "http://exquery.org/ns/";
-  /** REXQ URI. */
-  byte[] REXQURI = token(EXQUERY + "rest/annotation");
+  /** RESTXQ URI. */
+  byte[] RESTXQURI = token(EXQUERY + "restxq");
 
   /** EXPath URI. */
   String EXPATH = "http://expath.org/ns/";
@@ -536,13 +542,12 @@ public interface QueryText {
   byte[] REPOURI = token(BXMODULES + "repo");
 
   /** Java prefix. */
-  byte[] JAVAPRE = token("java:");
+  byte[] JAVAPREF = token("java:");
   /** Default collation. */
   byte[] URLCOLL = concat(FNURI, token("/collation/codepoint"));
 
   /** Static modules. */
-  TokenSet MODULES = new TokenSet(FILEURI, HTTPURI, PKGURI, ZIPURI, SQLURI,
-      CRYPTOURI);
+  TokenSet MODULES = new TokenSet(FILEURI, HTTPURI, PKGURI, ZIPURI, SQLURI, CRYPTOURI);
 
   // QUERY PLAN ===============================================================
 

@@ -6,9 +6,9 @@ import static org.junit.Assert.*;
 import java.io.*;
 
 import org.basex.io.out.*;
-import org.basex.query.util.Err;
-import org.basex.test.query.AdvancedQueryTest;
-import org.junit.Test;
+import org.basex.query.util.*;
+import org.basex.test.query.*;
+import org.junit.*;
 
 /**
  * This class tests the XQuery utility functions prefixed with "util".
@@ -188,5 +188,20 @@ public final class FNUtilTest extends AdvancedQueryTest {
   public void utilPath() {
     check(_UTIL_PATH);
     query(_UTIL_PATH.args(), "");
+  }
+
+  /**
+   * Test method for the util:type() function.
+   */
+  @Test
+  public void utilType() {
+    final PrintStream err = System.err;
+    System.setErr(NULL);
+    check(_UTIL_TYPE);
+    query(_UTIL_TYPE.args("()"), "");
+    query(_UTIL_TYPE.args("1"), "1");
+    query(_UTIL_TYPE.args("(1, 2, 3)"), "1 2 3");
+    query(_UTIL_TYPE.args("<x a='1' b='2' c='3'/>/@*/data()"), "1 2 3");
+    System.setErr(err);
   }
 }

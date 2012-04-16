@@ -25,6 +25,8 @@ import org.basex.util.*;
 public final class Add extends ACreate {
   /** Builder. */
   private Builder build;
+  /** Indicates if database should be locked. */
+  boolean lock = true;
 
   /**
    * Constructor, specifying a target path.
@@ -47,15 +49,14 @@ public final class Add extends ACreate {
    * @param input input file or XML string
    */
   public Add(final String path, final String input) {
-    super(DATAREF | User.WRITE, path == null ? "" : path, input);
+    super(Perm.WRITE, true, path == null ? "" : path, input);
   }
 
   @Override
   protected boolean run() {
-    final boolean create = context.user.perm(User.CREATE);
+    final boolean create = context.user.has(Perm.CREATE);
     String name = MetaData.normPath(args[0]);
-    if(name == null || name.endsWith("."))
-      return error(NAME_INVALID_X, args[0]);
+    if(name == null || name.endsWith(".")) return error(NAME_INVALID_X, args[0]);
 
     // add slash to the target if the addressed file is an archive or directory
     IO io = null;
@@ -72,7 +73,7 @@ public final class Add extends ACreate {
     }
 
     if(io != null) {
-      if(!io.exists()) return error(FILE_NOT_FOUND_X, create ? io : args[1]);
+      if(!io.exists()) return error(RESOURCE_NOT_FOUND_X, create ? io : args[1]);
       if(!name.endsWith("/") && (io.isDir() || io.isArchive())) name += '/';
     }
 
@@ -85,16 +86,16 @@ public final class Add extends ACreate {
 
     final Data data = context.data();
     final Parser parser;
-
     if(io != null) {
       // set name of document
       if(!name.isEmpty()) io.name(name);
       // get name from io reference
       else if(!(io instanceof IOContent)) name = io.name();
-      parser = new DirParser(io, target, prop, data.meta.path);
+      parser = new DirParser(io, prop, data.meta.path);
     } else {
-      parser = new SAXWrapper(new SAXSource(in), name, target, context.prop);
+      parser = new SAXWrapper(new SAXSource(in), name, context.prop);
     }
+    parser.target(target);
 
     // ensure that the final name is not empty
     if(name.isEmpty()) return error(NAME_INVALID_X, name);
@@ -113,20 +114,11 @@ public final class Add extends ACreate {
 
     // create random database name for disk-based creation
     final String db = large ? context.mprop.random(data.meta.name) : name;
-    build = large ? new DiskBuilder(db, parser, context) :
-      new MemBuilder(db, parser, context.prop);
+    build = large ? new DiskBuilder(db, parser, context) : new MemBuilder(db, parser);
 
     Data tmp = null;
     try {
       tmp = build.build();
-      // ignore empty fragments
-      if(tmp.meta.size > 1) {
-        data.insert(data.meta.size, -1, tmp);
-        context.update();
-        data.flush();
-      }
-      return info(parser.info() + PATH_ADDED_X_X, name, perf);
-
     } catch(final IOException ex) {
       Util.debug(ex);
       return error(Util.message(ex));
@@ -134,15 +126,25 @@ public final class Add extends ACreate {
     } finally {
       // close and drop intermediary database instance
       try { build.close(); } catch(final IOException e) { }
-      if(tmp != null) try { tmp.close(); } catch(final IOException e) { }
+      if(tmp != null) tmp.close();
       // drop temporary database instance
-      if(large) DropDB.drop(db, context.mprop);
+      if(large) DropDB.drop(db, context);
     }
+
+    // skip update if fragment is empty
+    if(tmp.meta.size > 1) {
+      if(lock && !data.startUpdate()) return error(DB_PINNED_X, data.meta.name);
+      data.insert(data.meta.size, -1, tmp);
+      context.update();
+      if(lock) data.finishUpdate();
+    }
+    // return info message
+    return info(parser.info() + PATH_ADDED_X_X, name, perf);
   }
 
   @Override
   public void build(final CommandBuilder cb) {
-    cb.init().arg(TO, 0).arg(1);
+    cb.init().arg(C_TO, 0).arg(1);
   }
 
   @Override

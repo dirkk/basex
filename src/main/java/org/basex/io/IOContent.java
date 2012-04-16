@@ -1,6 +1,5 @@
 package org.basex.io;
 
-import java.io.ByteArrayInputStream;
 import org.basex.io.in.ArrayInput;
 import org.basex.util.Token;
 import org.xml.sax.InputSource;
@@ -26,6 +25,14 @@ public final class IOContent extends IO {
   /**
    * Constructor.
    * @param c contents
+   */
+  public IOContent(final String c) {
+    this(Token.token(c), "");
+  }
+
+  /**
+   * Constructor.
+   * @param c contents
    * @param p content path
    */
   public IOContent(final byte[] c, final String p) {
@@ -45,7 +52,7 @@ public final class IOContent extends IO {
 
   @Override
   public InputSource inputSource() {
-    return new InputSource(new ByteArrayInputStream(cont));
+    return new InputSource(inputStream());
   }
 
   @Override

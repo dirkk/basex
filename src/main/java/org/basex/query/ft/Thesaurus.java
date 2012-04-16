@@ -112,8 +112,7 @@ public final class Thesaurus {
    */
   private void init(final InputInfo ii) throws QueryException {
     try {
-      final Data data = MemBuilder.build(
-          Parser.xmlParser(file, ctx.prop), ctx.prop);
+      final Data data = MemBuilder.build(Parser.xmlParser(file, ctx.prop));
       final Nodes result = nodes("//*:entry", new Nodes(0, data));
       for(int n = 0; n < result.size(); ++n) {
         build(new Nodes(result.list[n], data));
@@ -167,9 +166,8 @@ public final class Thesaurus {
    * @return resulting nodes
    * @throws QueryException query exception
    */
-  private Nodes nodes(final String query, final Nodes in)
-      throws QueryException {
-    return new QueryProcessor(query, in, ctx).queryNodes();
+  private Nodes nodes(final String query, final Nodes in) throws QueryException {
+    return new QueryProcessor(query, ctx).context(in).queryNodes();
   }
 
   /**
@@ -179,9 +177,8 @@ public final class Thesaurus {
    * @return resulting text
    * @throws QueryException query exception
    */
-  private byte[] text(final String query, final Nodes in)
-      throws QueryException {
-    return new QueryProcessor(query, in, ctx).iter().next().string(null);
+  private byte[] text(final String query, final Nodes in) throws QueryException {
+    return new QueryProcessor(query, ctx).context(in).iter().next().string(null);
   }
 
   /**

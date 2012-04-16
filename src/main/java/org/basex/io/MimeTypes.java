@@ -2,11 +2,11 @@ package org.basex.io;
 
 import static org.basex.util.Token.*;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.HashMap;
+
+import org.basex.io.in.*;
 import org.basex.util.Util;
 
 /**
@@ -18,35 +18,43 @@ import org.basex.util.Util;
  * @author Christian Gruen
  */
 public final class MimeTypes {
-  /** Media type: text/xml. */
-  private static final String TEXT_XML = "text/xml";
-  /** Media type: text/html. */
-  public static final String TEXT_HTML = "text/html";
-  /** Media type: text/plain. */
-  public static final String TEXT_PLAIN = "text/plain";
-  /** Media type: text/comma-separated-values. */
-  public static final String TEXT_CSV = "text/comma-separated-values";
-  /** Media type: text/plain. */
-  public static final String APP_OCTET = "application/octet-stream";
-  /** Media type: application/xml. */
-  public static final String APP_XML = "application/xml";
-  /** Media type: application/xquery. */
-  public static final String APP_XQUERY = "application/xquery";
+  /** Content-Type. */
+  public static final String CONTENT_TYPE = "Content-Type";
+  /** Charset. */
+  public static final String CHARSET = "; charset=";
+
+  /** Media type: application/html+xml. */
+  public static final String APP_HTML_XML = "application/html+xml";
   /** Media type: application/json. */
   public static final String APP_JSON = "application/json";
   /** Media type: application/jsonml+json. */
   public static final String APP_JSONML = "application/jsonml+json";
+  /** Media type: text/plain. */
+  public static final String APP_OCTET = "application/octet-stream";
+  /** Media type: application/xml. */
+  public static final String APP_XML = "application/xml";
+  /** Media type: application/xml-external-parsed-entity. */
+  public static final String APP_EXT_XML = "application/xml-external-parsed-entity";
+  /** Media type: application/x-www-form-urlencoded. */
+  public static final String APP_FORM = "application/x-www-form-urlencoded";
+  /** Media type: multipart/form-data. */
+  public static final String MULTIPART_FORM = "multipart/form-data";
 
-  /** XML media type. */
-  private static final String APPL_EXT_XML =
-      "application/xml-external-parsed-entity";
-  /** XML media type. */
-  private static final String TXT_EXT_XML =
-      "text/xml-external-parsed-entity";
+  /** Media type: text/comma-separated-values. */
+  public static final String TEXT_CSV = "text/comma-separated-values";
+  /** Media type: text/html. */
+  public static final String TEXT_HTML = "text/html";
+  /** Media type: text/plain. */
+  public static final String TEXT_PLAIN = "text/plain";
+  /** Media type: text/xml. */
+  public static final String TEXT_XML = "text/xml";
+
   /** XML media types' suffix. */
-  private static final String MIME_XML_SUFFIX = "+xml";
+  public static final String MIME_XML_SUFFIX = "+xml";
   /** Text media types' prefix. */
   public static final String MIME_TEXT_PREFIX = "text/";
+  /** XML media type. */
+  public static final String TEXT_XML_EXT = "text/xml-external-parsed-entity";
 
   /** Private constructor. */
   private MimeTypes() { }
@@ -58,29 +66,34 @@ public final class MimeTypes {
    * @return mime-type
    */
   public static String get(final String path) {
-    final int i = path.lastIndexOf('.');
-    if(i != -1) {
-      final String ct = TYPES.get(path.substring(i + 1));
-      if(ct != null) return ct;
-    }
-    return APP_OCTET;
+    final String ct = TYPES.get(IO.suffix(path));
+    return ct != null ? ct : APP_OCTET;
   }
 
   /**
    * Checks if the content type is an XML content type.
    * @param type content type
-   * @return result
+   * @return result of check
    */
   public static boolean isXML(final String type) {
-    return eq(type, TEXT_XML, TXT_EXT_XML, APP_XML, APPL_EXT_XML) ||
+    return eq(type, TEXT_XML, TEXT_XML_EXT, APP_XML, APP_EXT_XML) ||
         type.endsWith(MIME_XML_SUFFIX);
+  }
+
+  /**
+   * Checks if the main part of the content type is {@code "text"}.
+   * @param type content type
+   * @return result of check
+   */
+  public static boolean isText(final String type) {
+    return type.startsWith(MIME_TEXT_PREFIX);
   }
 
   /**
    * Checks if a content type is accepted by the specified pattern.
    * @param type content type
    * @param pattern pattern
-   * @return result
+   * @return result of check
    */
   public static boolean matches(final String type, final String pattern) {
     final String[] t = type.split("/", 2);
@@ -91,20 +104,19 @@ public final class MimeTypes {
   }
 
   /** Hash map containing all assignments. */
-  private static final HashMap<String, String> TYPES =
-      new HashMap<String, String>();
+  private static final HashMap<String, String> TYPES = new HashMap<String, String>();
 
   /** Reads in the mime-types. */
   static {
-    BufferedReader br = null;
+    NewlineInput nli = null;
     try {
       final String file = "/mime.txt";
       final InputStream is = MimeTypes.class.getResourceAsStream(file);
       if(is == null) {
         Util.errln(file + " not found.");
       } else {
-        br = new BufferedReader(new InputStreamReader(is));
-        for(String line; (line = br.readLine()) != null;) {
+        nli = new NewlineInput(is);
+        for(String line; (line = nli.readLine()) != null;) {
           final int i = line.indexOf('\t');
           if(i == -1 || line.startsWith("#")) continue;
           TYPES.put(line.substring(0, i), line.substring(i + 1));
@@ -113,7 +125,7 @@ public final class MimeTypes {
     } catch(final IOException ex) {
       Util.errln(ex);
     } finally {
-      if(br != null) try { br.close(); } catch(final IOException ex) { }
+      if(nli != null) try { nli.close(); } catch(final IOException ex) { }
     }
   }
 }

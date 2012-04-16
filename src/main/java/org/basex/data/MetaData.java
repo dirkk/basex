@@ -57,16 +57,12 @@ public final class MetaData {
   public boolean attrindex;
   /** Indicates if a full-text index exists. */
   public boolean ftxtindex;
-  /** Indicates if a path index exists. */
-  public boolean pathindex;
   /** Indicates if text index is to be recreated. */
   public boolean createtext;
   /** Indicates if attribute index is to be recreated. */
   public boolean createattr;
   /** Indicates if full-text index is to be recreated. */
   public boolean createftxt;
-  /** Indicates if path index is to be recreated. */
-  public boolean createpath;
 
   /** Flag for wildcard indexing. */
   public boolean wildcards;
@@ -116,7 +112,7 @@ public final class MetaData {
 
   /**
    * Constructor, specifying the database name and context.
-   * @param db database name
+   * @param db name of the database
    * @param ctx database context
    */
   public MetaData(final String db, final Context ctx) {
@@ -125,7 +121,7 @@ public final class MetaData {
 
   /**
    * Constructor, specifying the database name.
-   * @param db database name
+   * @param db name of the database
    * @param pr database properties
    * @param mprop main properties
    */
@@ -137,7 +133,6 @@ public final class MetaData {
     createtext = prop.is(Prop.TEXTINDEX);
     createattr = prop.is(Prop.ATTRINDEX);
     createftxt = prop.is(Prop.FTINDEX);
-    createpath = prop.is(Prop.PATHINDEX);
     diacritics = prop.is(Prop.DIACRITICS);
     wildcards = prop.is(Prop.WILDCARDS);
     stemming = prop.is(Prop.STEMMING);
@@ -155,13 +150,11 @@ public final class MetaData {
   /**
    * Checks if the specified file path refers to the specified database.
    * @param path file path
-   * @param db database name
+   * @param db name of the database
    * @param mprop main properties
    * @return result of check
    */
-  public static boolean found(final String path, final String db,
-      final MainProp mprop) {
-
+  public static boolean found(final String path, final String db, final MainProp mprop) {
     // return true if the database exists and if the
     // specified path and database name equal each other
     final IOFile file = mprop.dbpath(db);
@@ -243,6 +236,31 @@ public final class MetaData {
     return nl != 0;
   }
 
+  /**
+   * Calculates the database size.
+   * @param io current file
+   * @return file length
+   */
+  private static long dbsize(final IOFile io) {
+    long s = 0;
+    if(io.isDir()) {
+      for(final IOFile f : io.children()) s += dbsize(f);
+    } else {
+      s += io.length();
+    }
+    return s;
+  }
+
+  /**
+   * Creates a database file.
+   * @param path database path
+   * @param fn filename
+   * @return database filename
+   */
+  public static IOFile file(final IOFile path, final String fn) {
+    return new IOFile(path, fn + IO.BASEXSUFFIX);
+  }
+
   // PUBLIC METHODS ===========================================================
 
   /**
@@ -259,21 +277,6 @@ public final class MetaData {
    */
   public long dbtime() {
     return path != null ? path.timeStamp() : 0;
-  }
-
-  /**
-   * Calculates the database size.
-   * @param io current file
-   * @return file length
-   */
-  private static long dbsize(final IOFile io) {
-    long s = 0;
-    if(io.isDir()) {
-      for(final IOFile f : io.children()) s += dbsize(f);
-    } else {
-      s += io.length();
-    }
-    return s;
   }
 
   /**
@@ -347,11 +350,9 @@ public final class MetaData {
         else if(k.equals(DBFTDC))     diacritics = toBool(v);
         else if(k.equals(DBCHOP))     chop       = toBool(v);
         else if(k.equals(DBUPDIDX))   updindex   = toBool(v);
-        else if(k.equals(DBPTHIDX))   pathindex  = toBool(v);
         else if(k.equals(DBTXTIDX))   textindex  = toBool(v);
         else if(k.equals(DBATVIDX))   attrindex  = toBool(v);
         else if(k.equals(DBFTXIDX))   ftxtindex  = toBool(v);
-        else if(k.equals(DBCRTPTH))   createpath = toBool(v);
         else if(k.equals(DBCRTTXT))   createtext = toBool(v);
         else if(k.equals(DBCRTATV))   createattr = toBool(v);
         else if(k.equals(DBCRTFTX))   createftxt = toBool(v);
@@ -359,10 +360,13 @@ public final class MetaData {
         else if(k.equals(DBFTST))     stemming   = toBool(v);
         else if(k.equals(DBFTCS))     casesens   = toBool(v);
         else if(k.equals(DBFTDC))     diacritics = toBool(v);
-        else if(k.equals(DBUPTODATE)) uptodate   = toBool(v);
         else if(k.equals(DBFTLN))     language   = Language.get(v);
+        else if(k.equals(DBUPTODATE)) uptodate   = toBool(v);
+        // legacy: set up-to-date flag to false if path index does not exist
+        else if(k.equals(DBPTHIDX) && !toBool(v)) uptodate = false;
       }
     }
+
     // check version of database storage
     if(!storage.equals(STORAGE) && new Version(storage).compareTo(new Version(
         STORAGE)) > 0) throw new BuildException(H_DB_FORMAT, storage);
@@ -388,11 +392,9 @@ public final class MetaData {
     writeInfo(out, DBSIZE,     size);
     writeInfo(out, DBCHOP,     chop);
     writeInfo(out, DBUPDIDX,   updindex);
-    writeInfo(out, DBPTHIDX,   pathindex);
     writeInfo(out, DBTXTIDX,   textindex);
     writeInfo(out, DBATVIDX,   attrindex);
     writeInfo(out, DBFTXIDX,   ftxtindex);
-    writeInfo(out, DBCRTPTH,   createpath);
     writeInfo(out, DBCRTTXT,   createtext);
     writeInfo(out, DBCRTATV,   createattr);
     writeInfo(out, DBCRTFTX,   createftxt);
@@ -474,15 +476,5 @@ public final class MetaData {
       final String v) throws IOException {
     out.writeToken(token(k));
     out.writeToken(token(v));
-  }
-
-  /**
-   * Creates a database file instance.
-   * @param path database path
-   * @param fn filename
-   * @return database filename
-   */
-  private static IOFile file(final IOFile path, final String fn) {
-    return new IOFile(path, fn + IO.BASEXSUFFIX);
   }
 }

@@ -2,20 +2,15 @@ package org.basex.index.path;
 
 import static org.basex.util.Token.*;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
-import org.basex.data.Data;
-import org.basex.data.MetaData;
-import org.basex.index.Index;
-import org.basex.index.IndexIterator;
-import org.basex.index.IndexToken;
+import org.basex.data.*;
+import org.basex.index.*;
 import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
-import org.basex.util.Array;
-import org.basex.util.Util;
-import org.basex.util.hash.TokenIntMap;
-import org.basex.util.list.TokenList;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * This class stores the path summary of a database.
@@ -196,8 +191,7 @@ public final class PathSummary implements Index {
     for(final byte[] i : tl) {
       final boolean att = startsWith(i, '@');
       final byte kind = att ? Data.ATTR : Data.ELEM;
-      final int id = att ? data.atnindex.id(substring(i, 1)) :
-        data.tagindex.id(i);
+      final int id = att ? data.atnindex.id(substring(i, 1)) : data.tagindex.id(i);
 
       final ArrayList<PathNode> out = new ArrayList<PathNode>();
       for(final PathNode n : in) {
@@ -211,7 +205,7 @@ public final class PathSummary implements Index {
     }
 
     // sort by number of occurrences
-    final double[] tmp = new double[in.size()];
+    final int[] tmp = new int[in.size()];
     for(int i = 0; i < in.size(); ++i) tmp[i] = in.get(i).stats.count;
     final int[] occ = Array.createOrder(tmp, false);
 
@@ -248,7 +242,7 @@ public final class PathSummary implements Index {
   }
 
   @Override
-  public TokenIntMap entries(final byte[] prefix) {
+  public EntryIterator entries(final byte[] prefix) {
     throw Util.notexpected();
   }
 

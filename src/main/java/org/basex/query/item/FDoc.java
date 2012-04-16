@@ -8,6 +8,7 @@ import org.basex.query.iter.AxisMoreIter;
 import org.basex.query.iter.NodeCache;
 import org.basex.util.Util;
 import org.basex.util.hash.TokenMap;
+import org.basex.util.list.*;
 import org.w3c.dom.DocumentFragment;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -41,6 +42,20 @@ public final class FDoc extends FNode {
     super(NodeType.DOC);
     children = ch;
     base = b;
+    // update parent references
+    final long ns = (int) ch.size();
+    for(int n = 0; n < ns; ++n) ch.get(n).parent(this);
+  }
+
+  /**
+   * Adds a node and updates its parent reference.
+   * @param node node to be added
+   * @return self reference
+   */
+  public FDoc add(final ANode node) {
+    children.add(node);
+    node.parent(this);
+    return this;
   }
 
   /**
@@ -59,7 +74,9 @@ public final class FDoc extends FNode {
 
   @Override
   public void serialize(final Serializer ser) throws IOException {
+    ser.openDoc(base);
     for(int c = 0; c < children.size(); ++c) children.get(c).serialize(ser);
+    ser.closeDoc();
   }
 
   @Override
@@ -90,6 +107,11 @@ public final class FDoc extends FNode {
   @Override
   public void plan(final Serializer ser) throws IOException {
     ser.emptyElement(this, BASE, base);
+  }
+
+  @Override
+  public byte[] xdmInfo() {
+    return new ByteList().add(super.xdmInfo()).add(base).add(0).toArray();
   }
 
   @Override

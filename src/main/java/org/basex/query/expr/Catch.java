@@ -74,11 +74,11 @@ public final class Catch extends Single {
     final int s = prepare(ctx);
     try {
       int i = 0;
-      final byte[] io = ex.file() == null ? EMPTY : token(ex.file().path());
+      final byte[] io = ex.file() == null ? EMPTY : token(ex.file());
       final Value val = ex.value();
       for(final Value v : new Value[] { ex.qname(),
           Str.get(ex.getLocalizedMessage()), val == null ? Empty.SEQ : val,
-          Str.get(io), Int.get(ex.col()), Int.get(ex.line()), Empty.SEQ }) {
+          Str.get(io), Int.get(ex.line()), Int.get(ex.col()), Empty.SEQ }) {
         vars[i++].bind(v, ctx);
       }
       return ctx.value(expr);
@@ -107,9 +107,9 @@ public final class Catch extends Single {
   private boolean find(final Err err, final QNm code) {
     for(final QNm c : codes) {
       if(c != null) {
-        final byte[] cu = c.uri();
-        if(err == null || cu.length != 0 &&
-            !eq(err.qname().uri(), cu)) continue;
+        final byte[] cu = c.uri(), eu = err != null ? err.qname().uri() :
+          code.hasURI() ? code.uri() : null;
+        if(eu == null || cu.length != 0 && !eq(eu, cu)) continue;
         final byte[] nm = c.local();
         if(nm.length != 0 && !eq(code.local(), nm)) continue;
       }

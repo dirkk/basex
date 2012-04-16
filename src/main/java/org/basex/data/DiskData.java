@@ -2,32 +2,25 @@ package org.basex.data;
 
 import static org.basex.data.DataText.*;
 import static org.basex.util.Token.*;
-import java.io.IOException;
-import org.basex.build.DiskBuilder;
-import org.basex.core.BaseXException;
-import org.basex.core.Context;
-import org.basex.core.Prop;
-import org.basex.core.Text;
-import org.basex.core.cmd.Open;
-import org.basex.index.IdPreMap;
-import org.basex.index.Index;
+
+import java.io.*;
+import java.nio.channels.*;
+
+import org.basex.build.*;
+import org.basex.core.*;
+import org.basex.core.cmd.*;
+import org.basex.index.*;
 import org.basex.index.IndexToken.IndexType;
-import org.basex.index.ft.FTIndex;
-import org.basex.index.path.PathSummary;
-import org.basex.index.value.DiskValues;
-import org.basex.index.value.UpdatableDiskValues;
-import org.basex.index.Names;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
+import org.basex.index.ft.*;
+import org.basex.index.path.*;
+import org.basex.index.value.*;
+import org.basex.io.*;
 import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
-import org.basex.io.random.DataAccess;
-import org.basex.io.random.TableDiskAccess;
-import org.basex.util.Compress;
-import org.basex.util.Num;
-import org.basex.util.hash.TokenObjMap;
-import org.basex.util.list.IntList;
-import org.basex.util.Util;
+import org.basex.io.random.*;
+import org.basex.util.*;
+import org.basex.util.hash.*;
+import org.basex.util.list.*;
 
 /**
  * This class stores and organizes the database table and the index structures
@@ -49,6 +42,8 @@ public final class DiskData extends Data {
   private TokenObjMap<IntList> txts;
   /** Attribute values buffered for subsequent index updates. */
   private TokenObjMap<IntList> atvs;
+  /** Closed flag. */
+  private boolean closed;
 
   /**
    * Default constructor, called from {@link Open#open}.
@@ -59,9 +54,8 @@ public final class DiskData extends Data {
   public DiskData(final String db, final Context ctx) throws IOException {
     meta = new MetaData(db, ctx);
 
-    // don't allow to open locked databases
-    if(updateFile().exists())
-      throw new BaseXException(Text.DB_UPDATED_X, meta.name);
+    // don't open databases marked as updating
+    if(updateFile().exists()) throw new BaseXException(Text.DB_UPDATED_X, meta.name);
 
     final DataInput in = new DataInput(meta.dbfile(DATAINF));
     try {
@@ -76,20 +70,21 @@ public final class DiskData extends Data {
         else if(k.equals(DBNS))   nspaces = new Namespaces(in);
         else if(k.equals(DBDOCS)) resources.read(in);
       }
-      // open data and indexes
-      init();
-      if(meta.updindex) {
-        idmap = new IdPreMap(meta.dbfile(DATAIDP));
-        if(meta.textindex) txtindex = new UpdatableDiskValues(this, true);
-        if(meta.attrindex) atvindex = new UpdatableDiskValues(this, false);
-      } else {
-        if(meta.textindex) txtindex = new DiskValues(this, true);
-        if(meta.attrindex) atvindex = new DiskValues(this, false);
-      }
-      if(meta.ftxtindex) ftxindex = FTIndex.get(this, meta.wildcards);
     } finally {
       in.close();
     }
+
+    // open data and indexes
+    if(meta.updindex) {
+      idmap = new IdPreMap(meta.dbfile(DATAIDP));
+      if(meta.textindex) txtindex = new UpdatableDiskValues(this, true);
+      if(meta.attrindex) atvindex = new UpdatableDiskValues(this, false);
+    } else {
+      if(meta.textindex) txtindex = new DiskValues(this, true);
+      if(meta.attrindex) atvindex = new DiskValues(this, false);
+    }
+    if(meta.ftxtindex) ftxindex = FTIndex.get(this, meta.wildcards);
+    init();
   }
 
   /**
@@ -112,15 +107,16 @@ public final class DiskData extends Data {
     nspaces = n;
     if(meta.updindex) idmap = new IdPreMap(meta.lastid);
     init();
-    flush();
   }
 
-  @Override
+  /**
+   * Initializes the database.
+   * @throws IOException I/O exception
+   */
   public void init() throws IOException {
-    table = new TableDiskAccess(meta, DATATBL);
+    table = new TableDiskAccess(meta, false);
     texts = new DataAccess(meta.dbfile(DATATXT));
     values = new DataAccess(meta.dbfile(DATAATV));
-    super.init();
   }
 
   /**
@@ -128,61 +124,58 @@ public final class DiskData extends Data {
    * @throws IOException I/O exception
    */
   private void write() throws IOException {
-    final DataOutput out = new DataOutput(meta.dbfile(DATAINF));
-    meta.write(out);
-    out.writeToken(token(DBTAGS));
-    tagindex.write(out);
-    out.writeToken(token(DBATTS));
-    atnindex.write(out);
-    out.writeToken(token(DBPATH));
-    paths.write(out);
-    out.writeToken(token(DBNS));
-    nspaces.write(out);
-    out.writeToken(token(DBDOCS));
-    resources.write(out);
-    out.write(0);
-    out.close();
-    if(idmap != null) idmap.write(meta.dbfile(DATAIDP));
+    if(meta.dirty) {
+      final DataOutput out = new DataOutput(meta.dbfile(DATAINF));
+      meta.write(out);
+      out.writeToken(token(DBTAGS));
+      tagindex.write(out);
+      out.writeToken(token(DBATTS));
+      atnindex.write(out);
+      out.writeToken(token(DBPATH));
+      paths.write(out);
+      out.writeToken(token(DBNS));
+      nspaces.write(out);
+      out.writeToken(token(DBDOCS));
+      resources.write(out);
+      out.write(0);
+      out.close();
+      if(idmap != null) idmap.write(meta.dbfile(DATAIDP));
+      meta.dirty = false;
+    }
+    // in all cases, remove updating file
+    updateFile().delete();
   }
 
   @Override
-  public synchronized void flush() {
-    if(!meta.prop.is(Prop.AUTOFLUSH)) return;
+  public synchronized void close() {
+    if(closed) return;
+    closed = true;
     try {
-      if(meta.dirty) write();
-      table.flush();
-      texts.flush();
-      values.flush();
-      if(txtindex != null) ((DiskValues) txtindex).flush();
-      if(atvindex != null) ((DiskValues) atvindex).flush();
-      meta.dirty = false;
+      write();
+      table.close();
+      texts.close();
+      values.close();
+      closeIndex(IndexType.TEXT);
+      closeIndex(IndexType.ATTRIBUTE);
+      closeIndex(IndexType.FULLTEXT);
     } catch(final IOException ex) {
       Util.stack(ex);
     }
   }
 
   @Override
-  public synchronized void close() throws IOException {
-    if(meta.dirty) write();
-    table.close();
-    texts.close();
-    values.close();
-    closeIndex(IndexType.TEXT);
-    closeIndex(IndexType.ATTRIBUTE);
-    closeIndex(IndexType.FULLTEXT);
-  }
-
-  @Override
-  public synchronized void closeIndex(final IndexType type) throws IOException {
+  public synchronized void closeIndex(final IndexType type) {
+    // close existing index
     final Index index = index(type);
     if(index == null) return;
-
     index.close();
+
+    // invalidate index reference
+    meta.dirty = true;
     switch(type) {
       case TEXT:      txtindex = null; break;
       case ATTRIBUTE: atvindex = null; break;
       case FULLTEXT:  ftxindex = null; break;
-      case PATH:      paths.close(); break;
       default:        break;
     }
   }
@@ -194,15 +187,58 @@ public final class DiskData extends Data {
       case TEXT:      txtindex = index; break;
       case ATTRIBUTE: atvindex = index; break;
       case FULLTEXT:  ftxindex = index; break;
-      case PATH:      paths = (PathSummary) index; break;
       default:        break;
     }
   }
 
   @Override
-  public boolean updating(final boolean updating) {
-    final IOFile upd = updateFile();
-    return updating ? upd.touch() : upd.delete();
+  public boolean startUpdate() {
+    final IOFile uf = updateFile();
+    return (uf.exists() || uf.touch()) && table.lock(true);
+  }
+
+  @Override
+  public synchronized void finishUpdate() {
+    // skip all flush operations if auto flush is off, or file has already been closed
+    if(!meta.prop.is(Prop.AUTOFLUSH) || closed) return;
+
+    try {
+      write();
+      table.flush();
+      texts.flush();
+      values.flush();
+      if(txtindex != null) ((DiskValues) txtindex).flush();
+      if(atvindex != null) ((DiskValues) atvindex).flush();
+    } catch(final IOException ex) {
+      Util.stack(ex);
+    } finally {
+      table.lock(false);
+    }
+  }
+
+  /**
+   * Checks if the specified database can be exclusively locked.
+   * @param dbpath database path
+   * @return result of check
+   */
+  public static boolean writeLock(final IOFile dbpath) {
+    final IOFile io = new IOFile(dbpath, DATATBL + IO.BASEXSUFFIX);
+    if(!io.exists()) return true;
+
+    RandomAccessFile file = null;
+    try {
+      file = new RandomAccessFile(io.file(), "rw");
+      final FileLock lock = file.getChannel().tryLock();
+      if(lock != null) {
+        lock.release();
+        return true;
+      }
+    } catch(final IOException ex) {
+      Util.stack(ex);
+    } finally {
+      if(file != null) try { file.close(); } catch(final IOException ex) { }
+    }
+    return false;
   }
 
   /**
@@ -353,9 +389,7 @@ public final class DiskData extends Data {
   }
 
   @Override
-  protected long index(final int pre, final int id, final byte[] value,
-      final int kind) {
-
+  protected long index(final int pre, final int id, final byte[] value, final int kind) {
     final DataAccess store;
     final TokenObjMap<IntList> m;
 

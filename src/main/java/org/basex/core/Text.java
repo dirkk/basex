@@ -1,9 +1,16 @@
 package org.basex.core;
 
-import org.basex.core.Commands.*;
-import static org.basex.core.Lang.lang;
+import static org.basex.core.Lang.*;
 
-import java.util.Locale;
+import java.util.*;
+
+import org.basex.core.Commands.CmdCreate;
+import org.basex.core.Commands.CmdDrop;
+import org.basex.core.Commands.CmdIndex;
+import org.basex.core.Commands.CmdInfo;
+import org.basex.core.Commands.CmdPerm;
+import org.basex.core.Commands.CmdRepo;
+import org.basex.core.Commands.CmdShow;
 
 /**
  * This class contains internationalized text strings, which are used
@@ -134,6 +141,7 @@ public interface Text {
     "  -S         Start as service" + NL +
     "  -U<name>   Specify user name" + NL +
     "  -W         Deactivate WebDAV service" + NL +
+    "  -X         Deactivate RESTXQ service" + NL +
     "  -z         Suppress logging";
 
   /** Bug info. */
@@ -160,7 +168,7 @@ public interface Text {
   /** Ports was specified twice. */
   String PORT_TWICE_X = lang("port_twice_%");
   /** Unknown host. */
-  String UNKNOWN_HOST = lang("unknown_host");
+  String UNKNOWN_HOST_X = lang("unknown_host_x");
   /** Timeout exceeded. */
   String TIMEOUT_EXCEEDED = lang("timeout_exceeded");
   /** Connection error. */
@@ -186,17 +194,12 @@ public interface Text {
 
   // COMMANDS =================================================================
 
-  /** Command keyword. */
-  String ALL = "ALL";
-  /** Command keyword. */
-  String TO = "TO";
-  /** Command keyword. */
-  String ON = "ON";
-  /** Command keyword. */
-  String OFF = "OFF";
-  /** Keyword. */
+  /** OK Keyword. */
   String OK = "OK";
-
+  /** ON flag. */
+  String ON = "ON";
+  /** OFF flag. */
+  String OFF = "OFF";
   /** Yes flag. */
   String YES = "yes";
   /** No flag. */
@@ -206,21 +209,25 @@ public interface Text {
   /** False flag. */
   String FALSE = "false";
 
-  /** Command help. */
+  /** Command keyword. */
+  String C_ALL = "ALL";
+  /** Command keyword. */
+  String C_TO = "TO";
+  /** Command keyword. */
   String C_QUERY = "query";
-  /** Command help. */
+  /** Command keyword. */
   String C_PATH = "path";
-  /** Command help. */
+  /** Command keyword. */
   String C_INPUT = "input";
-  /** Command help. */
+  /** Command keyword. */
   String C_NAME = "name";
-  /** Command help. */
+  /** Command keyword. */
   String C_PW = "password";
-  /** Command help. */
+  /** Command keyword. */
   String C_PKGPATH = "path";
-  /** Command help. */
+  /** Command keyword. */
   String C_PKGNAME = "name";
-  /** Command help. */
+  /** Command keyword. */
   String C_PKGDIR = "dir";
 
   /** No help available. */
@@ -239,7 +246,7 @@ public interface Text {
     LI + CmdCreate.EVENT + " [" + C_NAME + "]: " + NL +
     "  " + lang("c_create9") + NL +
     LI + CmdCreate.INDEX + " [" + CmdIndex.TEXT + '|' + CmdIndex.ATTRIBUTE +
-    '|' + CmdIndex.FULLTEXT + '|' + CmdIndex.PATH + "]:" + NL +
+    '|' + CmdIndex.FULLTEXT + "]:" + NL +
     "  " + lang("c_create5") + NL +
     LI + CmdCreate.USER + " [" + C_NAME + "] ([" + C_PW + "]):" + NL +
     "  " + lang("c_create8")
@@ -256,12 +263,12 @@ public interface Text {
   };
   /** Command help. */
   String[] HELPADD = {
-    '(' + TO + " [" + C_PATH + "]) [" + C_INPUT + ']',
+    '(' + C_TO + " [" + C_PATH + "]) [" + C_INPUT + ']',
     lang("c_add1"), lang("c_add2", C_INPUT, C_PATH)
   };
   /** Command help. */
   String[] HELPSTORE = {
-    '(' + TO + " [" + C_PATH + "]) [" + C_INPUT + ']',
+    '(' + C_TO + " [" + C_PATH + "]) [" + C_INPUT + ']',
     lang("c_store1"), lang("c_store2", C_PATH)
   };
   /** Command help. */
@@ -308,7 +315,7 @@ public interface Text {
       "  " + lang("c_drop21") + NL +
     LI + CmdDrop.EVENT + " [" + C_NAME + "]:" + NL +
       "  " + lang("c_drop25", C_NAME) + NL +
-    LI + CmdDrop.INDEX + " [" + CmdIndex.PATH + '|' + CmdIndex.TEXT + '|' +
+    LI + CmdDrop.INDEX + " [" + CmdIndex.TEXT + '|' +
       CmdIndex.ATTRIBUTE + '|' + CmdIndex.FULLTEXT + "]:" + NL +
       "  " + lang("c_drop22") + NL +
     LI + CmdDrop.USER + " [" + C_NAME + "] (" + ON + " [database]): " + NL +
@@ -320,7 +327,7 @@ public interface Text {
   };
   /** Command help. */
   String[] HELPOPTIMIZE = {
-    '(' + ALL + ')', lang("c_optimize1"), lang("c_optimize2", ALL)
+    '(' + C_ALL + ')', lang("c_optimize1"), lang("c_optimize2", C_ALL)
   };
 
   /** Command help. */
@@ -375,7 +382,7 @@ public interface Text {
   /** Command help. */
   String[] HELPGRANT = {
     "[" + CmdPerm.NONE + '|' + CmdPerm.READ + '|' + CmdPerm.WRITE + '|' +
-    CmdPerm.CREATE + '|' + CmdPerm.ADMIN + "] (" + ON + " [database]) " + TO +
+    CmdPerm.CREATE + '|' + CmdPerm.ADMIN + "] (" + ON + " [database]) " + C_TO +
     " [user]",
     lang("c_grant1"),
     lang("c_grant2")
@@ -462,8 +469,8 @@ public interface Text {
   String CREATING_INDEXES = lang("creating_indexes");
   /** Possible corruption. */
   String DB_CORRUPT = lang("db_corrupt");
-  /** Builder error. */
-  String CREATION_CANCELED = lang("creation_canceled");
+  /** "Command was canceled". */
+  String COMMAND_CANCELED = lang("command_canceled");
   /** Create database information. */
   String NODES_PARSED_X = " \"%\" (" + lang("nodes_parsed_%") + ')';
   /** Scanner position. */
@@ -491,10 +498,10 @@ public interface Text {
   /** Parse error. */
   String NOT_PARSED_X = lang("not_parsed_%");
 
-  /** File not found. */
-  String FILE_NOT_FOUND_X = lang("file_not_found_%");
-  /** Path not found. */
-  String FILE_NOT_FOUND = lang("file_not_found");
+  /** Resource not found. */
+  String RESOURCE_NOT_FOUND_X = lang("resource_not_found_%");
+  /** Resource "%" not found. */
+  String RESOURCE_NOT_FOUND = lang("resource_not_found");
   /** Skipped corrupt files. */
   String SKIPPED = lang("skipped");
   /** Info on skipped corrupt files. */
@@ -520,8 +527,6 @@ public interface Text {
   String DB_UPDATED_X = lang("db_updated_%");
   /** Database closed. */
   String DB_CLOSED_X = lang("db_closed_%");
-  /** Database not closed. */
-  String DB_NOT_CLOSED_X = lang("db_not_closed_%");
   /** Database optimized. */
   String DB_OPTIMIZED_X = lang("db_optimized_%");
   /** Database dropped. */
@@ -556,7 +561,7 @@ public interface Text {
   String DB_EXPORTED_X = lang("db_exported_%");
   /** Database not deleted. */
   String FILE_NOT_DELETED_X = lang("file_not_deleted_%");
-  /** Database exists already. */
+  /** Database already exists. */
   String DB_EXISTS_X = lang("db_exists_%");
   /** Database was dropped. */
   String BACKUP_DROPPED_X = lang("backup_dropped_%");
@@ -707,14 +712,16 @@ public interface Text {
   /** Package deleted. */
   String PKG_DELETED_X = lang("pkg_deleted_%");
   /** Package installed. */
-  String PKG_INSTALLED_X = lang("pkg_installed_%");
+  String PKG_INSTALLED_X_X = lang("pkg_installed_%_%");
+  /** Package replaced. */
+  String PKG_REPLACED_X_X = lang("pkg_replaced_%_%");
 
   // GENERAL COMMANDS =========================================================
 
   /** "Unknown option '%'". */
   String UNKNOWN_OPTION_X = lang("unknown_option_%");
   /** Unknown command error. */
-  String UNKNOWN_OPT_SIMILAR_X = lang("unknown_option_%") + ' ' +
+  String UNKNOWN_OPT_SIMILAR_X_X = lang("unknown_option_%") + ' ' +
       lang("similar_cmd_%");
   /** "Unknown parser '%'". */
   String UNKNOWN_PARSER_X = lang("unknown_parser_%");
@@ -725,11 +732,11 @@ public interface Text {
 
   /** Waiting information. */
   String PLEASE_WAIT_D = lang("please_wait") + DOTS;
-  /** Optimize information. */
-  String OPTIMIZING_DB_D = lang("optimizing_db") + DOTS;
   /** Statistics information. */
   String CREATE_STATS_D = lang("create_stats") + DOTS;
 
+  /** "Name". */
+  String ALL = lang("all");
   /** "Name". */
   String NAME = lang("name");
   /** "Size". */
@@ -1004,21 +1011,23 @@ public interface Text {
   /** Target path. */
   String TARGET_PATH = lang("target_path");
 
-  /** XML file description. */
+  /** File description: XML Documents. */
   String XML_DOCUMENTS = "XML Documents";
-  /** JSON file description. */
+  /** File description: JSON Documents. */
   String JSON_DOCUMENTS = "JSON Documents";
-  /** HTML file description. */
+  /** File description: HTML Documents. */
   String HTML_DOCUMENTS = "HTML Documents";
-  /** CSV file description. */
+  /** File description: Comma-Separated Values. */
   String CSV_DOCUMENTS = "Comma-Separated Values";
-  /** TXT file description. */
+  /** File description: Plain Text. */
   String PLAIN_TEXT = "Plain Text";
-  /** ZIP file description. */
+  /** File description: ZIP Archives. */
   String ZIP_ARCHIVES = "ZIP Archives";
-  /** XAR file description. */
+  /** File description: XML Archives. */
   String XML_ARCHIVES = "XML Archives";
-  /** XQuery file extensions description. */
+  /** File description: Java archives. */
+  String JAVA_ARCHIVES = "Java Archives";
+  /** File description: XQuery files. */
   String XQUERY_FILES = "XQuery Files";
 
   /** Dialog title for database options. */
@@ -1137,8 +1146,6 @@ public interface Text {
   String OUTPUT_DIR = lang("output_dir");
   /** Dialog title for exporting nodes. */
   String DIR_NOT_EMPTY = lang("dir_not_empty");
-  /** Dialog title for exporting nodes. */
-  String INDENT_WITH_WS = lang("indent_with_ws");
 
   /** Database path. */
   String DATABASE_PATH = lang("database_path");
@@ -1152,9 +1159,10 @@ public interface Text {
   String SIMPLE_FILE_CHOOSER = lang("simple_file_chooser");
   /** Name display flag. */
   String SHOW_NAME_ATTS = lang("show_name_atts");
+  /** Maximum number of hits. */
+  String MAX_NO_OF_HITS = lang("max_nr_of_hits");
   /** Language preference. */
-  String LANGUAGE_RESTART = lang("language") + " (" +
-      lang("requires_restart") + ')';
+  String LANGUAGE_RESTART = lang("language") + " (" + lang("requires_restart") + ')';
 
   /** Dialog title for inserting new data. */
   String INSERT_NEW_DATA = lang("insert_new_data");
@@ -1231,13 +1239,11 @@ public interface Text {
   /** Developer info. */
   String CHIEF_ARCHITECT = lang("chief_architect") + ": Christian Gr\u00FCn";
   /** Contributors info. */
-  String TEAM1 = lang("team") +
-      ": Michael Seiferle, Alexander Holupirek,";
+  String TEAM1 = lang("team") + ": Michael Seiferle, Alexander Holupirek,";
   /** Developer names. */
   String TEAM2 = "Dimitar Popov, Rositsa Shadura, Lukas Kircher,";
   /** Developer names. */
-  String TEAM3 = "Leo W\u00F6rteler, Andreas Weiler " +
-      lang("and_others");
+  String TEAM3 = "Leo W\u00F6rteler " + lang("and_others");
   /** Translation. */
   String TRANSLATION = lang("translation");
 
@@ -1247,8 +1253,6 @@ public interface Text {
   String H_USED_MEM = lang("h_used_mem");
   /** Out of memory error due to database creation. */
   String H_OUT_OF_MEM = NL + lang("h_out_of_mem");
-  /** XML parsing error due to internal XML Parser. */
-  String H_PARSE_ERROR = NL + lang("h_parse_error");
 
   /** Help string. */
   String H_EXECUTE_QUERY = lang("h_execute_query");
@@ -1355,8 +1359,6 @@ public interface Text {
   String H_CHOP_WS = lang("h_chop_ws");
   /** Internal parser information. */
   String H_INT_PARSER = lang("h_int_parser");
-  /** Input format information. */
-  String H_INPUT_FORMAT = lang("h_input_format");
 
   /** Path summary information. */
   String H_PATH_INDEX = lang("h_path_index");

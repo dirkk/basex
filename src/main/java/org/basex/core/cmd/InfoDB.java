@@ -1,19 +1,17 @@
 package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
+import static org.basex.util.Util.*;
 
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.io.*;
+import java.text.*;
+import java.util.*;
 
-import org.basex.core.CommandBuilder;
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdInfo;
-import org.basex.core.User;
-import org.basex.data.MetaData;
-import org.basex.util.Performance;
-import org.basex.util.TokenBuilder;
-import org.basex.util.Util;
+import org.basex.data.*;
+import org.basex.util.*;
 
 /**
  * Evaluates the 'info database' command and returns information on the
@@ -24,19 +22,18 @@ import org.basex.util.Util;
  */
 public final class InfoDB extends AInfo {
   /** Date format. */
-  public static final SimpleDateFormat DATE =
-    new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+  public static final SimpleDateFormat DATE = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
 
   /**
    * Default constructor.
    */
   public InfoDB() {
-    super(DATAREF | User.READ);
+    super(Perm.READ, true);
   }
 
   @Override
   protected boolean run() throws IOException {
-    final boolean create = context.user.perm(User.CREATE);
+    final boolean create = context.user.has(Perm.CREATE);
     out.print(db(context.data().meta, false, true, create));
     return true;
   }
@@ -64,7 +61,7 @@ public final class InfoDB extends AInfo {
     final int bin = meta.binaries().descendants().size();
     format(tb, DOCUMENTS, Integer.toString(meta.ndocs));
     format(tb, BINARIES, Integer.toString(bin));
-    format(tb, TIMESTAMP, DATE.format(new Date(meta.dbtime())));
+    format(tb, TIMESTAMP, formatDate(new Date(meta.dbtime()), DATE));
     if(meta.corrupt) tb.add(' ' + DB_CORRUPT + NL);
 
     tb.add(NL).addExt(header, RESOURCE_PROPS);
@@ -72,7 +69,7 @@ public final class InfoDB extends AInfo {
       format(tb, INPUT_PATH, meta.original);
     if(meta.filesize != 0)
       format(tb, INPUT_SIZE, Performance.format(meta.filesize));
-    format(tb, TIMESTAMP, DATE.format(new Date(meta.time)));
+    format(tb, TIMESTAMP, formatDate(new Date(meta.time), DATE));
     format(tb, ENCODING, meta.encoding);
     format(tb, WS_CHOPPING, Util.flag(meta.chop));
 
@@ -82,7 +79,6 @@ public final class InfoDB extends AInfo {
         tb.add(' ' + H_INDEX_FORMAT + NL);
       } else {
         format(tb, UP_TO_DATE, String.valueOf(meta.uptodate));
-        format(tb, PATH_INDEX, Util.flag(meta.pathindex));
         format(tb, TEXT_INDEX, Util.flag(meta.textindex));
         format(tb, ATTRIBUTE_INDEX, Util.flag(meta.attrindex));
         format(tb, FULLTEXT_INDEX, Util.flag(meta.ftxtindex) +

@@ -65,7 +65,7 @@ public final class QuerySuggest extends QueryParser {
 
   @Override
   protected void checkInit() {
-    if(stack != null && !stack.empty() || !data.meta.pathindex) return;
+    if(stack != null && !stack.empty()) return;
     all = data.paths.root();
     curr = all;
     stack = new Stack<ArrayList<PathNode>>();
@@ -73,7 +73,7 @@ public final class QuerySuggest extends QueryParser {
 
   @Override
   protected void checkAxis(final Axis axis) {
-    all = axis != Axis.CHILD && axis != Axis.DESC || !data.meta.pathindex ?
+    all = axis != Axis.CHILD && axis != Axis.DESC ?
       new ArrayList<PathNode>() : PathSummary.desc(curr, axis == Axis.DESC);
     curr = all;
     show = true;
@@ -86,7 +86,7 @@ public final class QuerySuggest extends QueryParser {
     if(test != null) tb.add(test.toString().replaceAll("\\*:", ""));
     tag = tb.finish();
     // use inexact matching only, if the tag is at the end:
-    checkTest(qp < ql);
+    checkTest(ip < il);
   }
 
   /**
@@ -128,6 +128,6 @@ public final class QuerySuggest extends QueryParser {
   @Override
   public QueryException error(final Err err, final Object... arg)
       throws QueryException {
-    throw new QueryException(input(), err, arg).suggest(this, complete());
+    throw new QueryException(info(), err, arg).suggest(this, complete());
   }
 }

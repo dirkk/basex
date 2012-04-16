@@ -1,15 +1,15 @@
 package org.basex.build.xml;
 
-import static org.basex.core.Text.*;
 import static org.basex.build.BuildText.*;
 import static org.basex.util.Token.*;
-import java.io.IOException;
-import org.basex.build.BuildException;
-import org.basex.build.SingleParser;
+
+import java.io.*;
+
+import org.basex.build.*;
 import org.basex.build.BuildText.Type;
-import org.basex.core.Prop;
-import org.basex.io.IO;
-import org.basex.util.list.TokenList;
+import org.basex.core.*;
+import org.basex.io.*;
+import org.basex.util.list.*;
 
 /**
  * This class parses the tokens that are delivered by the {@link XMLScanner} and
@@ -23,50 +23,48 @@ import org.basex.util.list.TokenList;
 public class XMLParser extends SingleParser {
   /** Scanner reference. */
   private final XMLScanner scanner;
-  /** Opened tags. */
+  /** Names of opened elements. */
   private final TokenList tags = new TokenList();
+  /** Closed root tag. */
+  private boolean closed;
 
   /**
    * Constructor.
    * @param source document source
-   * @param target target path
-   * @param prop database properties
+   * @param pr database properties
    * @throws IOException I/O exception
    */
-  public XMLParser(final IO source, final String target, final Prop prop)
-      throws IOException {
-    super(source, target);
-    scanner = new XMLScanner(source, prop);
+  public XMLParser(final IO source, final Prop pr) throws IOException {
+    super(source, pr);
+    scanner = new XMLScanner(source, pr);
   }
 
   @Override
   public final void parse() throws IOException {
-    try {
-      // loop until all tokens have been processed
-      scanner.more();
-      while(true) {
-        if(scanner.type == Type.TEXT) {
-          builder.text(scanner.token.finish());
-        } else if(scanner.type == Type.COMMENT) {
-          builder.comment(scanner.token.finish());
-        } else if(scanner.type == Type.PI) {
-          builder.pi(scanner.token.finish());
-        } else if(scanner.type == Type.EOF) {
-          break;
-        } else if(scanner.type != Type.DTD) {
-          if(!parseTag()) break;
-          continue;
-        }
-        if(!scanner.more()) break;
+    // loop until all tokens have been processed
+    scanner.more();
+    while(true) {
+      if(scanner.type == Type.TEXT) {
+        final byte[] text = scanner.token.finish();
+        if(!tags.isEmpty() || !ws(text)) builder.text(scanner.token.finish());
+      } else if(scanner.type == Type.COMMENT) {
+        builder.comment(scanner.token.finish());
+      } else if(scanner.type == Type.PI) {
+        builder.pi(scanner.token.finish());
+      } else if(scanner.type == Type.EOF) {
+        break;
+      } else if(scanner.type != Type.DTD) {
+        // L_BR, L_BR_CLOSE
+        if(closed) throw new BuildException(MOREROOTS, det());
+        if(!parseTag()) break;
+        continue;
       }
-      scanner.close();
-      builder.encoding(scanner.encoding);
-    } catch(final BuildException ex) {
-      final String msg = ex.getMessage() + H_PARSE_ERROR;
-      final BuildException e = new BuildException(msg);
-      e.setStackTrace(ex.getStackTrace());
-      throw e;
+      if(!scanner.more()) break;
     }
+    scanner.close();
+    builder.encoding(scanner.encoding);
+
+    if(!tags.isEmpty()) throw new BuildException(DOCOPEN, det(), tags.pop());
   }
 
   @Override
@@ -80,7 +78,7 @@ public class XMLParser extends SingleParser {
    * @return result of scanner step
    */
   private boolean parseTag() throws IOException {
-    // find opening tag
+    // close element
     if(scanner.type == Type.L_BR_CLOSE) {
       scanner.more();
 
@@ -88,11 +86,11 @@ public class XMLParser extends SingleParser {
       final byte[] tag = consumeToken(Type.TAGNAME);
       skipSpace();
 
-      if(tags.isEmpty()) throw new BuildException(AFTERROOT, det());
       final byte[] open = tags.pop();
       if(!eq(open, tag)) throw new BuildException(CLOSINGTAG, det(), tag, open);
 
       builder.endElem();
+      if(tags.isEmpty()) closed = true;
       return consume(Type.R_BR);
     }
 
@@ -133,11 +131,14 @@ public class XMLParser extends SingleParser {
       }
     }
 
-    // send start tag to the xml builder
+    // send empty element to builder
     if(scanner.type == Type.CLOSE_R_BR) {
       builder.emptyElem(tag, atts);
+      if(tags.isEmpty()) closed = true;
       return scanner.more();
     }
+
+    // send start element
     builder.startElem(tag, atts);
     tags.add(tag);
     return consume(Type.R_BR);

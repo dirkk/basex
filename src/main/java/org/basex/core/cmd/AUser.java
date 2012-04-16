@@ -1,13 +1,13 @@
 package org.basex.core.cmd;
 
-import org.basex.core.Command;
-import org.basex.core.Prop;
 import static org.basex.core.Text.*;
-import org.basex.core.User;
-import org.basex.data.MetaData;
-import org.basex.io.IOFile;
 
-import java.util.regex.Pattern;
+import java.util.regex.*;
+
+import org.basex.core.*;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.util.list.*;
 
 /**
  * Abstract class for user commands.
@@ -18,11 +18,11 @@ import java.util.regex.Pattern;
 abstract class AUser extends Command {
   /**
    * Protected constructor, specifying command arguments.
-   * @param f command flags
+   * @param p required permission
    * @param a arguments
    */
-  AUser(final int f, final String... a) {
-    super(f, a);
+  AUser(final Perm p, final String... a) {
+    super(p, a);
   }
 
   /**
@@ -30,7 +30,7 @@ abstract class AUser extends Command {
    * @param a arguments
    */
   AUser(final String... a) {
-    this(User.ADMIN, a);
+    this(Perm.ADMIN, a);
   }
 
   /**
@@ -57,17 +57,16 @@ abstract class AUser extends Command {
     final String d = off + 1 < args.length ? args[off + 1] : null;
 
     if(!MetaData.validName(u, true)) return error(NAME_INVALID_X, u);
-    if(d != null && !MetaData.validName(d, true))
-      return error(NAME_INVALID_X, d);
+    if(d != null && !MetaData.validName(d, true)) return error(NAME_INVALID_X, d);
 
     // retrieve all users; stop if no user is found
     final String[] users = users(u);
     if(users.length == 0) return info(UNKNOWN_USER_X, u) && opt;
     // retrieve all databases
-    String[] dbs = null;
+    StringList dbs = null;
     if(d != null) {
-      dbs = databases(d);
-      if(dbs.length == 0) return info(DB_NOT_FOUND_X, d) && opt;
+      dbs = context.databases().listDBs(d);
+      if(dbs.size() == 0) return info(DB_NOT_FOUND_X, d) && opt;
     }
 
     // loop through all users

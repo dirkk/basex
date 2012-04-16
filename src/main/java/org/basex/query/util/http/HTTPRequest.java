@@ -6,11 +6,12 @@ import org.basex.query.iter.*;
 import org.basex.util.hash.*;
 
 /**
- * Container for parsed data from <http:request/>.
+ * Container for parsed data from {@code <http:request/>}.
+ *
  * @author BaseX Team 2005-12, BSD License
  * @author Rositsa Shadura
  */
-public final class Request {
+public final class HTTPRequest {
   /** Request attributes. */
   public final TokenMap attrs = new TokenMap();
   /** Request headers. */
@@ -18,7 +19,7 @@ public final class Request {
   /** Body or multipart attributes. */
   public final TokenMap payloadAttrs = new TokenMap();
   /** Body content. */
-  public final ItemCache bodyContent = new ItemCache();
+  public final ValueBuilder bodyContent = new ValueBuilder();
   /** Parts in case of multipart request. */
   public final ArrayList<Part> parts = new ArrayList<Part>();
   /** Indicator for multipart request. */
@@ -35,6 +36,6 @@ public final class Request {
     /** Attributes of part body. */
     public final TokenMap bodyAttrs = new TokenMap();
     /** Content of part body. */
-    public final ItemCache bodyContent = new ItemCache();
+    public final ValueBuilder bodyContent = new ValueBuilder();
   }
 }

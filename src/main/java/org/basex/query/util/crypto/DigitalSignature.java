@@ -3,82 +3,27 @@ package org.basex.query.util.crypto;
 import static org.basex.query.util.Err.*;
 import static org.basex.util.Token.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.StringWriter;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.KeyException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Vector;
+import java.io.*;
+import java.security.*;
+import java.security.cert.*;
+import java.util.*;
 
-import javax.xml.crypto.MarshalException;
-import javax.xml.crypto.XMLStructure;
-import javax.xml.crypto.dom.DOMStructure;
-import javax.xml.crypto.dsig.CanonicalizationMethod;
-import javax.xml.crypto.dsig.DigestMethod;
-import javax.xml.crypto.dsig.Reference;
-import javax.xml.crypto.dsig.SignatureMethod;
-import javax.xml.crypto.dsig.SignedInfo;
-import javax.xml.crypto.dsig.Transform;
-import javax.xml.crypto.dsig.XMLObject;
-import javax.xml.crypto.dsig.XMLSignature;
-import javax.xml.crypto.dsig.XMLSignatureException;
-import javax.xml.crypto.dsig.XMLSignatureFactory;
-import javax.xml.crypto.dsig.dom.DOMSignContext;
-import javax.xml.crypto.dsig.dom.DOMValidateContext;
-import javax.xml.crypto.dsig.keyinfo.KeyInfo;
-import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
-import javax.xml.crypto.dsig.keyinfo.KeyValue;
-import javax.xml.crypto.dsig.keyinfo.X509Data;
-import javax.xml.crypto.dsig.keyinfo.X509IssuerSerial;
-import javax.xml.crypto.dsig.spec.C14NMethodParameterSpec;
-import javax.xml.crypto.dsig.spec.TransformParameterSpec;
-import javax.xml.crypto.dsig.spec.XPathFilterParameterSpec;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpression;
-import javax.xml.xpath.XPathExpressionException;
-import javax.xml.xpath.XPathFactory;
+import javax.xml.crypto.*;
+import javax.xml.crypto.dom.*;
+import javax.xml.crypto.dsig.*;
+import javax.xml.crypto.dsig.dom.*;
+import javax.xml.crypto.dsig.keyinfo.*;
+import javax.xml.crypto.dsig.spec.*;
+import javax.xml.parsers.*;
+import javax.xml.xpath.*;
 
-import org.basex.build.MemBuilder;
-import org.basex.build.Parser;
-import org.basex.core.Prop;
-import org.basex.data.Data;
-import org.basex.io.IO;
-import org.basex.io.serial.Serializer;
-import org.basex.io.serial.SerializerProp;
-import org.basex.query.QueryException;
-import org.basex.query.item.ANode;
-import org.basex.query.item.Bln;
-import org.basex.query.item.DBNode;
-import org.basex.query.item.Item;
-import org.basex.util.InputInfo;
-import org.basex.util.hash.TokenMap;
-import org.basex.util.hash.TokenSet;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
+import org.basex.io.serial.*;
+import org.basex.query.*;
+import org.basex.query.item.*;
+import org.basex.util.*;
+import org.basex.util.hash.*;
+import org.w3c.dom.*;
+import org.xml.sax.*;
 
 /**
  * This class generates and validates digital signatures for XML data.
@@ -133,15 +78,14 @@ public final class DigitalSignature {
   }
 
   /** Input info. */
-  private final InputInfo input;
+  private final InputInfo info;
 
   /**
    * Constructor.
-   *
    * @param ii input info
    */
   public DigitalSignature(final InputInfo ii) {
-    input = ii;
+    info = ii;
   }
 
   /**
@@ -155,42 +99,42 @@ public final class DigitalSignature {
    * @param expr XPath expression which specifies node to be signed
    * @param ce certificate which contains keystore information for
    *        signing the node, may be null
+   * @param ii input info
    *
    * @return signed node
    * @throws QueryException query exception
    */
-  public ANode generateSignature(final ANode node, final byte[] c,
+  public Item generateSignature(final ANode node, final byte[] c,
       final byte[] d, final byte[] sig, final byte[] ns, final byte[] t,
-      final byte[] expr, final ANode ce) throws QueryException {
+      final byte[] expr, final ANode ce, final InputInfo ii) throws QueryException {
 
     // checking input variables
     byte[] b = c;
     if(b.length == 0) b = DEFC;
     b = CANONICALIZATIONS.get(lc(b));
-    if(b == null) CRYPTOCANINV.thrw(input, c);
+    if(b == null) CRYPTOCANINV.thrw(info, c);
     final String canonicalization = string(b);
 
     b = d;
     if(b.length == 0) b = DEFD;
     b = DIGESTS.get(lc(b));
-    if(b == null) CRYPTODIGINV.thrw(input, d);
+    if(b == null) CRYPTODIGINV.thrw(info, d);
     final String digest = string(b);
 
     b = sig;
     if(b.length == 0) b = DEFS;
     final byte[] tsig = b;
     b = SIGNATURES.get(lc(b));
-    if(b == null) CRYPTOSIGINV.thrw(input, sig);
+    if(b == null) CRYPTOSIGINV.thrw(info, sig);
     final String signature = string(b);
     final String keytype = string(tsig).substring(0, 3);
 
     b = t;
     if(b.length == 0) b = DEFT;
-    final int ti = TYPES.id(lc(b));
-    if(ti == 0) CRYPTOSIGTYPINV.thrw(input, t);
+    if(!TYPES.contains(lc(b))) CRYPTOSIGTYPINV.thrw(info, t);
     final byte[] type = b;
 
-    ANode signedNode = null;
+    Item signedNode = null;
 
     try {
 
@@ -211,7 +155,7 @@ public final class DigitalSignature {
         final Document ceDOM = toDOMNode(ce);
         if(!ceDOM.getDocumentElement().getNodeName().
             equals("digital-certificate"))
-          CRYPTOINVNM.thrw(input, ceDOM);
+          CRYPTOINVNM.thrw(info, ceDOM);
         final NodeList ceChildren = ceDOM.getDocumentElement().getChildNodes();
         final int s = ceChildren.getLength();
         int ci = 0;
@@ -234,13 +178,13 @@ public final class DigitalSignature {
         // initialize the keystore
         final KeyStore ks = KeyStore.getInstance(ksTY);
 
-        if(ks == null) CRYPTOKSNULL.thrw(input, ks);
+        if(ks == null) CRYPTOKSNULL.thrw(info, ks);
 
         ks.load(new FileInputStream(ksURI), ksPW.toCharArray());
         pk = (PrivateKey) ks.getKey(kAlias, pkPW.toCharArray());
         final X509Certificate x509ce = (X509Certificate)
             ks.getCertificate(kAlias);
-        if(x509ce == null) CRYPTOALINV.thrw(input, kAlias);
+        if(x509ce == null) CRYPTOALINV.thrw(info, kAlias);
         puk = x509ce.getPublicKey();
         final KeyInfoFactory kifactory = fac.getKeyInfoFactory();
         final KeyValue keyValue = kifactory.newKeyValue(puk);
@@ -280,7 +224,7 @@ public final class DigitalSignature {
         final NodeList xRes = (NodeList) xExpr.evaluate(inputNode,
             XPathConstants.NODESET);
         if(xRes.getLength() < 1)
-          CRYPTOXPINV.thrw(input, expr);
+          CRYPTOXPINV.thrw(info, expr);
         tfList = new ArrayList<Transform>(2);
         tfList.add(fac.newTransform(Transform.XPATH,
             new XPathFilterParameterSpec(string(expr))));
@@ -341,34 +285,33 @@ public final class DigitalSignature {
 
       // actually sign the document
       xmlSig.sign(signContext);
-      signedNode = toDBNode(inputNode);
+      signedNode = NodeType.DOC.cast(inputNode, ii);
 
     } catch(final XPathExpressionException e) {
-      CRYPTOXPINV.thrw(input, e);
+      CRYPTOXPINV.thrw(info, e);
     } catch(final SAXException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final IOException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final ParserConfigurationException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final KeyStoreException e) {
-      CRYPTOKSEXC.thrw(input, e);
+      CRYPTOKSEXC.thrw(info, e);
     } catch(final MarshalException e) {
-      CRYPTOSIGEXC.thrw(input, e);
+      CRYPTOSIGEXC.thrw(info, e);
     } catch(final XMLSignatureException e) {
-      CRYPTOSIGEXC.thrw(input, e);
+      CRYPTOSIGEXC.thrw(info, e);
     } catch(final NoSuchAlgorithmException e) {
-      CRYPTOALGEXC.thrw(input, e);
+      CRYPTOALGEXC.thrw(info, e);
     } catch(final CertificateException e) {
-      CRYPTOALGEXC.thrw(input, e);
+      CRYPTOALGEXC.thrw(info, e);
     } catch(final UnrecoverableKeyException e) {
-      CRYPTONOKEY.thrw(input, e);
+      CRYPTONOKEY.thrw(info, e);
     } catch(final KeyException e) {
-      CRYPTONOKEY.thrw(input, e);
+      CRYPTONOKEY.thrw(info, e);
     } catch(final InvalidAlgorithmParameterException e) {
-      CRYPTOALGEXC.thrw(input, e);
+      CRYPTOALGEXC.thrw(info, e);
     }
-
     return signedNode;
   }
 
@@ -390,63 +333,25 @@ public final class DigitalSignature {
       final NodeList signl = doc.getElementsByTagNameNS(XMLSignature.XMLNS,
           "Signature");
       if(signl.getLength() < 1)
-        CRYPTONOSIG.thrw(input, node);
+        CRYPTONOSIG.thrw(info, node);
       valContext.setNode(signl.item(0));
       final XMLSignatureFactory fac = XMLSignatureFactory.getInstance("DOM");
       final XMLSignature signature = fac.unmarshalXMLSignature(valContext);
       coreVal = signature.validate(valContext);
 
-      return Bln.get(coreVal);
-
     } catch(final XMLSignatureException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final SAXException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final ParserConfigurationException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final IOException e) {
-      CRYPTOIOEXC.thrw(input, e);
+      CRYPTOIOEXC.thrw(info, e);
     } catch(final MarshalException e) {
-      CRYPTOSIGEXC.thrw(input, e);
+      CRYPTOSIGEXC.thrw(info, e);
     }
 
     return Bln.get(coreVal);
-  }
-
-  /**
-   * Creates a BaseX database node from the given DOM node.
-   * @param n DOM node
-   * @return database node
-   * @throws QueryException query exception
-   */
-  private ANode toDBNode(final Node n) throws QueryException {
-    final String xmlString;
-
-    DBNode dbn = null;
-
-    try {
-      final TransformerFactory transfac = TransformerFactory.newInstance();
-      final Transformer trans = transfac.newTransformer();
-
-      //create string from xml tree
-      final StringWriter sw = new StringWriter();
-      final StreamResult result = new StreamResult(sw);
-      final DOMSource source = new DOMSource(n);
-      trans.transform(source, result);
-      xmlString = sw.toString();
-
-      final Parser parser = Parser.xmlParser(IO.get(xmlString), new Prop());
-      final MemBuilder builder = new MemBuilder("", parser, new Prop());
-      final Data mem = builder.build();
-      dbn = new DBNode(mem, 1);
-
-    } catch(final IOException e) {
-      CRYPTOIOEXC.thrw(input, e);
-    } catch(final TransformerException e) {
-      CRYPTOIOEXC.thrw(input, e);
-    }
-
-    return dbn;
   }
 
   /**
@@ -455,12 +360,9 @@ public final class DigitalSignature {
    * @return byte array containing XML
    * @throws IOException exception
    */
-  private static byte[] nodeToBytes(final ANode n)
-      throws IOException {
-
+  private static byte[] nodeToBytes(final ANode n) throws IOException {
     final ByteArrayOutputStream b = new ByteArrayOutputStream();
-    final Serializer s = Serializer.get(b,
-        new SerializerProp("format=no"));
+    final Serializer s = Serializer.get(b, new SerializerProp("format=no"));
     n.serialize(s);
     s.close();
     return b.toByteArray();

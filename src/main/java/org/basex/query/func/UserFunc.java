@@ -54,9 +54,9 @@ public class UserFunc extends Single {
    * @param r return type
    * @param a annotations
    */
-  public UserFunc(final InputInfo ii, final QNm n, final Var[] v,
-      final SeqType r, final Ann a) {
-    this(ii, n, v, r, a, true, false);
+  public UserFunc(final InputInfo ii, final QNm n, final Var[] v, final SeqType r,
+      final Ann a) {
+    this(ii, n, v, r, a, true);
   }
 
   /**
@@ -67,10 +67,9 @@ public class UserFunc extends Single {
    * @param r return type
    * @param a annotations
    * @param d declaration flag
-   * @param u updating flag
    */
-  public UserFunc(final InputInfo ii, final QNm n, final Var[] v,
-      final SeqType r, final Ann a, final boolean d, final boolean u) {
+  public UserFunc(final InputInfo ii, final QNm n, final Var[] v, final SeqType r,
+      final Ann a, final boolean d) {
 
     super(ii, null);
     name = n;
@@ -79,7 +78,7 @@ public class UserFunc extends Single {
     cast = r != null;
     ann = a == null ? new Ann() : a;
     declared = d;
-    updating = u;
+    updating = ann.contains(Ann.UPDATING);
   }
 
   /**
@@ -90,11 +89,11 @@ public class UserFunc extends Single {
     final boolean u = expr.uses(Use.UPD);
     if(updating) {
       // updating function
-      if(ret != null) UPFUNCTYPE.thrw(input);
-      if(!u && !expr.isVacuous()) UPEXPECTF.thrw(input);
+      if(ret != null) UPFUNCTYPE.thrw(info);
+      if(!u && !expr.isVacuous()) UPEXPECTF.thrw(info);
     } else if(u) {
       // uses updates, but is not declared as such
-      UPNOT.thrw(input, description());
+      UPNOT.thrw(info, description());
     }
   }
 
@@ -110,18 +109,19 @@ public class UserFunc extends Single {
    * @param cache cache variables
    * @throws QueryException query exception
    */
-  void comp(final QueryContext ctx, final boolean cache)
-      throws QueryException {
-
+  void comp(final QueryContext ctx, final boolean cache) throws QueryException {
     if(compiled) return;
     compiled = true;
 
     final int vs = ctx.vars.size();
     final VarStack vl = cache ? ctx.vars.cache(args.length) : null;
-    for(final Var v : args) ctx.vars.add(v);
-    expr = expr.comp(ctx);
-    if(cache) ctx.vars.reset(vl);
-    else ctx.vars.size(vs);
+    try {
+      for(final Var v : args) ctx.vars.add(v);
+      expr = expr.comp(ctx);
+    } finally {
+      if(cache) ctx.vars.reset(vl);
+      else ctx.vars.size(vs);
+    }
 
     // convert all function calls in tail position to proper tail calls
     if(tco()) expr = expr.markTailCalls();
@@ -149,7 +149,7 @@ public class UserFunc extends Single {
     try {
       final Item it = expr.item(ctx, ii);
       // optionally promote return value to target type
-      return cast ? ret.cast(it, this, false, ctx, input) : it;
+      return cast ? ret.cast(it, false, ctx, info, this) : it;
     } finally {
       ctx.value = cv;
       ctx.sc.ns.stack(ns);
@@ -165,7 +165,7 @@ public class UserFunc extends Single {
     try {
       final Value v = ctx.value(expr);
       // optionally promote return value to target type
-      return cast ? ret.promote(v, ctx, input) : v;
+      return cast ? ret.promote(v, ctx, info) : v;
     } finally {
       ctx.value = cv;
       ctx.sc.ns.stack(ns);

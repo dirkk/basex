@@ -2,11 +2,12 @@ package org.basex.util;
 
 import static org.basex.core.Text.*;
 import static org.basex.util.Token.*;
+
+import org.basex.core.*;
 import org.basex.io.IO;
 
 /**
- * Simple command and query parser; can be overwritten to support more complex
- * parsings.
+ * Abstract class for parsing various inputs, such as database commands or queries.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
@@ -15,35 +16,35 @@ public abstract class InputParser {
   /** Parsing exception. */
   private static final String FOUND = ", found '%'";
 
-  /** Input query. */
-  public final String query;
+  /** Input to be parsed. */
+  public final String input;
   /** Query length. */
-  public final int ql;
+  public final int il;
 
-  /** Optional reference to query input. */
-  public IO file;
-  /** Current query position. */
-  public int qp;
-  /** Marked query position. */
-  public int qm;
+  /** File reference. */
+  public String file;
+  /** Current input position. */
+  public int ip;
+  /** Marked input position. */
+  public int im;
 
   /**
    * Constructor.
-   * @param q input query
+   * @param in input
    */
-  protected InputParser(final String q) {
-    this(q, null);
+  protected InputParser(final String in) {
+    input = in;
+    il = input.length();
   }
 
   /**
-   * Constructor.
-   * @param q input query
+   * Sets a file reference.
    * @param f file
+   * @param c database context
    */
-  protected InputParser(final String q, final IO f) {
-    query = q;
-    ql = query.length();
-    file = f;
+  protected void file(final IO f, final Context c) {
+    file = f == null || f.isDir() ? null : c.user.has(Perm.ADMIN) ?
+        f.path() : f.name();
   }
 
   /**
@@ -51,7 +52,7 @@ public abstract class InputParser {
    * @return current character
    */
   protected final boolean more() {
-    return qp < ql;
+    return ip < il;
   }
 
   /**
@@ -59,8 +60,8 @@ public abstract class InputParser {
    * @return current character
    */
   protected final char curr() {
-    final int p = qp;
-    return p < ql ? query.charAt(p) : 0;
+    final int i = ip;
+    return i < il ? input.charAt(i) : 0;
   }
 
   /**
@@ -69,15 +70,15 @@ public abstract class InputParser {
    * @return result of check
    */
   protected final boolean curr(final int ch) {
-    final int p = qp;
-    return p < ql && ch == query.charAt(p);
+    final int i = ip;
+    return i < il && ch == input.charAt(i);
   }
 
   /**
    * Remembers the current position.
    */
   protected final void mark() {
-    qm = qp;
+    im = ip;
   }
 
   /**
@@ -85,8 +86,8 @@ public abstract class InputParser {
    * @return result of check
    */
   protected final char next() {
-    final int p = qp + 1;
-    return p < ql ? query.charAt(p) : 0;
+    final int i = ip + 1;
+    return i < il ? input.charAt(i) : 0;
   }
 
   /**
@@ -94,7 +95,7 @@ public abstract class InputParser {
    * @return next character
    */
   protected final char consume() {
-    return qp < ql ? query.charAt(qp++) : 0;
+    return ip < il ? input.charAt(ip++) : 0;
   }
 
   /**
@@ -103,9 +104,9 @@ public abstract class InputParser {
    * @return true if character was found
    */
   protected final boolean consume(final int ch) {
-    final int p = qp;
-    if(p >= ql || ch != query.charAt(p)) return false;
-    ++qp;
+    final int i = ip;
+    if(i >= il || ch != input.charAt(i)) return false;
+    ++ip;
     return true;
   }
 
@@ -124,13 +125,13 @@ public abstract class InputParser {
    * @return true if string was found
    */
   protected final boolean consume(final String str) {
-    int p = qp;
+    int i = ip;
     final int l = str.length();
-    if(p + l > ql) return false;
+    if(i + l > il) return false;
     for(int s = 0; s < l; ++s) {
-      if(query.charAt(p++) != str.charAt(s)) return false;
+      if(input.charAt(i++) != str.charAt(s)) return false;
     }
-    qp = p;
+    ip = i;
     return true;
   }
 
@@ -147,15 +148,15 @@ public abstract class InputParser {
    * @return query substring
    */
   protected final String rest() {
-    final int e = Math.min(ql, qp + 15);
-    return query.substring(qp, e) + (e == ql ? "" : DOTS);
+    final int ie = Math.min(il, ip + 15);
+    return input.substring(ip, ie) + (ie == il ? "" : DOTS);
   }
 
   /**
    * Creates input information.
    * @return input information
    */
-  protected final InputInfo input() {
+  protected final InputInfo info() {
     return new InputInfo(this);
   }
 }

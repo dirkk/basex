@@ -9,7 +9,6 @@ import java.util.regex.*;
 import org.basex.core.*;
 import org.basex.io.in.*;
 import org.basex.util.*;
-import org.basex.util.list.*;
 import org.xml.sax.*;
 
 /**
@@ -29,14 +28,7 @@ public final class IOUrl extends IO {
 
   @Override
   public byte[] read() throws IOException {
-    final ByteList bl = new ByteList();
-    final BufferInput bi = inputStream();
-    try {
-      for(int b; (b = bi.read()) != -1;) bl.add(b);
-    } finally {
-      try { bi.close(); } catch(final IOException ex) { }
-    }
-    return bl.toArray();
+    return new BufferInput(this).content();
   }
 
   @Override
@@ -45,10 +37,14 @@ public final class IOUrl extends IO {
   }
 
   @Override
-  public BufferInput inputStream() throws IOException {
+  public InputStream inputStream() throws IOException {
     final URL url = new URL(path);
     try {
-      return new BufferInput(url.openStream());
+      return url.openStream();
+    } catch(final IOException ex) {
+      final IOException io = new IOException(Util.message(ex));
+      io.setStackTrace(ex.getStackTrace());
+      throw io;
     } catch(final RuntimeException ex) {
       // catch unexpected runtime exceptions
       Util.debug(ex);
@@ -64,9 +60,8 @@ public final class IOUrl extends IO {
   @Override
   public IO merge(final String f) {
     final IO io = IO.get(f);
-    if(!(io instanceof IOFile)) return io;
-    final String p = path;
-    return IO.get((p.endsWith("/") ? p : p.replace("^(.*/).*", "$1")) + f);
+    if(!(io instanceof IOFile) || f.contains(":") || f.startsWith("/")) return io;
+    return IO.get((path.endsWith("/") ? path : path.replace("^(.*/).*", "$1")) + f);
   }
 
   /** Pattern for duplicate slashes. */

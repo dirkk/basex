@@ -10,7 +10,7 @@ import org.basex.query.item.SeqType;
 import org.basex.query.item.Value;
 import org.basex.query.item.SeqType.Occ;
 import org.basex.query.iter.Iter;
-import org.basex.query.iter.ItemCache;
+import org.basex.query.iter.ValueBuilder;
 import org.basex.util.InputInfo;
 import org.basex.util.TokenBuilder;
 
@@ -58,7 +58,7 @@ public final class List extends Arr {
       final SeqType et = e.type();
       type = type == SeqType.EMP ? et :
         SeqType.get(et.type == type.type ? et.type : AtomType.ITEM,
-            et.mayBeZero() && type.mayBeZero() ? Occ.ZM : Occ.OM);
+            et.mayBeZero() && type.mayBeZero() ? Occ.ZERO_MORE : Occ.ONE_MORE);
     }
 
     // return cached integer sequence, cached values or self reference
@@ -90,9 +90,9 @@ public final class List extends Arr {
 
   @Override
   public Value value(final QueryContext ctx) throws QueryException {
-    final ItemCache ic = new ItemCache();
-    for(final Expr e : expr) ic.add(ctx.value(e));
-    return ic.value();
+    final ValueBuilder vb = new ValueBuilder();
+    for(final Expr e : expr) vb.add(ctx.value(e));
+    return vb.value();
   }
 
   @Override

@@ -1,72 +1,38 @@
 package org.basex.query.path;
 
-import org.basex.data.Data;
-import org.basex.data.Nodes;
-import org.basex.query.QueryContext;
-import org.basex.query.item.DBNode;
-import org.basex.query.item.DBNodeSeq;
-import org.basex.query.item.Item;
-import org.basex.query.item.ANode;
-import org.basex.query.item.NodeType;
-import org.basex.query.iter.ValueIter;
-import org.basex.util.TokenBuilder;
-import org.basex.util.list.IntList;
+import org.basex.query.item.*;
+import org.basex.query.iter.*;
 
 /**
- * Document test for database nodes.
+ * Document kind test.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
  */
-final class DocTest extends Test {
-  /** Database nodes. */
-  private final Nodes nodes;
+public final class DocTest extends Test {
+  /** Optional child test. */
+  private final Test test;
 
   /**
    * Constructor.
-   * @param n database document nodes
+   * @param t child test (may be {@code null})
    */
-  private DocTest(final Nodes n) {
+  public DocTest(final Test t) {
     type = NodeType.DOC;
-    nodes = n;
-  }
-
-  /**
-   * Returns a document test. This test will only be utilized by
-   * {@link AxisPath#index} if all context values are database nodes.
-   * @param ctx query context
-   * @param data data reference
-   * @return document test
-   */
-  static Test get(final QueryContext ctx, final Data data) {
-    // use simple test if database contains only one node
-    if(data.single()) return Test.DOC;
-
-    // adopt nodes from existing sequence
-    if(ctx.value instanceof DBNodeSeq) {
-      final DBNodeSeq seq = (DBNodeSeq) ctx.value;
-      return seq.complete ? Test.DOC : new DocTest(new Nodes(seq.pres, data));
-    }
-
-    // loop through all documents and add pre values of documents
-    // not more than 2^31 documents supported
-    final IntList il = new IntList((int) ctx.value.size());
-    final ValueIter ir = ctx.value.iter();
-    for(Item it; (it = ir.next()) != null;) il.add(((DBNode) it).pre);
-    return new DocTest(new Nodes(il.toArray(), data));
+    test = t;
   }
 
   @Override
-  public boolean eval(final ANode node) {
-    // no document node, or no database instance
-    if(node.type != type || !(node instanceof DBNode)) return false;
-    // ensure that the pre value is contained in the target documents
-    final DBNode db = (DBNode) node;
-    return nodes.data == db.data && nodes.contains(db.pre);
+  public boolean eq(final ANode node) {
+    if(node.type != NodeType.DOC) return false;
+    final AxisMoreIter ai = node.children();
+    return ai.more() && test.eq(ai.next()) && !ai.more();
   }
 
   @Override
   public String toString() {
-    return new TokenBuilder(NodeType.DOC.string()).add("(...)").toString();
+    final StringBuilder sb = new StringBuilder().append(type).append('(');
+    if(test != null) sb.append(test);
+    return sb.append(')').toString();
   }
 }

@@ -21,9 +21,10 @@ import org.basex.util.Token;
 import org.basex.util.TokenBuilder;
 import org.basex.util.Util;
 import org.basex.util.ft.Scoring;
+import org.basex.util.list.*;
 
 /**
- * Disk-based Node item.
+ * Database nodes.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
@@ -37,7 +38,15 @@ public class DBNode extends ANode {
   private Atts nsp;
 
   /**
-   * Constructor.
+   * Constructor, creating a document node from the specified data reference.
+   * @param d data reference
+   */
+  public DBNode(final Data d) {
+    this(d, 0);
+  }
+
+  /**
+   * Constructor, creating a node from the specified data reference.
    * @param d data reference
    * @param p pre value
    */
@@ -46,7 +55,7 @@ public class DBNode extends ANode {
   }
 
   /**
-   * Constructor.
+   * Constructor, specifying full node information.
    * @param d data reference
    * @param p pre value
    * @param k node kind
@@ -56,7 +65,7 @@ public class DBNode extends ANode {
   }
 
   /**
-   * Constructor.
+   * Constructor, specifying full node information.
    * @param d data reference
    * @param p pre value
    * @param r parent reference
@@ -76,17 +85,16 @@ public class DBNode extends ANode {
    * @throws IOException I/O exception
    */
   public DBNode(final IO input, final Prop prop) throws IOException {
-    this(Parser.xmlParser(input, prop), prop);
+    this(Parser.xmlParser(input, prop));
   }
 
   /**
    * Constructor, specifying a parser reference.
    * @param parser parser
-   * @param prop database properties
    * @throws IOException I/O exception
    */
-  public DBNode(final Parser parser, final Prop prop) throws IOException {
-    this(MemBuilder.build("", parser, prop), 0);
+  public DBNode(final Parser parser) throws IOException {
+    this(MemBuilder.build("", parser));
   }
 
   /**
@@ -151,18 +159,17 @@ public class DBNode extends ANode {
 
   @Override
   public final QNm qname() {
-    return update(new QNm());
+    return qname(new QNm());
   }
 
   @Override
-  public final QNm update(final QNm name) {
+  public final QNm qname(final QNm name) {
     // update the name and uri strings in the specified QName
     final byte[] nm = name();
     byte[] uri = Token.EMPTY;
     final boolean pref = Token.indexOf(nm, ':') != -1;
     if(pref || data.nspaces.size() != 0) {
-      final int n = pref ? data.nspaces.uri(nm, pre) :
-        data.uri(pre, data.kind(pre));
+      final int n = pref ? data.nspaces.uri(nm, pre) : data.uri(pre, data.kind(pre));
       final byte[] u = n > 0 ? data.nspaces.uri(n) : pref ?
           NSGlobal.uri(Token.prefix(nm)) : null;
       if(u != null) uri = u;
@@ -213,7 +220,7 @@ public class DBNode extends ANode {
     final MemData md = data instanceof MemData ?
         new MemData(data) : new MemData(data.meta.prop);
     new DataBuilder(md).build(this);
-    return new DBNode(md, 0);
+    return new DBNode(md);
 
     /*if(hasChildren()) {
       // adopt index structures if database is a main-memory instance
@@ -459,10 +466,17 @@ public class DBNode extends ANode {
 
   @Override
   public final void plan(final Serializer ser) throws IOException {
-    ser.openElement(Token.token(Util.name(this)), NAM,
-        Token.token(data.meta.name));
+    ser.openElement(Token.token(Util.name(this)), NAM, Token.token(data.meta.name));
     if(pre != 0) ser.attribute(PRE, Token.token(pre));
     ser.closeElement();
+  }
+
+  @Override
+  public byte[] xdmInfo() {
+    final ByteList bl = new ByteList().add(super.xdmInfo());
+    if(type == NodeType.DOC) bl.add(baseURI()).add(0);
+    else if(type == NodeType.ATT) bl.add(qname().uri()).add(0);
+    return bl.toArray();
   }
 
   @Override

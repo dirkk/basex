@@ -4,22 +4,18 @@ import static org.basex.core.Text.*;
 import static org.basex.data.DataText.*;
 import static org.basex.util.Token.*;
 import static org.basex.util.ft.FTFlag.*;
-import java.io.IOException;
-import java.util.Arrays;
-import org.basex.core.Prop;
-import org.basex.data.Data;
-import org.basex.data.DataText;
-import org.basex.index.IndexIterator;
-import org.basex.index.IndexStats;
-import org.basex.index.IndexToken;
-import org.basex.io.random.DataAccess;
-import org.basex.util.Num;
-import org.basex.util.Performance;
-import org.basex.util.TokenBuilder;
-import org.basex.util.Util;
-import org.basex.util.ft.FTLexer;
-import org.basex.util.hash.TokenIntMap;
-import org.basex.util.list.IntList;
+
+import java.io.*;
+import java.util.*;
+
+import org.basex.core.*;
+import org.basex.data.*;
+import org.basex.index.*;
+import org.basex.index.IndexCache.CacheEntry;
+import org.basex.io.random.*;
+import org.basex.util.*;
+import org.basex.util.ft.*;
+import org.basex.util.list.*;
 
 /**
  * <p>This class performs full-text index requests on a compressed trie on disk.
@@ -82,8 +78,8 @@ final class FTTrie extends FTIndex {
       return Math.max(1, data.meta.size / 10);
 
     final byte[] token = lex.get();
-    final int id = cache.id(token);
-    if(id > 0) return cache.size(id);
+    final CacheEntry e = cache.get(token);
+    if(e != null) return e.size;
 
     int size = 0;
     long poi = 0;
@@ -115,13 +111,13 @@ final class FTTrie extends FTIndex {
     }
 
     // return cached or new result
-    final int id = cache.id(token);
-    return id == 0 ? iter(0, token, false) :
-      iter(cache.pointer(id), cache.size(id), inB, false);
+    final CacheEntry e = cache.get(token);
+    return e == null ? iter(0, token, false) :
+      iter(e.pointer, e.size, inB, false);
   }
 
   @Override
-  public synchronized void close() throws IOException {
+  public synchronized void close() {
     inB.close();
     inC.close();
     inA.close();
@@ -145,7 +141,7 @@ final class FTTrie extends FTIndex {
   }
 
   @Override
-  public TokenIntMap entries(final byte[] prefix) {
+  public EntryIterator entries(final byte[] prefix) {
     throw Util.notexpected(this);
   }
 
@@ -199,7 +195,7 @@ final class FTTrie extends FTIndex {
   }
 
   /**
-   * Called by {@link #info}. Collects all tokens and their sizes found
+   * Called by {@link #info()}. Collects all tokens and their sizes found
    * in the index structure.
    * @param token current token
    * @param id on node array (in main memory)

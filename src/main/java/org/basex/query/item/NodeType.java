@@ -14,10 +14,7 @@ import org.basex.core.Prop;
 import org.basex.query.QueryContext;
 import org.basex.query.QueryException;
 import org.basex.query.util.Err;
-import org.basex.util.InputInfo;
-import org.basex.util.Token;
-import org.basex.util.TokenBuilder;
-import org.basex.util.Util;
+import org.basex.util.*;
 import org.basex.util.hash.TokenMap;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Comment;
@@ -35,10 +32,10 @@ import org.w3c.dom.Text;
  */
 public enum NodeType implements Type {
   /** Node type. */
-  NOD("node", AtomType.ITEM),
+  NOD("node", AtomType.ITEM, 8),
 
   /** Text type. */
-  TXT("text", NOD) {
+  TXT("text", NOD, 9) {
     @Override
     public ANode cast(final Object o, final InputInfo ii) {
       return o instanceof BXText ? ((BXText) o).getNod() : new FTxt((Text) o);
@@ -46,7 +43,7 @@ public enum NodeType implements Type {
   },
 
   /** PI type. */
-  PI("processing-instruction", NOD) {
+  PI("processing-instruction", NOD, 10) {
     @Override
     public ANode cast(final Object o, final InputInfo ii) {
       return o instanceof BXPI ? ((BXPI) o).getNod() :
@@ -55,7 +52,7 @@ public enum NodeType implements Type {
   },
 
   /** Element type. */
-  ELM("element", NOD) {
+  ELM("element", NOD, 11) {
     @Override
     public ANode cast(final Object o, final InputInfo ii) {
       return o instanceof BXElem ? ((BXElem) o).getNod() :
@@ -64,16 +61,14 @@ public enum NodeType implements Type {
   },
 
   /** Document type. */
-  DOC("document-node", NOD) {
+  DOC("document-node", NOD, 12) {
     @Override
-    public ANode cast(final Object o, final InputInfo ii)
-        throws QueryException {
-
+    public ANode cast(final Object o, final InputInfo ii) throws QueryException {
       if(o instanceof BXDoc) return ((BXDoc) o).getNod();
       if(o instanceof Document) {
         try {
-          final DOMWrapper p = new DOMWrapper((Document) o, "");
-          return new DBNode(MemBuilder.build(p, new Prop()), 0);
+          final DOMWrapper p = new DOMWrapper((Document) o, "", new Prop());
+          return new DBNode(MemBuilder.build(p));
         } catch(final IOException ex) {
           UNDOC.thrw(ii, ex);
         }
@@ -86,10 +81,10 @@ public enum NodeType implements Type {
   },
 
   /** Document element type. */
-  DEL("document-node(element())", NOD),
+  DEL("document-node(element())", NOD, 13),
 
   /** Attribute type. */
-  ATT("attribute", NOD) {
+  ATT("attribute", NOD, 14) {
     @Override
     public ANode cast(final Object o, final InputInfo ii) {
       return o instanceof BXAttr ? ((BXAttr) o).getNod() : new FAttr((Attr) o);
@@ -97,7 +92,7 @@ public enum NodeType implements Type {
   },
 
   /** Comment type. */
-  COM("comment", NOD) {
+  COM("comment", NOD, 15) {
     @Override
     public ANode cast(final Object o, final InputInfo ii) {
       return o instanceof BXComm ? ((BXComm) o).getNod() :
@@ -106,14 +101,34 @@ public enum NodeType implements Type {
   },
 
   /** Namespace type. */
-  NSP("namespace-node", NOD);
+  NSP("namespace-node", NOD, 16),
+
+  /** Schema-element. */
+  SCE("schema-element", NOD, 17),
+
+  /** Schema-attribute. */
+  SCA("schema-attribute", NOD, 18);
 
   /** String representation. */
   private final byte[] string;
   /** Parent type. */
   private final Type par;
+  /** Type id . */
+  private final int id;
   /** Sequence type. */
   private SeqType seq;
+
+  /**
+   * Constructor.
+   * @param nm string representation
+   * @param pr parent type
+   * @param i type id
+   */
+  NodeType(final String nm, final Type pr, final int i) {
+    string = Token.token(nm);
+    par = pr;
+    id = i;
+  }
 
   @Override
   public final boolean isNode() {
@@ -167,21 +182,31 @@ public enum NodeType implements Type {
     return null;
   }
 
-  /**
-   * Constructor.
-   * @param nm string representation
-   * @param pr parent type
-   */
-  NodeType(final String nm, final Type pr) {
-    string = Token.token(nm);
-    par = pr;
-  }
-
   @Override
   public SeqType seqType() {
     // cannot be statically instantiated due to circular dependency
     if(seq == null) seq = new SeqType(this);
     return seq;
+  }
+
+  @Override
+  public final boolean instanceOf(final Type t) {
+    return this == t || par != null && par.instanceOf(t);
+  }
+
+  @Override
+  public int id() {
+    return id;
+  }
+
+  @Override
+  public byte[] string() {
+    return string;
+  }
+
+  @Override
+  public String toString() {
+    return new TokenBuilder().add(string).add("()").toString();
   }
 
   /**
@@ -191,17 +216,9 @@ public enum NodeType implements Type {
    * @return dummy item
    * @throws QueryException query exception
    */
-  Item error(final Item it, final InputInfo ii)
-      throws QueryException {
+  Item error(final Item it, final InputInfo ii) throws QueryException {
     Err.cast(ii, this, it);
     return null;
-  }
-
-  // PUBLIC AND STATIC METHODS ================================================
-
-  @Override
-  public final boolean instanceOf(final Type t) {
-    return this == t || par != null && par.instanceOf(t);
   }
 
   /**
@@ -217,20 +234,5 @@ public enum NodeType implements Type {
       }
     }
     return null;
-  }
-
-  @Override
-  public int id() {
-    return ordinal() + 8;
-  }
-
-  @Override
-  public String toString() {
-    return new TokenBuilder(string).add("()").toString();
-  }
-
-  @Override
-  public byte[] string() {
-    return string;
   }
 }

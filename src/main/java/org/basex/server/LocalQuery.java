@@ -1,11 +1,9 @@
 package org.basex.server;
 
-import java.io.IOException;
-import java.io.OutputStream;
-
-import org.basex.core.Context;
-import org.basex.io.in.ArrayInput;
-import org.basex.io.out.ArrayOutput;
+import java.io.*;
+import org.basex.core.*;
+import org.basex.io.in.*;
+import org.basex.io.out.*;
 
 /**
  * This class defines all methods for iteratively evaluating queries locally.
@@ -26,28 +24,32 @@ public class LocalQuery extends Query {
    * @param ctx database context
    * @param o output stream to write query output
    */
-  LocalQuery(final String q, final Context ctx, final OutputStream o) {
+  protected LocalQuery(final String q, final Context ctx, final OutputStream o) {
     ql = new QueryListener(q, ctx);
     out = o;
   }
 
   @Override
-  public void bind(final String n, final Object v, final String t)
-      throws IOException {
+  public void bind(final String n, final Object v, final String t) throws IOException {
     ql.bind(n, v, t);
+  }
+
+  @Override
+  public void context(final Object v, final String t) throws IOException {
+    ql.context(v, t);
   }
 
   @Override
   protected void cache() throws IOException {
     final ArrayOutput ao = new ArrayOutput();
-    ql.execute(true, ao, true);
+    ql.execute(true, ao, true, false);
     cache(new ArrayInput(ao.toArray()));
   }
 
   @Override
   public String execute() throws IOException {
     final OutputStream os = out == null ? new ArrayOutput() : out;
-    ql.execute(false, os, false);
+    ql.execute(false, os, false, false);
     return out == null ? os.toString() : null;
   }
 
@@ -59,6 +61,11 @@ public class LocalQuery extends Query {
   @Override
   public String options() throws IOException {
     return ql.options();
+  }
+
+  @Override
+  public boolean updating() throws IOException {
+    return ql.updating();
   }
 
   @Override

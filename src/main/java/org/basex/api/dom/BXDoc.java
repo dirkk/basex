@@ -39,19 +39,17 @@ public final class BXDoc extends BXNode implements Document {
 
   @Override
   public BXNode adoptNode(final Node source) {
-    readOnly();
-    return null;
+    throw readOnly();
   }
 
   @Override
   public BXAttr createAttribute(final String nm) {
-    final QNm name = new QNm(token(nm));
-    return new BXAttr(new FAttr(name, EMPTY));
+    return new BXAttr(new FAttr(new QNm(nm), EMPTY));
   }
 
   @Override
   public BXAttr createAttributeNS(final String uri, final String qn) {
-    return new BXAttr(new FAttr(new QNm(token(qn), token(uri)), EMPTY));
+    return new BXAttr(new FAttr(new QNm(qn, uri), EMPTY));
   }
 
   @Override
@@ -71,23 +69,22 @@ public final class BXDoc extends BXNode implements Document {
 
   @Override
   public BXElem createElement(final String nm) {
-    return new BXElem(new FElem(new QNm(token(nm))));
+    return new BXElem(new FElem(new QNm(nm)));
   }
 
   @Override
   public BXElem createElementNS(final String uri, final String qn) {
-    return new BXElem(new FElem(new QNm(token(qn), token(uri))));
+    return new BXElem(new FElem(new QNm(qn, uri)));
   }
 
   @Override
   public EntityReference createEntityReference(final String name) {
-    readOnly();
-    return null;
+    throw readOnly();
   }
 
   @Override
   public BXPI createProcessingInstruction(final String t, final String dat) {
-    return new BXPI(new FPI(new QNm(token(t)), token(dat)));
+    return new BXPI(new FPI(new QNm(t), token(dat)));
   }
 
   @Override
@@ -117,14 +114,12 @@ public final class BXDoc extends BXNode implements Document {
 
   @Override
   public DOMConfiguration getDomConfig() {
-    Util.notimplemented();
-    return null;
+    throw Util.notimplemented();
   }
 
   @Override
   public BXElem getElementById(final String elementId) {
-    Util.notimplemented();
-    return null;
+    throw Util.notimplemented();
   }
 
   @Override
@@ -135,8 +130,7 @@ public final class BXDoc extends BXNode implements Document {
   @Override
   public BXNList getElementsByTagNameNS(final String namespaceURI,
       final String localName) {
-    Util.notimplemented();
-    return null;
+    throw Util.notimplemented();
   }
 
   @Override
@@ -151,8 +145,7 @@ public final class BXDoc extends BXNode implements Document {
 
   @Override
   public boolean getStrictErrorChecking() {
-    Util.notimplemented();
-    return false;
+    throw Util.notimplemented();
   }
 
   @Override
@@ -172,39 +165,37 @@ public final class BXDoc extends BXNode implements Document {
 
   @Override
   public BXNode importNode(final Node importedNode, final boolean deep) {
-    Util.notimplemented();
-    return null;
+    throw Util.notimplemented();
   }
 
   @Override
   public void normalizeDocument() {
-    readOnly();
+    throw readOnly();
   }
 
   @Override
   public BXNode renameNode(final Node n, final String namespaceURI,
       final String qualifiedName) {
-    readOnly();
-    return null;
+    throw readOnly();
   }
 
   @Override
   public void setDocumentURI(final String documentURI) {
-    readOnly();
+    throw readOnly();
   }
 
   @Override
   public void setStrictErrorChecking(final boolean strictErrorChecking) {
-    Util.notimplemented();
+    throw Util.notimplemented();
   }
 
   @Override
   public void setXmlStandalone(final boolean xmlStandalone) {
-    Util.notimplemented();
+    throw Util.notimplemented();
   }
 
   @Override
   public void setXmlVersion(final String xmlVersion) {
-    Util.notimplemented();
+    throw Util.notimplemented();
   }
 }

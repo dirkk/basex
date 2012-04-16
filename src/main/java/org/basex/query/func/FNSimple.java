@@ -41,7 +41,7 @@ public final class FNSimple extends StandardFunc {
       case ONE_OR_MORE:
         final Iter ir = expr[0].iter(ctx);
         final long len = ir.size();
-        if(len == 0) throw EXPECTOM.thrw(input);
+        if(len == 0) throw EXPECTOM.thrw(info);
         if(len > 0) return ir;
         return new Iter() {
           private boolean first = true;
@@ -49,7 +49,7 @@ public final class FNSimple extends StandardFunc {
           public Item next() throws QueryException {
             final Item it = ir.next();
             if(first) {
-              if(it == null) throw EXPECTOM.thrw(input);
+              if(it == null) throw EXPECTOM.thrw(info);
               first = false;
             }
             return it;
@@ -67,7 +67,7 @@ public final class FNSimple extends StandardFunc {
     switch(sig) {
       case ONE_OR_MORE:
         final Value val = ctx.value(expr[0]);
-        if(val.isEmpty()) throw EXPECTOM.thrw(input);
+        if(val.isEmpty()) throw EXPECTOM.thrw(info);
         return val;
       case UNORDERED:
         return ctx.value(expr[0]);
@@ -91,20 +91,20 @@ public final class FNSimple extends StandardFunc {
       case EXISTS:
         return Bln.get(e.iter(ctx).next() != null);
       case BOOLEAN:
-        return Bln.get(e.ebv(ctx, input).bool(input));
+        return Bln.get(e.ebv(ctx, info).bool(info));
       case NOT:
-        return Bln.get(!e.ebv(ctx, input).bool(input));
+        return Bln.get(!e.ebv(ctx, info).bool(info));
       case DEEP_EQUAL:
         return Bln.get(deep(ctx));
       case ZERO_OR_ONE:
         Iter ir = e.iter(ctx);
         Item it = ir.next();
-        if(it != null && ir.next() != null) EXPECTZ0.thrw(input);
+        if(it != null && ir.next() != null) EXPECTZ0.thrw(info);
         return it;
       case EXACTLY_ONE:
         ir = e.iter(ctx);
         it = ir.next();
-        if(it == null || ir.next() != null) EXPECTO.thrw(input);
+        if(it == null || ir.next() != null) EXPECTO.thrw(info);
         return it;
       default:
         return super.item(ctx, ii);
@@ -149,13 +149,13 @@ public final class FNSimple extends StandardFunc {
         }
         return this;
       case ZERO_OR_ONE:
-        type = SeqType.get(e.type().type, Occ.ZO);
+        type = SeqType.get(e.type().type, Occ.ZERO_ONE);
         return e.type().zeroOrOne() ? e : this;
       case EXACTLY_ONE:
-        type = SeqType.get(e.type().type, Occ.O);
+        type = SeqType.get(e.type().type, Occ.ONE);
         return e.type().one() ? e : this;
       case ONE_OR_MORE:
-        type = SeqType.get(e.type().type, Occ.OM);
+        type = SeqType.get(e.type().type, Occ.ONE_MORE);
         return !e.type().mayBeZero() ? e : this;
       case UNORDERED:
         return e;
@@ -189,6 +189,6 @@ public final class FNSimple extends StandardFunc {
    */
   private boolean deep(final QueryContext ctx) throws QueryException {
     if(expr.length == 3) checkColl(expr[2], ctx);
-    return Compare.deep(ctx.iter(expr[0]), ctx.iter(expr[1]), input);
+    return Compare.deep(ctx.iter(expr[0]), ctx.iter(expr[1]), info);
   }
 }

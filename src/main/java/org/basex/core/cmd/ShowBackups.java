@@ -2,18 +2,14 @@ package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
 
-import java.io.IOException;
-import org.basex.core.Command;
-import org.basex.core.CommandBuilder;
+import java.io.*;
+
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdShow;
-import org.basex.core.Context;
-import org.basex.core.User;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
-import org.basex.util.Table;
-import org.basex.util.list.StringList;
-import org.basex.util.list.TokenList;
+import org.basex.io.*;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'show backups' command and shows available backups.
@@ -26,7 +22,7 @@ public final class ShowBackups extends Command {
    * Default constructor.
    */
   public ShowBackups() {
-    super(User.CREATE);
+    super(Perm.CREATE);
   }
 
   @Override
@@ -52,26 +48,5 @@ public final class ShowBackups extends Command {
   @Override
   public void build(final CommandBuilder cb) {
     cb.init(Cmd.SHOW + " " + CmdShow.BACKUPS);
-  }
-
-  /**
-   * Returns all backups of the specified database.
-   * @param db database
-   * @param full return full path
-   * @param ctx database context
-   * @return available backups
-   */
-  public static StringList list(final String db, final boolean full,
-      final Context ctx) {
-
-    final StringList sl = new StringList();
-    for(final IOFile f : ctx.mprop.dbpath().children()) {
-      final String name = f.name();
-      if(name.matches(db + IO.DATEPATTERN + IO.ZIPSUFFIX)) {
-        sl.add(full ? f.path() : name.replaceAll(IO.ZIPSUFFIX + '$', ""));
-      }
-    }
-    sl.sort(false, false);
-    return sl;
   }
 }

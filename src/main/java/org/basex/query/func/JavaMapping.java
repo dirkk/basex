@@ -5,46 +5,23 @@ import static org.basex.query.QueryText.*;
 import static org.basex.query.util.Err.*;
 import static org.basex.util.Token.*;
 
-import java.lang.reflect.Method;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.URI;
-import java.net.URL;
-import java.util.Map;
+import java.lang.reflect.*;
+import java.math.*;
+import java.net.*;
+import java.util.*;
 
-import javax.xml.datatype.Duration;
-import javax.xml.datatype.XMLGregorianCalendar;
-import javax.xml.namespace.QName;
+import javax.xml.datatype.*;
+import javax.xml.namespace.*;
 
-import org.basex.query.QueryContext;
-import org.basex.query.QueryException;
-import org.basex.query.QueryModule;
-import org.basex.query.expr.Arr;
-import org.basex.query.expr.Expr;
-import org.basex.query.item.AtomType;
-import org.basex.query.item.Bln;
-import org.basex.query.item.Dbl;
-import org.basex.query.item.Empty;
-import org.basex.query.item.Flt;
-import org.basex.query.item.FuncType;
-import org.basex.query.item.Int;
-import org.basex.query.item.Jav;
-import org.basex.query.item.NodeType;
-import org.basex.query.item.QNm;
-import org.basex.query.item.Str;
+import org.basex.core.*;
+import org.basex.query.*;
+import org.basex.query.expr.*;
+import org.basex.query.item.*;
 import org.basex.query.item.Type;
-import org.basex.query.item.Value;
-import org.basex.query.iter.ItemCache;
-import org.basex.query.iter.Iter;
-import org.basex.util.InputInfo;
-import org.basex.util.Reflect;
-import org.basex.util.TokenBuilder;
-import org.w3c.dom.Attr;
-import org.w3c.dom.Comment;
-import org.w3c.dom.Document;
-import org.w3c.dom.DocumentFragment;
-import org.w3c.dom.Element;
-import org.w3c.dom.ProcessingInstruction;
+import org.basex.query.iter.*;
+import org.basex.query.util.pkg.*;
+import org.basex.util.*;
+import org.w3c.dom.*;
 import org.w3c.dom.Text;
 
 /**
@@ -63,8 +40,8 @@ public abstract class JavaMapping extends Arr {
     Byte.class,       short.class,    Short.class,        int.class,
     Integer.class,    long.class,     Long.class,         float.class,
     Float.class,      double.class,   Double.class,       BigDecimal.class,
-    BigInteger.class, QName.class,    CharSequence.class, char.class,
-    Character.class,  URI.class,      URL.class,          Map.class
+    BigInteger.class, QName.class,    char.class,         Character.class,
+    URI.class,        URL.class,      Map.class
   };
   /** Resulting XQuery types. */
   private static final Type[] XQUERY = {
@@ -73,7 +50,7 @@ public abstract class JavaMapping extends Arr {
     AtomType.INT, AtomType.LNG, AtomType.LNG, AtomType.FLT,
     AtomType.FLT, AtomType.DBL, AtomType.DBL, AtomType.DEC,
     AtomType.ITR, AtomType.QNM, AtomType.STR, AtomType.STR,
-    AtomType.STR, AtomType.URI, AtomType.URI, FuncType.ANY_FUN
+    AtomType.URI, AtomType.URI, FuncType.ANY_FUN
   };
 
   /**
@@ -95,18 +72,20 @@ public abstract class JavaMapping extends Arr {
     final Value[] args = new Value[expr.length];
     for(int a = 0; a < expr.length; ++a) {
       args[a] = ctx.value(expr[a]);
-      if(args[a].isEmpty()) XPEMPTY.thrw(input, description());
+      if(args[a].isEmpty()) XPEMPTY.thrw(info, description());
     }
-    return toValue(eval(args));
+    return toValue(eval(args, ctx));
   }
 
   /**
    * Returns the result of the evaluated Java function.
    * @param args arguments
+   * @param ctx query context
    * @return arguments
    * @throws QueryException query exception
    */
-  protected abstract Object eval(final Value[] args) throws QueryException;
+  protected abstract Object eval(final Value[] args, final QueryContext ctx)
+      throws QueryException;
 
   /**
    * Converts the specified result to an XQuery value.
@@ -124,76 +103,108 @@ public abstract class JavaMapping extends Arr {
 
     if(!res.getClass().isArray()) return new Jav(res);
 
-    final ItemCache ic = new ItemCache();
+    final ValueBuilder vb = new ValueBuilder();
     if(res instanceof boolean[]) {
-      for(final boolean o : (boolean[]) res) ic.add(Bln.get(o));
+      for(final boolean o : (boolean[]) res) vb.add(Bln.get(o));
     } else if(res instanceof char[]) {
-      ic.add(Str.get(new String((char[]) res)));
+      vb.add(Str.get(new String((char[]) res)));
     } else if(res instanceof byte[]) {
-      for(final byte o : (byte[]) res) ic.add(new Int(o, AtomType.BYT));
+      for(final byte o : (byte[]) res) vb.add(new Int(o, AtomType.BYT));
     } else if(res instanceof short[]) {
-      for(final short o : (short[]) res) ic.add(Int.get(o));
+      for(final short o : (short[]) res) vb.add(new Int(o, AtomType.SHR));
     } else if(res instanceof int[]) {
-      for(final int o : (int[]) res) ic.add(Int.get(o));
+      for(final int o : (int[]) res) vb.add(new Int(o, AtomType.INT));
     } else if(res instanceof long[]) {
-      for(final long o : (long[]) res) ic.add(Int.get(o));
+      for(final long o : (long[]) res) vb.add(Int.get(o));
     } else if(res instanceof float[]) {
-      for(final float o : (float[]) res) ic.add(Flt.get(o));
+      for(final float o : (float[]) res) vb.add(Flt.get(o));
     } else if(res instanceof double[]) {
-      for(final double o : (double[]) res) ic.add(Dbl.get(o));
+      for(final double o : (double[]) res) vb.add(Dbl.get(o));
     } else {
       for(final Object o : (Object[]) res) {
-        ic.add(o instanceof Value ? (Value) o : new Jav(o));
+        vb.add(o instanceof Value ? (Value) o : new Jav(o));
       }
     }
-    return ic.value();
+    return vb.value();
   }
 
   /**
    * Returns a new Java function instance.
-   * @param name function name
+   * @param qname function name
    * @param args arguments
    * @param ctx query context
    * @param ii input info
-   * @return Java function
+   * @return Java function, or {@code null}
    * @throws QueryException query exception
    */
-  static JavaMapping get(final QNm name, final Expr[] args,
-      final QueryContext ctx, final InputInfo ii) throws QueryException {
+  static JavaMapping get(final QNm qname, final Expr[] args, final QueryContext ctx,
+      final InputInfo ii) throws QueryException {
 
-    // resolve function name: convert dashes to upper-case initials
-    final TokenBuilder m = new TokenBuilder();
-    final byte[] ln = name.local();
+    final byte[] uri = qname.uri();
+    final byte[] ln = qname.local();
+    // check if URI starts with "java:" prefix (if yes, module must be Java code)
+    final boolean java = startsWith(uri, JAVAPREF);
+    final QNm nm = new QNm(ln, java ? substring(uri, JAVAPREF.length) : uri);
+
+    // rewrite function name: convert dashes to upper-case initials
+    final TokenBuilder tb = new TokenBuilder();
     boolean dash = false;
     for(int p = 0; p < ln.length; p += cl(ln, p)) {
       final int ch = cp(ln, p);
       if(dash) {
-        m.add(Character.toUpperCase(ch));
+        tb.add(Character.toUpperCase(ch));
         dash = false;
       } else {
         dash = ch == '-';
-        if(!dash) m.add(ch);
+        if(!dash) tb.add(ch);
       }
     }
-    final String mth = m.toString();
+    final String name = tb.toString();
 
-    // check if class was imported as Java module
-    final String clz = string(substring(name.uri(), JAVAPRE.length));
-    for(final QueryModule jm : ctx.javaModules.keySet()) {
-      final Class<?> c = jm.getClass();
-      if(c.getName().equals(clz)) {
-        for(final Method meth : c.getMethods()) {
-          if(meth.getName().equals(mth))
-            return new JavaModuleFunc(ii, jm, meth, args);
+    // check imported Java modules
+    String path = string(nm.uri());
+    final String p = ModuleLoader.uri2path(path);
+    if(p != null) path = p;
+    path = path.replace("/", ".").substring(1);
+
+    final Object jm  = ctx.modules.findImport(path);
+    if(jm != null) {
+      // find method with identical name and arity
+      Method meth = null;
+      for(final Method m : jm.getClass().getMethods()) {
+        if(m.getName().equals(name) && m.getParameterTypes().length == args.length) {
+          if(meth != null) JAVAAMB.thrw(ii, path + ':' + name);
+          meth = m;
         }
-        WHICHJAVA.thrw(ii, clz + '.' + mth);
       }
+
+      if(meth != null) {
+        // check if user has sufficient permissions to call the function
+        Perm perm = Perm.ADMIN;
+        final QueryModule.Requires req = meth.getAnnotation(QueryModule.Requires.class);
+        if(req != null) perm = Perm.get(req.value().name());
+        if(!ctx.context.user.has(perm)) return null;
+        return new JavaModuleFunc(ii, jm, meth, args);
+      }
+      WHICHJAVA.thrw(ii, path + ':' + name);
     }
 
-    Class<?> cls = Reflect.find(clz);
-    if(cls == null && ctx.jars != null) cls = Reflect.find(clz, ctx.jars);
-    if(cls == null) WHICHJAVA.thrw(ii, clz + '.' + mth);
-    return new JavaFunc(ii, cls, mth, args);
+    // only allowed with administrator permissions
+    if(!ctx.context.user.has(Perm.ADMIN)) return null;
+
+    // check addressed class
+    try {
+      return new JavaFunc(ii, ctx.modules.findClass(path), name, args);
+    } catch(final ClassNotFoundException ex) {
+      // only throw exception if "java:" prefix was explicitly specified
+      if(java) throw WHICHJAVA.thrw(ii, uri);
+    } catch(final Throwable th) {
+      Util.debug(th);
+      throw INITJAVA.thrw(ii, th);
+    }
+
+    // no function found
+    return null;
   }
 
   /**
@@ -239,10 +250,30 @@ public abstract class JavaMapping extends Arr {
    * @param type Java type
    * @return xquery type
    */
-  static Type type(final Class<?> type) {
+  protected static Type type(final Class<?> type) {
     for(int j = 0; j < JAVA.length; ++j) {
       if(JAVA[j].isAssignableFrom(type)) return XQUERY[j];
     }
     return null;
+  }
+
+  /**
+   * Returns a string representation of all found arguments.
+   * @param args array with arguments
+   * @return string representation
+   */
+  protected static String foundArgs(final Value[] args) {
+    // compose found arguments
+    final StringBuilder found = new StringBuilder();
+    for(final Value a : args) {
+      if(found.length() != 0) found.append(", ");
+      found.append(a.type());
+    }
+    return found.toString();
+  }
+
+  @Override
+  public boolean uses(final Use u) {
+    return u == Use.NDT || super.uses(u);
   }
 }

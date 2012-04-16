@@ -105,7 +105,7 @@ public final class JSONSerializer extends OutputSerializer {
     if(type == null) {
       int t = -1;
       final int tl = typeCache.length;
-      while(++t < tl && typeCache[t].id(tag) == 0);
+      while(++t < tl && !typeCache[t].contains(tag));
       if(t != tl) type = TYPES[t];
       else type = T_STRING;
       types.set(level,  type);
@@ -248,7 +248,7 @@ public final class JSONSerializer extends OutputSerializer {
     }
     if(mode == 2) {
       tb.add('_');
-    } else if(mode > 0 && tb.size() != 0) {
+    } else if(mode > 0 && !tb.isEmpty()) {
       tb.add('?');
     }
     return tb.finish();

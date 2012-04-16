@@ -1,12 +1,12 @@
 package org.basex.io;
 
-import java.io.IOException;
-import java.text.SimpleDateFormat;
+import java.io.*;
+import java.text.*;
+import java.util.*;
 
-import org.basex.data.Data;
-import org.basex.io.in.BufferInput;
-import org.basex.util.Token;
-import org.xml.sax.InputSource;
+import org.basex.data.*;
+import org.basex.util.*;
+import org.xml.sax.*;
 
 /**
  * Generic representation for inputs and outputs. The underlying source can
@@ -31,6 +31,8 @@ public abstract class IO {
   public static final String CSVSUFFIX = ".csv";
   /** JSON file suffix. */
   public static final String JSONSUFFIX = ".json";
+  /** JAR file suffix. */
+  public static final String JARSUFFIX = ".jar";
   /** GZIP file suffix. */
   public static final String GZSUFFIX = ".gz";
   /** XAR file suffix. */
@@ -38,11 +40,9 @@ public abstract class IO {
   /** File prefix. */
   public static final String FILEPREF = "file:";
   /** Date format which is appended to backups. */
-  public static final SimpleDateFormat DATE =
-    new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
+  public static final SimpleDateFormat DATE = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss");
   /** Date pattern. */
-  public static final String DATEPATTERN =
-    "-\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}-\\d{2}";
+  public static final String DATEPATTERN = "-\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}-\\d{2}";
 
   /** XQuery suffixes. */
   public static final String[] XQSUFFIXES =
@@ -99,8 +99,7 @@ public abstract class IO {
     path = p;
     final String n = p.substring(p.lastIndexOf('/') + 1);
     // use current time if no name is given
-    name = n.isEmpty() ? Long.toString(System.currentTimeMillis()) +
-        XMLSUFFIX : n;
+    name = n.isEmpty() ? Long.toString(System.currentTimeMillis()) + XMLSUFFIX : n;
   }
 
   /**
@@ -138,7 +137,7 @@ public abstract class IO {
   public abstract byte[] read() throws IOException;
 
   /**
-   * Tests if the file exists.
+   * Tests if the file exists. Returns {@code true} by default.
    * @return result of check
    */
   public boolean exists() {
@@ -150,6 +149,19 @@ public abstract class IO {
    * @return result of check
    */
   public boolean isDir() {
+    return false;
+  }
+
+  /**
+   * Tests if the file suffix matches the specified suffixes.
+   * @param suffixes suffixes to compare with
+   * @return result of check
+   */
+  public boolean hasSuffix(final String... suffixes) {
+    final int i = path.lastIndexOf('.');
+    if(i == -1) return false;
+    final String suf = path.substring(i).toLowerCase(Locale.ENGLISH);
+    for(final String z : suffixes) if(suf.equals(z)) return true;
     return false;
   }
 
@@ -185,11 +197,11 @@ public abstract class IO {
   public abstract InputSource inputSource();
 
   /**
-   * Returns a buffered input stream.
+   * Returns an input stream.
    * @return input stream
    * @throws IOException I/O exception
    */
-  public abstract BufferInput inputStream() throws IOException;
+  public abstract InputStream inputStream() throws IOException;
 
   /**
    * Merges two filenames.
@@ -202,16 +214,16 @@ public abstract class IO {
    * Checks if this file is an archive.
    * @return result of check
    */
-  public boolean isArchive() {
-    return false;
+  public final boolean isArchive() {
+    return hasSuffix(ZIPSUFFIXES);
   }
 
   /**
    * Checks if this file contains XML.
    * @return result of check
    */
-  public boolean isXML() {
-    return false;
+  public final boolean isXML() {
+    return hasSuffix(XMLSUFFIXES);
   }
 
   /**
@@ -279,5 +291,17 @@ public abstract class IO {
   @Override
   public String toString() {
     return path;
+  }
+
+  /**
+   * Returns the suffix of the specified path. An empty string is returned if the last
+   * path segment has no suffix.
+   * @param path path to be checked
+   * @return mime-type
+   */
+  public static String suffix(final String path) {
+    final int s = path.lastIndexOf('/');
+    final int d = path.lastIndexOf('.');
+    return d <= s ? "" : path.substring(d + 1);
   }
 }

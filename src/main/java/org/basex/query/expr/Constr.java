@@ -44,7 +44,7 @@ public final class Constr {
   /** Query context. */
   private final QueryContext ctx;
   /** Input information. */
-  private final InputInfo input;
+  private final InputInfo info;
   /** Text cache. */
   private final TokenBuilder text = new TokenBuilder();
   /** Space separator flag. */
@@ -56,7 +56,7 @@ public final class Constr {
    * @param qc query context
    */
   public Constr(final InputInfo ii, final QueryContext qc) {
-    input = ii;
+    info = ii;
     ctx = qc;
   }
 
@@ -74,7 +74,7 @@ public final class Constr {
         final Iter iter = ctx.iter(e);
         for(Item ch; (ch = iter.next()) != null && add(ch););
       }
-      if(text.size() != 0) children.add(new FTxt(text.finish()));
+      if(!text.isEmpty()) children.add(new FTxt(text.finish()));
       return this;
     } finally {
       ctx.sc.ns.size(s);
@@ -90,12 +90,12 @@ public final class Constr {
    */
   private boolean add(final Item it) throws QueryException {
     final Type ip = it.type;
-    if(ip.isFunction()) CONSFUNC.thrw(input, it);
+    if(ip.isFunction()) CONSFUNC.thrw(info, it);
 
     if(!ip.isNode()) {
       // type: atomic value
       if(more) text.add(' ');
-      text.add(it.string(input));
+      text.add(it.string(info));
       more = true;
 
     } else {
@@ -110,7 +110,7 @@ public final class Constr {
         // type: attribute node
 
         // no attribute allowed after texts or child nodes
-        if(text.size() != 0 || children.size() != 0) {
+        if(!text.isEmpty() || children.size() != 0) {
           errAtt = true;
           return false;
         }
@@ -134,7 +134,7 @@ public final class Constr {
         // type: namespace node
 
         // no attribute allowed after texts or child nodes
-        if(text.size() != 0 || children.size() != 0) {
+        if(!text.isEmpty() || children.size() != 0) {
           errNS = true;
           return false;
         }
@@ -161,7 +161,7 @@ public final class Constr {
         // type: element/comment/processing instruction node
 
         // add text node
-        if(text.size() != 0) {
+        if(!text.isEmpty()) {
           children.add(new FTxt(text.finish()));
           text.reset();
         }

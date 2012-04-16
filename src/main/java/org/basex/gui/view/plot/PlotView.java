@@ -32,9 +32,7 @@ import org.basex.gui.layout.BaseXLabel;
 import org.basex.gui.layout.BaseXLayout;
 import org.basex.gui.layout.BaseXPopup;
 import org.basex.gui.layout.BaseXSlider;
-import org.basex.gui.view.View;
-import org.basex.gui.view.ViewNotifier;
-import org.basex.gui.view.ViewRect;
+import org.basex.gui.view.*;
 import org.basex.index.StatsType;
 import org.basex.util.list.IntList;
 
@@ -131,13 +129,14 @@ public final class PlotView extends View {
         refreshUpdate();
       }
     });
-    dots = new BaseXSlider(new ActionListener() {
+    dots = new BaseXSlider(-6, 6, gui.gprop.num(GUIProp.PLOTDOTS), gui,
+        new ActionListener() {
       @Override
       public void actionPerformed(final ActionEvent e) {
         gui.gprop.set(GUIProp.PLOTDOTS, dots.value());
         refreshLayout();
       }
-    }, -6, 6, gui.gprop.num(GUIProp.PLOTDOTS), gui);
+    });
     BaseXLayout.setWidth(dots, 40);
     yLog = new BaseXCheckBox(PLOTLOG, false, gui);
     yLog.setSelected(gui.gprop.is(GUIProp.PLOTYLOG));
@@ -301,7 +300,7 @@ public final class PlotView extends View {
     g.setFont(font);
     g.setColor(Color.black);
     final Data data = gui.context.data();
-    final boolean nd = data == null || !data.meta.pathindex;
+    final boolean nd = data == null;
     if(nd || plotWidth - sz < 0 || plotHeight - sz < 0) {
       BaseXLayout.drawCenter(g, nd ? NO_DATA : NO_SPACE, w, h / 2 - MARGIN[0]);
       return;
@@ -359,10 +358,11 @@ public final class PlotView extends View {
         int ya = calcCoordinate(false, y1) + gui.gprop.num(GUIProp.PLOTDOTS);
         final int ww = getWidth();
 
-        final byte[] nm = data.attValue(data.nameID, focused);
+        final int id = ViewData.nameID(data);
+        final byte[] nm = data.attValue(id, focused);
         String name = nm != null ? string(nm) : "";
-        if(!name.isEmpty() && plotData.xAxis.attrID != data.nameID &&
-            plotData.yAxis.attrID != data.nameID) {
+        if(!name.isEmpty() && plotData.xAxis.attrID != id &&
+            plotData.yAxis.attrID != id) {
 
           if(ol > 1) name = ol + "x: " + name + ", ...";
           final int lw = BaseXLayout.width(g, label);

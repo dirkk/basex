@@ -9,10 +9,10 @@ import java.util.*;
 
 import org.basex.core.*;
 import org.basex.core.cmd.*;
-import org.basex.core.cmd.List;
 import org.basex.data.*;
 import org.basex.gui.*;
 import org.basex.gui.layout.*;
+import org.basex.io.*;
 import org.basex.io.in.DataInput;
 import org.basex.util.*;
 import org.basex.util.list.*;
@@ -62,7 +62,7 @@ public final class DialogManage extends Dialog {
     panel.setLayout(new BorderLayout(8, 0));
 
     // create database chooser
-    final StringList dbs = List.list(main.context, true);
+    final StringList dbs = main.context.databases().list();
     choice = new BaseXList(dbs.toArray(), this, false);
     choice.setSize(200, 500);
 
@@ -114,7 +114,7 @@ public final class DialogManage extends Dialog {
     set(tabs, BorderLayout.EAST);
 
     action(null);
-    if(dbs.size() != 0) finish(null);
+    if(!dbs.isEmpty()) finish(null);
   }
 
   /**
@@ -130,7 +130,7 @@ public final class DialogManage extends Dialog {
     final Context ctx = gui.context;
     if(refresh) {
       // rebuild databases and focus list chooser
-      choice.setData(List.list(ctx, true).toArray());
+      choice.setData(ctx.databases().list().toArray());
       choice.requestFocusInWindow();
       refresh = false;
     }
@@ -151,13 +151,13 @@ public final class DialogManage extends Dialog {
       refresh = true;
 
     } else if(cmp == rename) {
-      final DialogInput dr = new DialogInput(db, RENAME_DB, gui, 1);
+      final DialogInput dr = new DialogInput(db, RENAME_DB, this, 1);
       if(!dr.ok() || dr.input().equals(db)) return;
       cmds.add(new AlterDB(db, dr.input()));
       refresh = true;
 
     } else if(cmp == copy) {
-      final DialogInput dc = new DialogInput(db, COPY_DB, gui, 2);
+      final DialogInput dc = new DialogInput(db, COPY_DB, this, 2);
       if(!dc.ok() || dc.input().equals(db)) return;
       cmds.add(new Copy(db, dc.input()));
       refresh = true;
@@ -167,8 +167,7 @@ public final class DialogManage extends Dialog {
 
     } else if(cmp == restore) {
       // show warning if existing database would be overwritten
-      if(!gui.context.mprop.dbexists(db) ||
-          Dialog.confirm(gui, OVERWRITE_DB_QUESTION))
+      if(!gui.context.mprop.dbexists(db) || Dialog.confirm(gui, OVERWRITE_DB_QUESTION))
         cmds.add(new Restore(db));
 
     } else if(cmp == backups) {
@@ -206,8 +205,7 @@ public final class DialogManage extends Dialog {
           if(in != null) try { in.close(); } catch(final IOException ex) { }
         }
       } else {
-        detail.setText(dbs.size() == 1 ?
-            Token.token(ONLY_BACKUP) : Token.EMPTY);
+        detail.setText(dbs.size() == 1 ? Token.token(ONLY_BACKUP) : Token.EMPTY);
       }
 
       // enable or disable buttons
@@ -222,7 +220,12 @@ public final class DialogManage extends Dialog {
       backup.setEnabled(active);
 
       // enable/disable backup buttons
-      final String[] back = ShowBackups.list(db, false, ctx).toArray();
+      final String[] back = Databases.backupPaths(db, ctx).toArray();
+      for(int b = 0; b < back.length; b++) {
+        final String n = new IOFile(back[b]).name();
+        back[b] = n.substring(0, n.lastIndexOf('.'));
+      }
+
       active = back.length > 0;
       backups.setData(back);
       backups.setEnabled(active);
@@ -233,7 +236,7 @@ public final class DialogManage extends Dialog {
     }
 
     // run all commands
-    if(cmds.size() != 0) {
+    if(!cmds.isEmpty()) {
       DialogProgress.execute(this, "", cmds.toArray(new Command[cmds.size()]));
     }
   }

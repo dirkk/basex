@@ -4,6 +4,7 @@ import static org.basex.data.DataText.*;
 import static org.basex.query.util.Err.SERILL;
 import static org.basex.query.util.Err.SERPI;
 import static org.basex.util.Token.*;
+
 import org.basex.util.hash.TokenSet;
 import org.basex.util.list.TokenList;
 
@@ -17,6 +18,11 @@ import java.io.OutputStream;
  * @author Christian Gruen
  */
 public class HTMLSerializer extends OutputSerializer {
+  /** (X)HTML: elements with an empty content model. */
+  static final TokenList EMPTIES = new TokenList();
+  /** (X)HTML: URI attributes. */
+  static final TokenSet URIS = new TokenSet();
+
   /** HTML: script elements. */
   private static final TokenList SCRIPTS = new TokenList();
   /** HTML: boolean attributes. */
@@ -28,8 +34,7 @@ public class HTMLSerializer extends OutputSerializer {
    * @param p serialization properties
    * @throws IOException I/O exception
    */
-  HTMLSerializer(final OutputStream os, final SerializerProp p)
-      throws IOException {
+  HTMLSerializer(final OutputStream os, final SerializerProp p) throws IOException {
     super(os, p, V40, V401);
   }
 
@@ -37,9 +42,9 @@ public class HTMLSerializer extends OutputSerializer {
   public void attribute(final byte[] n, final byte[] v) throws IOException {
     // don't append value for boolean attributes
     final byte[] tagatt = concat(lc(tag), COLON, lc(n));
-    if(BOOLEAN.id(tagatt) != 0 && eq(n, v)) return;
+    if(BOOLEAN.contains(tagatt) && eq(n, v)) return;
     // escape URI attributes
-    final byte[] val = escape && URIS.id(tagatt) != 0 ? escape(v) : v;
+    final byte[] val = escape && URIS.contains(tagatt) ? escape(v) : v;
 
     print(' ');
     print(n);
@@ -62,7 +67,7 @@ public class HTMLSerializer extends OutputSerializer {
 
   @Override
   public void finishComment(final byte[] n) throws IOException {
-    if(ind) indent();
+    if(sep) indent();
     print(COMM_O);
     print(n);
     print(COMM_C);
@@ -70,7 +75,7 @@ public class HTMLSerializer extends OutputSerializer {
 
   @Override
   public void finishPi(final byte[] n, final byte[] v) throws IOException {
-    if(ind) indent();
+    if(sep) indent();
     if(contains(v, '>')) SERPI.thrwSerial();
     print(PI_O);
     print(n);
@@ -90,10 +95,10 @@ public class HTMLSerializer extends OutputSerializer {
   @Override
   protected void startOpen(final byte[] t) throws IOException {
     doctype(null);
-    if(ind) indent();
+    if(sep) indent();
     print(ELEM_O);
     print(t);
-    ind = indent;
+    sep = indent;
     script = SCRIPTS.contains(lc(t));
     if(content && eq(lc(tag), HEAD)) ct++;
   }
@@ -109,7 +114,7 @@ public class HTMLSerializer extends OutputSerializer {
     if(ct(true, true)) return;
     print(ELEM_C);
     if(EMPTIES.contains(lc(tag))) return;
-    ind = false;
+    sep = false;
     finishClose();
   }
 
@@ -149,5 +154,57 @@ public class HTMLSerializer extends OutputSerializer {
     BOOLEAN.add(token("textarea:readonly"));
     BOOLEAN.add(token("th:nowrap"));
     BOOLEAN.add(token("ul:compact"));
+    // elements with an empty content model
+    EMPTIES.add(token("area"));
+    EMPTIES.add(token("base"));
+    EMPTIES.add(token("br"));
+    EMPTIES.add(token("col"));
+    EMPTIES.add(token("hr"));
+    EMPTIES.add(token("img"));
+    EMPTIES.add(token("input"));
+    EMPTIES.add(token("link"));
+    EMPTIES.add(token("meta"));
+    EMPTIES.add(token("basefont"));
+    EMPTIES.add(token("frame"));
+    EMPTIES.add(token("isindex"));
+    EMPTIES.add(token("param"));
+    // URI attributes
+    URIS.add(token("a:href"));
+    URIS.add(token("a:name"));
+    URIS.add(token("applet:codebase"));
+    URIS.add(token("area:href"));
+    URIS.add(token("base:href"));
+    URIS.add(token("blockquote:cite"));
+    URIS.add(token("body:background"));
+    URIS.add(token("button:datasrc"));
+    URIS.add(token("del:cite"));
+    URIS.add(token("div:datasrc"));
+    URIS.add(token("form:action"));
+    URIS.add(token("frame:longdesc"));
+    URIS.add(token("frame:src"));
+    URIS.add(token("head:profile"));
+    URIS.add(token("iframe:longdesc"));
+    URIS.add(token("iframe:src"));
+    URIS.add(token("img:longdesc"));
+    URIS.add(token("img:src"));
+    URIS.add(token("img:usemap"));
+    URIS.add(token("input:datasrc"));
+    URIS.add(token("input:src"));
+    URIS.add(token("input:usemap"));
+    URIS.add(token("ins:cite"));
+    URIS.add(token("link:href"));
+    URIS.add(token("object:archive"));
+    URIS.add(token("object:classid"));
+    URIS.add(token("object:codebase"));
+    URIS.add(token("object:data"));
+    URIS.add(token("object:datasrc"));
+    URIS.add(token("object:usemap"));
+    URIS.add(token("q:cite"));
+    URIS.add(token("script:for"));
+    URIS.add(token("script:src"));
+    URIS.add(token("select:datasrc"));
+    URIS.add(token("span:datasrc"));
+    URIS.add(token("table:datasrc"));
+    URIS.add(token("textarea:datasrc"));
   }
 }

@@ -2,17 +2,11 @@ package org.basex.server;
 
 import static org.basex.core.Text.*;
 import static org.basex.util.Token.*;
-
 import java.io.IOException;
 import java.net.Socket;
 import java.util.HashMap;
-
 import org.basex.BaseXServer;
-import org.basex.core.BaseXException;
-import org.basex.core.Command;
-import org.basex.core.CommandParser;
-import org.basex.core.Context;
-import org.basex.core.MainProp;
+import org.basex.core.*;
 import org.basex.core.cmd.Add;
 import org.basex.core.cmd.Close;
 import org.basex.core.cmd.CreateDB;
@@ -105,8 +99,7 @@ public final class ClientListener extends Thread {
       final String us = in.readString();
       final String pw = in.readString();
       context.user = context.users.get(us);
-      running = context.user != null &&
-        md5(string(context.user.password) + ts).equals(pw);
+      running = context.user != null && md5(context.user.password + ts).equals(pw);
 
       // write log information
       if(running) {
@@ -126,7 +119,7 @@ public final class ClientListener extends Thread {
     }
     if(!running) return;
 
-    // authentification done, start command loop
+    // authentication done, start command loop
     ServerCmd sc = null;
     String cmd = null;
 
@@ -186,15 +179,13 @@ public final class ClientListener extends Thread {
           continue;
         }
 
-        // start timeout
-        command.startTimeout(context.mprop.num(MainProp.TIMEOUT));
-        log.write(this,
-            command.toString().replace('\r', ' ').replace('\n', ' '));
+        log.write(this, command.toString().replace('\r', ' ').replace('\n', ' '));
 
         // execute command and send {RESULT}
         boolean ok = true;
         String info;
         try {
+          // run command
           command.execute(context, new EncodingOutput(out));
           info = command.info();
         } catch(final BaseXException ex) {
@@ -202,8 +193,6 @@ public final class ClientListener extends Thread {
           info = ex.getMessage();
           if(info.startsWith(INTERRUPTED)) info = TIMEOUT_EXCEEDED;
         }
-        // stop timeout
-        command.stopTimeout();
 
         // send 0 to mark end of result
         out.write(0);
@@ -230,6 +219,8 @@ public final class ClientListener extends Thread {
    * Exits the session.
    */
   public synchronized void quit() {
+    if(!running) return;
+
     running = false;
     if(log != null) log.write(this, "LOGOUT " + context.user.name, OK);
 
@@ -462,22 +453,30 @@ public final class ClientListener extends Thread {
 
         // ID has already been removed
         if(qp == null) {
-          if(sc != ServerCmd.CLOSE)
-            throw new IOException("Unknown Query ID: " + arg);
+          if(sc != ServerCmd.CLOSE) throw new IOException("Unknown Query ID: " + arg);
         } else if(sc == ServerCmd.BIND) {
           final String key = in.readString();
           final String val = in.readString();
           final String typ = in.readString();
           qp.bind(key, val, typ);
           log.write(this, sc + "(" + arg + ')', key, val, typ, OK, perf);
+        } else if(sc == ServerCmd.CONTEXT) {
+          final String val = in.readString();
+          final String typ = in.readString();
+          qp.context(val, typ);
+          log.write(this, sc + "(" + arg + ')', val, typ, OK, perf);
         } else if(sc == ServerCmd.ITER) {
-          qp.execute(true, out, true);
+          qp.execute(true, out, true, false);
         } else if(sc == ServerCmd.EXEC) {
-          qp.execute(false, out, true);
+          qp.execute(false, out, true, false);
+        } else if(sc == ServerCmd.FULL) {
+          qp.execute(true, out, true, true);
         } else if(sc == ServerCmd.INFO) {
           out.print(qp.info());
         } else if(sc == ServerCmd.OPTIONS) {
           out.print(qp.options());
+        } else if(sc == ServerCmd.UPDATING) {
+          out.print(Boolean.toString(qp.updating()));
         } else if(sc == ServerCmd.CLOSE) {
           queries.remove(arg);
         } else if(sc == ServerCmd.NEXT) {
@@ -489,7 +488,9 @@ public final class ClientListener extends Thread {
       // send 0 as success flag
       out.write(0);
       // write log file (bind and execute have been logged before)
-      if(sc != ServerCmd.BIND) log.write(this, sc + "(" + arg + ')', OK, perf);
+      if(sc != ServerCmd.BIND && sc != ServerCmd.CONTEXT) {
+        log.write(this, sc + "(" + arg + ')', OK, perf);
+      }
     } catch(final Exception ex) {
       // log exception (static or runtime)
       err = ex.getMessage();

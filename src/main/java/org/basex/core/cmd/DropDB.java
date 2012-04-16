@@ -2,15 +2,12 @@ package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
 
-import org.basex.core.Command;
-import org.basex.core.CommandBuilder;
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdDrop;
-import org.basex.core.Context;
-import org.basex.core.MainProp;
-import org.basex.core.User;
-import org.basex.data.MetaData;
-import org.basex.io.IOFile;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'drop database' command and deletes a database.
@@ -18,23 +15,22 @@ import org.basex.io.IOFile;
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
  */
-public final class DropDB extends Command {
+public final class DropDB extends ACreate {
   /**
    * Default constructor.
    * @param name name of database
    */
   public DropDB(final String name) {
-    super(User.CREATE, name);
+    super(name);
   }
 
   @Override
   protected boolean run() {
-    if(!MetaData.validName(args[0], true))
-      return error(NAME_INVALID_X, args[0]);
+    if(!MetaData.validName(args[0], true)) return error(NAME_INVALID_X, args[0]);
 
     // retrieve all databases; return true if no database is found (no error)
-    final String[] dbs = databases(args[0]);
-    if(dbs.length == 0) return info(NO_DB_DROPPED, args[0]);
+    final StringList dbs = context.databases().listDBs(args[0]);
+    if(dbs.size() == 0) return info(NO_DB_DROPPED, args[0]);
 
     // loop through all databases
     boolean ok = true;
@@ -45,7 +41,7 @@ public final class DropDB extends Command {
       if(context.pinned(db)) {
         info(DB_PINNED_X, db);
         ok = false;
-      } else if(!drop(db, mprop)) {
+      } else if(!drop(db, context)) {
         // dropping was not successful
         info(DB_NOT_DROPPED_X, db);
         ok = false;
@@ -58,32 +54,34 @@ public final class DropDB extends Command {
 
   /**
    * Deletes the specified database.
-   * @param db database name
-   * @param mprop main properties
+   * @param db name of the database
+   * @param ctx database context
    * @return success flag
    */
-  public static synchronized boolean drop(final String db,
-      final MainProp mprop) {
-
-    final IOFile dbpath = mprop.dbpath(db);
-    return dbpath.exists() && drop(dbpath, null);
+  public static synchronized boolean drop(final String db, final Context ctx) {
+    final IOFile dbpath = ctx.mprop.dbpath(db);
+    return dbpath.exists() && drop(dbpath) && ctx.databases().delete(db);
   }
 
   /**
    * Drops a database directory.
    * @param path database path
+   * @return success of operation
+   */
+  public static synchronized boolean drop(final IOFile path) {
+    return path.exists() && path.delete();
+  }
+
+  /**
+   * Recursively drops files in database directory with the specified pattern.
+   * @param path database path
    * @param pat file pattern
    * @return success of operation
    */
   public static synchronized boolean drop(final IOFile path, final String pat) {
-    boolean ok = path.exists();
-    // try to delete all files
-    for(final IOFile sub : path.children()) {
-      ok &= sub.isDir() ? drop(sub, pat) :
-        pat != null && !sub.name().matches(pat) || sub.delete();
-    }
-    // only delete directory if no pattern was specified
-    return (pat != null || path.delete()) && ok;
+    boolean ok = true;
+    for(final IOFile f : path.children()) ok &= !f.name().matches(pat) || f.delete();
+    return ok;
   }
 
   @Override

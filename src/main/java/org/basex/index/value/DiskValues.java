@@ -4,23 +4,15 @@ import static org.basex.core.Text.*;
 import static org.basex.data.DataText.*;
 import static org.basex.util.Token.*;
 
-import java.io.IOException;
+import java.io.*;
 
-import org.basex.data.Data;
-import org.basex.index.Index;
-import org.basex.index.IndexCache;
-import org.basex.index.IndexIterator;
-import org.basex.index.IndexStats;
-import org.basex.index.IndexToken;
-import org.basex.index.RangeToken;
-import org.basex.io.random.DataAccess;
-import org.basex.util.Num;
-import org.basex.util.Performance;
-import org.basex.util.TokenBuilder;
-import org.basex.util.hash.IntMap;
-import org.basex.util.hash.TokenIntMap;
-import org.basex.util.hash.TokenObjMap;
-import org.basex.util.list.IntList;
+import org.basex.data.*;
+import org.basex.index.*;
+import org.basex.index.IndexCache.CacheEntry;
+import org.basex.io.random.*;
+import org.basex.util.*;
+import org.basex.util.hash.*;
+import org.basex.util.list.*;
 
 /**
  * This class provides access to attribute values and text contents stored on
@@ -62,8 +54,7 @@ public class DiskValues implements Index {
    * @param pref file prefix
    * @throws IOException I/O Exception
    */
-  DiskValues(final Data d, final boolean txt, final String pref)
-      throws IOException {
+  DiskValues(final Data d, final boolean txt, final String pref) throws IOException {
     data = d;
     text = txt;
     idxl = new DataAccess(d.meta.dbfile(pref + 'l'));
@@ -91,10 +82,12 @@ public class DiskValues implements Index {
   public synchronized IndexIterator iter(final IndexToken tok) {
     if(tok instanceof RangeToken) return idRange((RangeToken) tok);
 
-    final int id = cache.id(tok.get());
-    if(id > 0) return iter(cache.size(id), cache.pointer(id));
+    final byte[] key = tok.get();
 
-    final int ix = get(tok.get());
+    final CacheEntry e = cache.get(key);
+    if(e != null) return iter(e.size, e.pointer);
+
+    final int ix = get(key);
     if(ix < 0) return IndexIterator.EMPTY;
     final long pos = idxr.read5(ix * 5L);
     return iter(idxl.readNum(pos), idxl.cursor());
@@ -107,8 +100,8 @@ public class DiskValues implements Index {
     final byte[] key = it.get();
     if(key.length > data.meta.maxlen) return Integer.MAX_VALUE;
 
-    final int id = cache.id(key);
-    if(id > 0) return cache.size(id);
+    final CacheEntry e = cache.get(key);
+    if(e != null) return e.size;
 
     final int ix = get(key);
     if(ix < 0) return 0;
@@ -121,21 +114,28 @@ public class DiskValues implements Index {
   }
 
   @Override
-  public TokenIntMap entries(final byte[] prefix) {
-    final TokenIntMap tim = new TokenIntMap();
-    int ix = get(prefix);
-    if(ix < 0) ix = -ix - 1;
-    idxr.cursor(ix * 5l);
-    for(; ix < size; ix++) {
-      final long pos = idxr.read5();
-      final int nr = idxl.readNum(pos);
-      final int pre = idxl.readNum();
-      final byte[] key = data.text(pre, text);
-      cache.add(key, nr, pos + Num.length(nr));
-      if(!startsWith(key, prefix)) break;
-      tim.add(key, nr);
-    }
-    return tim;
+  public EntryIterator entries(final byte[] prefix) {
+    final int i = get(prefix);
+    return new EntryIterator() {
+      int ix = (i < 0 ? -i - 1 : i) - 1;
+      int nr;
+      @Override
+      public synchronized byte[] next() {
+        while(++ix < size) {
+          final long pos = idxr.read5(ix * 5l);
+          nr = idxl.readNum(pos);
+          final byte[] key = data.text(idxl.readNum(), text);
+          if(!startsWith(key, prefix)) break;
+          if(prefix.length != 0) cache.add(key, nr, pos + Num.length(nr));
+          return key;
+        }
+        return null;
+      }
+      @Override
+      public int count() {
+        return nr;
+      }
+    };
   }
 
   /**
@@ -175,8 +175,8 @@ public class DiskValues implements Index {
 
     // check if min and max are positive integers with the same number of digits
     final int len = max > 0 && (long) max == max ? token(max).length : 0;
-    final boolean simple = len != 0 && min > 0 && (long) min == min
-        && token(min).length == len;
+    final boolean simple = len != 0 && min > 0 && (long) min == min &&
+        token(min).length == len;
 
     final IntList pres = new IntList();
     for(int l = 0; l < size; ++l) {
@@ -234,7 +234,7 @@ public class DiskValues implements Index {
   }
 
   /**
-   * Get the first pre value from the id-list at the specified position.
+   * Gets the first pre value from the id-list at the specified position.
    * @param pos position of the id-list in {@link #idxl}
    * @return pre value
    */
@@ -282,15 +282,14 @@ public class DiskValues implements Index {
 
   /**
    * Flushes the buffered data.
-   * @throws IOException I/O exception
    */
-  public void flush() throws IOException {
+  public void flush() {
     idxl.flush();
     idxr.flush();
   }
 
   @Override
-  public synchronized void close() throws IOException {
+  public synchronized void close() {
     idxl.close();
     idxr.close();
   }

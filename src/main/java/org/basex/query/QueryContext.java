@@ -5,58 +5,32 @@ import static org.basex.query.QueryText.*;
 import static org.basex.query.util.Err.*;
 import static org.basex.util.Token.*;
 
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.io.*;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.regex.*;
 
+import org.basex.core.*;
 import org.basex.core.Context;
-import org.basex.core.Progress;
-import org.basex.core.Prop;
-import org.basex.core.cmd.Set;
-import org.basex.data.Data;
-import org.basex.data.FTPosData;
-import org.basex.data.Nodes;
-import org.basex.data.Result;
-import org.basex.io.serial.Serializer;
-import org.basex.io.serial.SerializerException;
-import org.basex.io.serial.SerializerProp;
-import org.basex.query.expr.Expr;
-import org.basex.query.expr.ParseExpr;
-import org.basex.query.func.JavaMapping;
-import org.basex.query.func.UserFuncs;
-import org.basex.query.item.DBNode;
-import org.basex.query.item.Dat;
-import org.basex.query.item.Dtm;
-import org.basex.query.item.Item;
-import org.basex.query.item.QNm;
-import org.basex.query.item.SeqType;
-import org.basex.query.item.Tim;
-import org.basex.query.item.Type;
-import org.basex.query.item.Types;
-import org.basex.query.item.Value;
-import org.basex.query.iter.ItemCache;
-import org.basex.query.iter.Iter;
-import org.basex.query.up.Updates;
-import org.basex.query.util.JDBCConnections;
-import org.basex.query.util.Var;
-import org.basex.query.util.VarContext;
-import org.basex.query.util.json.JsonMapConverter;
-import org.basex.util.InputInfo;
-import org.basex.util.JarLoader;
-import org.basex.util.TokenBuilder;
-import org.basex.util.Util;
-import org.basex.util.XMLToken;
-import org.basex.util.ft.FTLexer;
-import org.basex.util.ft.FTOpt;
-import org.basex.util.hash.TokenMap;
-import org.basex.util.list.IntList;
+import org.basex.data.*;
+import org.basex.io.*;
+import org.basex.io.serial.*;
+import org.basex.query.expr.*;
+import org.basex.query.func.*;
+import org.basex.query.item.*;
+import org.basex.query.iter.*;
+import org.basex.query.up.*;
+import org.basex.query.util.*;
+import org.basex.query.util.json.*;
+import org.basex.query.util.pkg.*;
+import org.basex.util.*;
+import org.basex.util.ft.*;
+import org.basex.util.hash.*;
+import org.basex.util.list.*;
 
 /**
- * This class provides query-specific methods and properties.
+ * This class organizes both static and dynamic properties that are specific to a
+ * single query.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
@@ -81,15 +55,13 @@ public final class QueryContext extends Progress {
   public boolean xquery3;
 
   /** Cached stop word files. */
-  public HashMap<String, String> stop;
+  public HashMap<String, IO> stop;
   /** Cached thesaurus files. */
-  public HashMap<String, String> thes;
+  public HashMap<String, IO> thes;
   /** Query options (are valid during query execution). */
-  public final HashMap<String, String> dbOptions =
-      new HashMap<String, String>();
+  public final HashMap<String, String> dbOptions = new HashMap<String, String>();
   /** Global options (will be set after query execution). */
-  public final HashMap<String, Object> globalOpt =
-      new HashMap<String, Object>();
+  public final HashMap<String, Object> globalOpt = new HashMap<String, Object>();
 
   /** Root expression of the query. */
   public Expr root;
@@ -143,16 +115,10 @@ public final class QueryContext extends Progress {
   SerializerProp serProp;
   /** Initial context value. */
   public Expr ctxItem;
-  /** Java modules. */
-  public final HashMap<QueryModule, ArrayList<Method>> javaModules =
-      new HashMap<QueryModule, ArrayList<Method>>();
-  /** JAR modules. */
-  public JarLoader jars;
+  /** Module loader. */
+  public ModuleLoader modules;
   /** Opened connections to relational databases. */
   JDBCConnections jdbc;
-
-  /** Indicates if this query includes updating expressions. */
-  private boolean updating;
 
   /** String container for query background information. */
   private final TokenBuilder info = new TokenBuilder();
@@ -171,10 +137,11 @@ public final class QueryContext extends Progress {
     context = ctx;
     nodes = ctx.current();
     xquery3 = ctx.prop.is(Prop.XQUERY3);
-    inf = ctx.prop.is(Prop.QUERYINFO) || Util.debug;
+    inf = ctx.prop.is(Prop.QUERYINFO) || Prop.debug;
     final String path = ctx.prop.get(Prop.QUERYPATH);
     if(!path.isEmpty()) sc.baseURI(path);
     maxCalls = ctx.prop.num(Prop.TAILCALLS);
+    modules = new ModuleLoader(ctx);
   }
 
   /**
@@ -183,16 +150,17 @@ public final class QueryContext extends Progress {
    * @throws QueryException query exception
    */
   public void parse(final String qu) throws QueryException {
-    root = new QueryParser(qu, this).parse(sc.baseIO(), null);
+    root = new QueryParser(qu, this).parse(null);
   }
 
   /**
    * Parses the specified module.
    * @param qu input query
+   * @return name of module
    * @throws QueryException query exception
    */
-  public void module(final String qu) throws QueryException {
-    new QueryParser(qu, this).parse(sc.baseIO(), EMPTY);
+  public QNm module(final String qu) throws QueryException {
+    return (QNm) new QueryParser(qu, this).parse(EMPTY);
   }
 
   /**
@@ -204,9 +172,9 @@ public final class QueryContext extends Progress {
     if(inf) compInfo(NL + COMPILING_C);
 
     // temporarily set database values (size check added for better performance)
-    if(dbOptions.size() != 0) {
+    if(!dbOptions.isEmpty()) {
       for(final Entry<String, String> e : dbOptions.entrySet()) {
-        Set.set(e.getKey(), e.getValue(), context.prop);
+        context.prop.set(e.getKey(), e.getValue());
       }
     }
 
@@ -217,7 +185,7 @@ public final class QueryContext extends Progress {
       } catch(final QueryException ex) {
         if(ex.err() != XPNOCTX) throw ex;
         // only {@link ParseExpr} instances may cause this error
-        CTXINIT.thrw(((ParseExpr) ctxItem).input, ex.getMessage());
+        CTXINIT.thrw(((ParseExpr) ctxItem).info, ex.getMessage());
       }
     } else if(nodes != null) {
       // add full-text container reference
@@ -270,7 +238,7 @@ public final class QueryContext extends Progress {
     try {
       final Value v = value(root);
       if(updating) {
-        updates.applyUpdates();
+        updates.apply();
         if(context.data() != null) context.update();
       }
       return v;
@@ -281,129 +249,6 @@ public final class QueryContext extends Progress {
     }
   }
 
-  /**
-   * Evaluates the expression with the specified context set.
-   * @return resulting value
-   * @throws QueryException query exception
-   */
-  Result execute() throws QueryException {
-    // evaluates the query
-    final Iter ir = iter();
-    final ItemCache ic = new ItemCache();
-    Item it;
-
-    // check if all results belong to the database of the input context
-    if(serProp == null && nodes != null) {
-      final IntList pre = new IntList();
-
-      while((it = ir.next()) != null) {
-        checkStop();
-        if(!(it instanceof DBNode)) break;
-        if(it.data() != nodes.data) break;
-        pre.add(((DBNode) it).pre);
-      }
-
-      // completed... return standard nodeset with full-text positions
-      final int ps = pre.size();
-      if(it == null) return ps == 0 ? ic :
-          new Nodes(pre.toArray(), nodes.data, ftpos).checkRoot();
-
-      // otherwise, add nodes to standard iterator
-      for(int p = 0; p < ps; ++p) ic.add(new DBNode(nodes.data, pre.get(p)));
-      ic.add(it);
-    }
-
-    // use standard iterator
-    while((it = ir.next()) != null) {
-      checkStop();
-      ic.add(it);
-    }
-    return ic;
-  }
-
-  /**
-   * Binds an object to a global variable. If the object is an {@link Expr}
-   * instance, it is directly assigned. Otherwise, it is first cast to the
-   * appropriate XQuery type. If {@code "json"} is specified as data type,
-   * the value is interpreted according to the rules specified in
-   * {@link JsonMapConverter}.
-   * @param name name of variable
-   * @param val object to be bound
-   * @param type data type
-   * @throws QueryException query exception
-   */
-  public void bind(final String name, final Object val, final String type)
-      throws QueryException {
-
-    Object obj = val;
-    if(type != null && !type.isEmpty()) {
-      if(type.equals(JSONSTR)) {
-        obj = JsonMapConverter.parse(token(val.toString()), null);
-      } else {
-        final QNm nm = new QNm(token(type), this);
-        if(!nm.hasURI() && nm.hasPrefix()) NOURI.thrw(null, nm);
-        final Type typ = Types.find(nm, true);
-        if(typ == null) NOTYPE.thrw(null, nm);
-        obj = typ.cast(obj, null);
-      }
-    }
-    bind(name, obj);
-  }
-
-  /**
-   * Binds an value to a global variable. If the value is an {@link Expr}
-   * instance, it is directly assigned. Otherwise, it is first cast to the
-   * appropriate XQuery type.
-   * @param name name of variable
-   * @param val value to be bound
-   * @throws QueryException query exception
-   */
-  public void bind(final String name, final Object val) throws QueryException {
-    final Expr ex = val instanceof Expr ? (Expr) val : JavaMapping.toValue(val);
-
-    // remove optional $ prefix
-    String nm = name.indexOf('$') == 0 ? name.substring(1) : name;
-    byte[] uri = EMPTY;
-
-    // check for namespace declaration
-    final Matcher m = BIND.matcher(nm);
-    if(m.find()) {
-      String u = m.group(3);
-      if(u == null) u = m.group(5);
-      uri = token(u);
-      nm = m.group(6);
-    }
-    final byte[] ln = token(nm);
-    if(nm.isEmpty() || !XMLToken.isNCName(ln)) return;
-
-    // bind variable
-    final QNm qnm = uri.length == 0 ? new QNm(ln, this) : new QNm(ln, uri);
-    final Var gl = vars.globals().get(qnm);
-    if(gl == null) {
-      // assign new variable
-      vars.updateGlobal(Var.create(this, null, qnm, null).bind(ex, this));
-    } else {
-      // reset declaration state and bind new expression
-      gl.declared = false;
-      gl.bind(gl.type != null ? gl.type.type.cast(ex.item(this, null),
-          this, null) : ex, this);
-    }
-  }
-
-  /**
-   * Recursively serializes the query plan.
-   * @param ser serializer
-   * @throws IOException I/O exception
-   */
-  void plan(final Serializer ser) throws IOException {
-    // only show root node if functions or variables exist
-    final boolean r = funcs.funcs().length != 0 || vars.globals().size != 0;
-    if(r) ser.openElement(PLAN);
-    funcs.plan(ser);
-    vars.plan(ser);
-    root.plan(ser);
-    if(r) ser.closeElement();
-  }
 
   /**
    * Evaluates the specified expression and returns an iterator.
@@ -520,7 +365,7 @@ public final class QueryContext extends Progress {
   }
 
   /**
-   * Returns the updating flag.
+   * Returns {@code true} if the query may perform updates.
    * @return updating flag
    */
   public boolean updating() {
@@ -550,5 +395,174 @@ public final class QueryContext extends Progress {
   @Override
   public double prog() {
     return 0;
+  }
+
+  // CLASS METHODS ======================================================================
+
+
+  /**
+   * Evaluates the expression with the specified context set.
+   * @return resulting value
+   * @throws QueryException query exception
+   */
+  Result execute() throws QueryException {
+    // GUI: limit number of hits to be returned and displayed
+    int max = context.prop.num(Prop.MAXHITS);
+    if(!Prop.gui || max < 0) max = Integer.MAX_VALUE;
+
+    // evaluates the query
+    final Iter ir = iter();
+    final ValueBuilder vb = new ValueBuilder();
+    Item it = null;
+
+    // check if all results belong to the database of the input context
+    if(serProp == null && nodes != null) {
+      final IntList pre = new IntList();
+
+      while((it = ir.next()) != null) {
+        checkStop();
+        if(!(it instanceof DBNode) || it.data() != nodes.data) break;
+        if(pre.size() < max) pre.add(((DBNode) it).pre);
+      }
+
+      final int ps = pre.size();
+      if(it == null || ps == max) {
+        // all nodes have been processed: return GUI-friendly nodeset
+        return ps == 0 ? vb : new Nodes(pre.toArray(), nodes.data, ftpos).checkRoot();
+      }
+
+      // otherwise, add nodes to standard iterator
+      for(int p = 0; p < ps; ++p) vb.add(new DBNode(nodes.data, pre.get(p)));
+      vb.add(it);
+    }
+
+    // use standard iterator
+    while((it = ir.next()) != null) {
+      checkStop();
+      if(vb.size() < max) vb.add(it);
+    }
+    return vb;
+  }
+
+  /**
+   * Binds a value to the context item, using the same rules as for
+   * {@link #bind binding variables}.
+   * @param val value to be bound
+   * @param type data type (may be {@code null})
+   * @throws QueryException query exception
+   */
+  void context(final Object val, final String type) throws QueryException {
+    ctxItem = cast(val, type);
+  }
+
+  /**
+   * Binds a value to a global variable. The specified type is interpreted as follows:
+   * <ul>
+   * <li>If {@code "json"} is specified, the value is converted according to the rules
+   *     specified in {@link JsonMapConverter}.</li>
+   * <li>If {@code "xml"} is specified, the value is converted to a document node.</li>
+   * <li>Otherwise, the type is interpreted as atomic XDM data type.</li>
+   * </ul>
+   * If the value is an XQuery expression or value {@link Expr}, it is directly assigned.
+   * Otherwise, it is cast to the XQuery data model, using a Java/XQuery mapping.
+   * @param name name of variable
+   * @param val value to be bound
+   * @param type data type (may be {@code null})
+   * @throws QueryException query exception
+   */
+  void bind(final String name, final Object val, final String type)
+      throws QueryException {
+    bind(name, cast(val, type));
+  }
+
+  /**
+   * Recursively serializes the query plan.
+   * @param ser serializer
+   * @throws IOException I/O exception
+   */
+  void plan(final Serializer ser) throws IOException {
+    // only show root node if functions or variables exist
+    final boolean r = funcs.funcs().length != 0 || vars.globals().size != 0;
+    if(r) ser.openElement(PLAN);
+    funcs.plan(ser);
+    vars.plan(ser);
+    root.plan(ser);
+    if(r) ser.closeElement();
+  }
+
+  // PRIVATE METHODS ====================================================================
+
+  /**
+   * Binds an value to a global variable. If the value is an {@link Expr}
+   * instance, it is directly assigned. Otherwise, it is first cast to the
+   * appropriate XQuery type.
+   * @param name name of variable
+   * @param val value to be bound
+   * @throws QueryException query exception
+   */
+  private void bind(final String name, final Expr val) throws QueryException {
+    // remove optional $ prefix
+    String nm = name.indexOf('$') == 0 ? name.substring(1) : name;
+    byte[] uri = EMPTY;
+
+    // check for namespace declaration
+    final Matcher m = BIND.matcher(nm);
+    if(m.find()) {
+      String u = m.group(3);
+      if(u == null) u = m.group(5);
+      uri = token(u);
+      nm = m.group(6);
+    }
+    final byte[] ln = token(nm);
+    if(nm.isEmpty() || !XMLToken.isNCName(ln)) return;
+
+    // bind variable
+    final QNm qnm = uri.length == 0 ? new QNm(ln, this) : new QNm(ln, uri);
+    final Var gl = vars.globals().get(qnm);
+    if(gl == null) {
+      // assign new variable
+      vars.updateGlobal(Var.create(this, null, qnm, null).bind(val, this));
+    } else {
+      // reset declaration state and bind new expression
+      gl.declared = false;
+      gl.bind(gl.type == null ? val :
+        gl.type.type.cast(val.item(this, null), this, null), this);
+    }
+  }
+
+  /**
+   * Casts a value to the specified type.
+   * See {@link #bind(String, Object, String)} for more infos.
+   * @param val value to be cast
+   * @param type data type (may be {@code null})
+   * @return cast value
+   * @throws QueryException query exception
+   */
+  private Expr cast(final Object val, final String type) throws QueryException {
+    // return original value
+    if(type == null || type.isEmpty()) {
+      return val instanceof Expr ? (Expr) val : JavaMapping.toValue(val);
+    }
+
+    // convert to json
+    if(type.equalsIgnoreCase(JSONSTR)) {
+      return JsonMapConverter.parse(token(val.toString()), null);
+    }
+
+    // convert to xml
+    if(type.equalsIgnoreCase(XMLSTR)) {
+      try {
+        return new DBNode(new IOContent(val.toString()), context.prop);
+      } catch(final IOException ex) {
+        throw SAXERR.thrw(null, ex);
+      }
+    }
+
+    // convert to the specified type
+    final QNm nm = new QNm(token(type), this);
+    if(!nm.hasURI() && nm.hasPrefix()) NOURI.thrw(null, nm);
+    final Type typ = AtomType.find(nm, false);
+    if(typ == null) NOTYPE.thrw(null, nm);
+    return typ.cast(val, null);
   }
 }

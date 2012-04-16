@@ -1,6 +1,6 @@
 package org.basex.core;
 
-import java.io.IOException;
+import java.io.*;
 
 import org.basex.util.Token;
 import org.basex.util.Util;
@@ -26,7 +26,8 @@ public final class BaseXException extends IOException {
    * @param ex exception
    */
   public BaseXException(final Exception ex) {
-    this(ex.getMessage() != null ? ex.getMessage() : ex.toString());
+    super(Util.message(ex));
+    setStackTrace(ex.getStackTrace());
   }
 
   /**
@@ -41,8 +42,7 @@ public final class BaseXException extends IOException {
       if(ext[e] instanceof byte[]) {
         ext[e] = Token.string((byte[]) ext[e]);
       } else if(ext[e] instanceof Throwable) {
-        final Throwable th = (Throwable) ext[e];
-        ext[e] = th.getMessage() != null ? th.getMessage() : th.toString();
+        ext[e] = Util.message((Throwable) ext[e]);
       } else if(!(ext[e] instanceof String)) {
         ext[e] = ext[e].toString();
       }

@@ -1,16 +1,16 @@
 package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
-import java.io.IOException;
-import org.basex.core.CommandBuilder;
-import org.basex.core.User;
+
+import java.io.*;
+
+import org.basex.core.*;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdIndexInfo;
 import org.basex.core.Commands.CmdInfo;
-import org.basex.data.Data;
+import org.basex.data.*;
 import org.basex.index.IndexToken.IndexType;
-import org.basex.util.Token;
-import org.basex.util.TokenBuilder;
+import org.basex.util.*;
 
 /**
  * Evaluates the 'info index' command and returns information on the indexes
@@ -32,7 +32,7 @@ public final class InfoIndex extends AInfo {
    * @param type optional index type, defined in {@link CmdIndexInfo}
    */
   public InfoIndex(final Object type) {
-    super(DATAREF | User.READ, type != null && type != CmdIndexInfo.NULL ?
+    super(Perm.READ, true, type != null && type != CmdIndexInfo.NULL ?
         type.toString() : null);
   }
 
@@ -68,14 +68,13 @@ public final class InfoIndex extends AInfo {
     switch(idx) {
       case TAG:       return info(ELEMENTS, IndexType.TAG, data, true);
       case ATTNAME:   return info(ATTRIBUTES, IndexType.ATTNAME, data, true);
+      case PATH:      return info(PATH_INDEX, IndexType.PATH, data, true);
       case TEXT:      return info(TEXT_INDEX, IndexType.TEXT, data,
           data.meta.textindex);
       case ATTRIBUTE: return info(ATTRIBUTE_INDEX, IndexType.ATTRIBUTE, data,
           data.meta.attrindex);
       case FULLTEXT:  return info(FULLTEXT_INDEX, IndexType.FULLTEXT, data,
           data.meta.ftxtindex);
-      case PATH:      return info(PATH_INDEX, IndexType.PATH, data,
-          data.meta.pathindex);
       default:        return Token.token(LI + NOT_AVAILABLE);
     }
   }

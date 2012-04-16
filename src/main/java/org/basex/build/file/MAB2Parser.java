@@ -69,16 +69,13 @@ public final class MAB2Parser extends SingleParser {
   /**
    * Constructor.
    * @param source source data
-   * @param target database target
-   * @param prop database properties
+   * @param pr database properties
    * @throws IOException I/O exception
    */
-  public MAB2Parser(final IO source, final String target, final Prop prop)
-      throws IOException {
-
-    super(source, target);
+  public MAB2Parser(final IO source, final Prop pr) throws IOException {
+    super(source, pr);
     // set parser properties
-    final ParserProp props = new ParserProp(prop.get(Prop.PARSEROPT));
+    final ParserProp props = new ParserProp(pr.get(Prop.PARSEROPT));
     flat = props.is(ParserProp.FLAT);
     input = new DataAccess(new IOFile(source.path()));
   }
@@ -129,14 +126,14 @@ public final class MAB2Parser extends SingleParser {
       if(child) entry.add(pos);
       else entry.pos(pos);
 
-      if(Util.debug) {
+      if(Prop.debug) {
         if((++i & 0x7FFF) == 0) Util.err(" " + i + '\n');
         else if((i & 0xFFF) == 0) Util.err("!");
         else if((i & 0x3FF) == 0) Util.err(".");
       }
     }
 
-    if(Util.debug) Util.err("\nParse Offsets (%): %/%\n", ids.size(), p,
+    if(Prop.debug) Util.err("\nParse Offsets (%): %/%\n", ids.size(), p,
         Performance.getMemory());
 
     // create all titles
@@ -151,7 +148,7 @@ public final class MAB2Parser extends SingleParser {
       }
       if(entry.size != 0 && pos != 0 && !flat) builder.endElem();
     }
-    if(Util.debug) Util.err("\nCreate Titles: %/%\n", p,
+    if(Prop.debug) Util.err("\nCreate Titles: %/%\n", p,
         Performance.getMemory());
     builder.endElem();
 
@@ -489,7 +486,7 @@ public final class MAB2Parser extends SingleParser {
     final TokenBuilder tb = new TokenBuilder();
     for(final byte[] lang : split(t, '+')) {
       final byte[] l = languages.get(lang);
-      if(tb.size() != 0) tb.add('+');
+      if(!tb.isEmpty()) tb.add('+');
       tb.add(l != null ? l : t);
     }
     return tb.finish();

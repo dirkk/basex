@@ -1,8 +1,9 @@
 package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
-import org.basex.core.Command;
-import org.basex.util.TokenBuilder;
+
+import org.basex.core.*;
+import org.basex.util.*;
 
 /**
  * Abstract class for database info.
@@ -13,11 +14,12 @@ import org.basex.util.TokenBuilder;
 abstract class AInfo extends Command {
   /**
    * Protected constructor.
-   * @param p properties
+   * @param p permissions
+   * @param d requires opened database
    * @param a arguments
    */
-  AInfo(final int p, final String... a) {
-    super(p, a);
+  AInfo(final Perm p, final boolean d, final String... a) {
+    super(p, d, a);
   }
 
   /**
@@ -26,8 +28,7 @@ abstract class AInfo extends Command {
    * @param key key
    * @param val value
    */
-  static void format(final TokenBuilder tb, final String key,
-      final String val) {
+  static void format(final TokenBuilder tb, final String key, final String val) {
     tb.add(' ').add(key).add(COLS).add(val).add(NL);
   }
 }

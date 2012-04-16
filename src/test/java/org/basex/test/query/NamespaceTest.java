@@ -4,16 +4,14 @@ import static org.basex.core.Text.*;
 import static org.basex.util.Token.*;
 import static org.junit.Assert.*;
 
-import org.basex.core.BaseXException;
-import org.basex.core.Prop;
-import org.basex.core.cmd.CreateDB;
-import org.basex.core.cmd.DropDB;
-import org.basex.core.cmd.Set;
-import org.basex.core.cmd.XQuery;
+import org.basex.core.*;
+import org.basex.core.cmd.*;
+import org.basex.io.*;
 import org.basex.query.*;
-import org.basex.query.up.primitives.RenameNode;
-import org.basex.query.util.Err;
-import org.basex.util.Util;
+import org.basex.query.item.*;
+import org.basex.query.up.primitives.*;
+import org.basex.query.util.*;
+import org.basex.util.*;
 import org.junit.*;
 
 /**
@@ -23,9 +21,6 @@ import org.junit.*;
  * @author Lukas Kircher
  */
 public final class NamespaceTest extends AdvancedQueryTest {
-  /** Default database name. */
-  private static final String DB = Util.name(NamespaceTest.class);
-
   /** Test documents. */
   private static final String[][] DOCS = {
     { "d1", "<x/>" },
@@ -63,7 +58,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
     assertEquals(NL +
         "  Pre[3] xmlns:ns=\"A\" " + NL +
         "  Pre[4] xmlns=\"B\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -77,7 +72,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
     query("insert node <c/> as first into doc('d13')/a");
     assertEquals(NL +
         "  Pre[3] xmlns=\"A\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -94,7 +89,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
         "    Pre[2] xmlns=\"B\" " + NL +
         "      Pre[3] xmlns=\"D\" " + NL +
         "    Pre[4] xmlns=\"C\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -108,7 +103,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
     query("delete node doc('d12')/a/b");
     assertEquals(NL +
         "  Pre[2] xmlns=\"B\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -123,7 +118,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
     assertEquals(NL +
         "  Pre[1] xmlns=\"A\" " + NL +
         "    Pre[2] xmlns=\"C\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -139,7 +134,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
         "  Pre[1] xmlns=\"A\" " + NL +
         "    Pre[2] xmlns=\"B\" " + NL +
         "    Pre[3] xmlns=\"E\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -151,7 +146,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
   public void deleteShiftPreValues4() throws Exception {
     create(16);
     query("delete node doc('d16')/a/b");
-    assertTrue(CONTEXT.data().nspaces.toString().isEmpty());
+    assertTrue(context.data().nspaces.toString().isEmpty());
   }
 
   /**
@@ -255,7 +250,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
         "  Pre[1] xmlns=\"A\" " + NL +
         "    Pre[4] xmlns=\"D\" " + NL +
         "    Pre[6] xmlns=\"F\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /**
@@ -271,7 +266,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
         "    Pre[4] xmlns=\"D\" " + NL +
         "      Pre[5] xmlns=\"G\" " + NL +
         "    Pre[7] xmlns=\"F\" ",
-        CONTEXT.data().nspaces.toString());
+        context.data().nspaces.toString());
   }
 
   /** Test query. */
@@ -425,8 +420,10 @@ public final class NamespaceTest extends AdvancedQueryTest {
   @Test
   public void deleteDocumentNode() throws Exception {
     create(2);
-    CONTEXT.data().delete(0);
-    final byte[] ns = CONTEXT.data().nspaces.globalNS();
+    context.data().startUpdate();
+    context.data().delete(0);
+    context.data().finishUpdate();
+    final byte[] ns = context.data().nspaces.globalNS();
     assertTrue(ns != null && ns.length == 0);
   }
 
@@ -574,7 +571,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
     query(
       "let $b := <a xmlns:x='X' x:id='0'/> " +
       "return insert node $b//@*:id into /*:n");
-    assertEquals(1, CONTEXT.data().ns(1).size());
+    assertEquals(1, context.data().ns(1).size());
   }
 
   /** Handles duplicate prefixes. */
@@ -664,6 +661,19 @@ public final class NamespaceTest extends AdvancedQueryTest {
   }
 
   /**
+   * Test query for stripping existing namespaces.
+   * @throws Exception exception
+   */
+  @Test
+  public void stripNS() throws Exception {
+    final IO io = IO.get("<a xmlns:a='a'><b><c/><c/><c/></b></a>");
+    final ANode root = new DBNode(io, context.prop);
+    final QueryProcessor qp = new QueryProcessor("/*:a/*:b", context).context(root);
+    final ANode sub = (ANode) qp.iter().next();
+    DataBuilder.stripNS(sub, token("a"), context);
+  }
+
+  /**
    * Test query.
    * Detects malformed namespace hierarchy.
    */
@@ -677,7 +687,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
           "    <!-- for 6 months -->" +
           "  )," +
           "  $target := $input-context/works[1]/employee[1]" +
-          "return insert nodes $source into $target", CONTEXT).execute();
+          "return insert nodes $source into $target", context).execute();
     } catch(final QueryException ex) {
       assertEquals("XUTY0004", string(ex.qname().local()));
     }
@@ -715,7 +725,7 @@ public final class NamespaceTest extends AdvancedQueryTest {
   @BeforeClass
   public static void start() throws BaseXException {
     // turn off pretty printing
-    new Set(Prop.SERIALIZER, "indent=no").execute(CONTEXT);
+    new Set(Prop.SERIALIZER, "indent=no").execute(context);
   }
 
   /**
@@ -726,20 +736,8 @@ public final class NamespaceTest extends AdvancedQueryTest {
   static void create(final int... db) throws BaseXException {
     for(final int d : db) {
       final String[] doc = DOCS[d - 1];
-      new CreateDB(doc[0], doc[1]).execute(CONTEXT);
+      new CreateDB(doc[0], doc[1]).execute(context);
     }
-  }
-
-  /**
-   * Removes test databases and closes the database context.
-   * @throws BaseXException database exception
-   */
-  @AfterClass
-  public static void finish() throws BaseXException {
-    // drop all test databases
-    for(final String[] db : DOCS) new DropDB(db[0]).execute(CONTEXT);
-    new DropDB(DB).execute(CONTEXT);
-    CONTEXT.close();
   }
 
   /**
@@ -762,8 +760,8 @@ public final class NamespaceTest extends AdvancedQueryTest {
       final String expected) {
 
     try {
-      if(first != null) new XQuery(first).execute(CONTEXT);
-      final String result = new XQuery(second).execute(CONTEXT).trim();
+      if(first != null) new XQuery(first).execute(context);
+      final String result = new XQuery(second).execute(context).trim();
 
       // quotes are replaced by apostrophes to simplify comparison
       final String res = result.replaceAll("\"", "'");

@@ -3,62 +3,29 @@ package org.basex.query.func;
 import static org.basex.data.DataText.*;
 import static org.basex.query.util.Err.*;
 import static org.basex.util.Token.*;
+import static org.basex.util.Util.*;
 
-import java.io.IOException;
+import java.io.*;
 import java.util.Date;
 
-import org.basex.core.Prop;
-import org.basex.core.User;
-import org.basex.core.cmd.Info;
-import org.basex.core.cmd.InfoDB;
-import org.basex.core.cmd.List;
-import org.basex.core.cmd.Rename;
-import org.basex.data.Data;
-import org.basex.data.MetaData;
+import org.basex.core.*;
+import org.basex.core.cmd.*;
+import org.basex.data.*;
 import org.basex.index.IndexToken.IndexType;
-import org.basex.index.Resources;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
-import org.basex.io.MimeTypes;
+import org.basex.index.*;
+import org.basex.io.*;
 import org.basex.io.in.DataInput;
-import org.basex.io.out.ArrayOutput;
-import org.basex.io.serial.Serializer;
-import org.basex.io.serial.SerializerException;
-import org.basex.query.QueryContext;
-import org.basex.query.QueryException;
-import org.basex.query.expr.Expr;
-import org.basex.query.expr.IndexAccess;
-import org.basex.query.item.ANode;
-import org.basex.query.item.B64Stream;
-import org.basex.query.item.Bln;
-import org.basex.query.item.DBNode;
-import org.basex.query.item.DBNodeSeq;
-import org.basex.query.item.Empty;
-import org.basex.query.item.FAttr;
-import org.basex.query.item.FElem;
-import org.basex.query.item.FNode;
-import org.basex.query.item.FTxt;
-import org.basex.query.item.Int;
-import org.basex.query.item.Item;
-import org.basex.query.item.QNm;
-import org.basex.query.item.Str;
-import org.basex.query.item.Value;
-import org.basex.query.iter.Iter;
-import org.basex.query.iter.NodeIter;
-import org.basex.query.iter.ValueIter;
-import org.basex.query.path.NameTest;
-import org.basex.query.up.primitives.DBAdd;
-import org.basex.query.up.primitives.DBDelete;
-import org.basex.query.up.primitives.DBOptimize;
-import org.basex.query.up.primitives.DBRename;
-import org.basex.query.up.primitives.DBStore;
-import org.basex.query.up.primitives.DeleteNode;
-import org.basex.query.up.primitives.ReplaceValue;
-import org.basex.query.util.IndexContext;
-import org.basex.util.InputInfo;
-import org.basex.util.list.IntList;
-import org.basex.util.list.StringList;
-import org.basex.util.list.TokenList;
+import org.basex.io.out.*;
+import org.basex.io.serial.*;
+import org.basex.query.*;
+import org.basex.query.expr.*;
+import org.basex.query.item.*;
+import org.basex.query.iter.*;
+import org.basex.query.path.*;
+import org.basex.query.up.primitives.*;
+import org.basex.query.util.*;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * Database functions.
@@ -69,23 +36,23 @@ import org.basex.util.list.TokenList;
  */
 public final class FNDb extends StandardFunc {
   /** Resource element name. */
-  static final QNm SYSTEM = new QNm(token("system"));
+  static final QNm SYSTEM = new QNm("system");
   /** Resource element name. */
-  static final QNm DATABASE = new QNm(token("database"));
+  static final QNm DATABASE = new QNm("database");
   /** Resource element name. */
-  static final QNm RESOURCE = new QNm(token("resource"));
+  static final QNm RESOURCE = new QNm("resource");
   /** Resource element name. */
-  static final QNm RESOURCES = new QNm(token("resources"));
+  static final QNm RESOURCES = new QNm("resources");
   /** Path element name. */
-  static final QNm PATH = new QNm(token("path"));
+  static final QNm PATH = new QNm("path");
   /** Raw element name. */
-  static final QNm RAW = new QNm(token("raw"));
+  static final QNm RAW = new QNm("raw");
   /** Size element name. */
-  static final QNm SIZE = new QNm(token("size"));
+  static final QNm SIZE = new QNm("size");
   /** Content type element name. */
-  static final QNm CTYPE = new QNm(token("content-type"));
+  static final QNm CTYPE = new QNm("content-type");
   /** Modified date element name. */
-  static final QNm MDATE = new QNm(token("modified-date"));
+  static final QNm MDATE = new QNm("modified-date");
   /** MIME type application/xml. */
   static final byte[] APP_XML = token(MimeTypes.APP_XML);
 
@@ -172,7 +139,7 @@ public final class FNDb extends StandardFunc {
     final Data data = data(0, ctx);
     final int v = (int) checkItr(expr[1], ctx);
     final int pre = id ? data.pre(v) : v;
-    if(pre < 0 || pre >= data.meta.size) IDINVALID.thrw(input, this, v);
+    if(pre < 0 || pre >= data.meta.size) IDINVALID.thrw(info, this, v);
     return new DBNode(data, pre);
   }
 
@@ -184,7 +151,7 @@ public final class FNDb extends StandardFunc {
    */
   private Iter text(final QueryContext ctx) throws QueryException {
     final IndexContext ic = new IndexContext(ctx, data(0, ctx), null, true);
-    return new IndexAccess(input, expr[1], IndexType.TEXT, ic).iter(ctx);
+    return new IndexAccess(info, expr[1], IndexType.TEXT, ic).iter(ctx);
   }
 
   /**
@@ -196,28 +163,27 @@ public final class FNDb extends StandardFunc {
   private Iter attribute(final QueryContext ctx) throws QueryException {
     final IndexContext ic = new IndexContext(ctx, data(0, ctx), null, true);
     final IndexAccess ia = new IndexAccess(
-        input, expr[1], IndexType.ATTRIBUTE, ic);
+        info, expr[1], IndexType.ATTRIBUTE, ic);
 
     // return iterator if no name test is specified
     if(expr.length < 3) return ia.iter(ctx);
 
     // parse and compile the name test
-    final Item name = checkNoEmpty(expr[2].item(ctx, input));
+    final Item name = checkNoEmpty(expr[2].item(ctx, info));
     final QNm nm = new QNm(checkStr(name, ctx), ctx);
     if(!nm.hasPrefix()) nm.uri(ctx.sc.ns.uri(EMPTY));
 
-    final NameTest nt = new NameTest(nm, NameTest.Name.STD, true);
+    final NameTest nt = new NameTest(nm, NameTest.Mode.STD, true);
     // no results expected: return empty sequence
     if(!nt.comp(ctx)) return Empty.ITER;
 
     // wrap iterator with name test
     return new Iter() {
       final NodeIter ir = ia.iter(ctx);
-
       @Override
       public ANode next() throws QueryException {
         ANode n;
-        while((n = ir.next()) != null && !nt.eval(n));
+        while((n = ir.next()) != null && !nt.eq(n));
         return n;
       }
     };
@@ -243,7 +209,7 @@ public final class FNDb extends StandardFunc {
     final TokenList tl = new TokenList();
     final int el = expr.length;
     if(el == 0) {
-      for(final String s : List.list(ctx.context)) tl.add(s);
+      for(final String s : ctx.context.databases().listDBs()) tl.add(s);
     } else {
       final Data data = data(0, ctx);
       final String path = string(el == 1 ? EMPTY : checkStr(expr[1], ctx));
@@ -280,8 +246,7 @@ public final class FNDb extends StandardFunc {
     if(expr.length == 0) return listDBs(ctx);
 
     final Data data = data(0, ctx);
-    final String path =
-        string(expr.length == 1 ? EMPTY : checkStr(expr[1], ctx));
+    final String path = string(expr.length == 1 ? EMPTY : checkStr(expr[1], ctx));
     final IntList il = data.resources.docs(path);
     final TokenList tl = data.resources.binaries(path);
 
@@ -320,7 +285,7 @@ public final class FNDb extends StandardFunc {
    * @return iterator
    */
   private Iter listDBs(final QueryContext ctx) {
-    final StringList sl = List.list(ctx.context);
+    final StringList sl = ctx.context.databases().listDBs();
     return new Iter() {
       int pos;
       @Override
@@ -333,13 +298,13 @@ public final class FNDb extends StandardFunc {
           di = new DataInput(meta.dbfile(DATAINF));
           meta.read(di);
           res.add(new FAttr(RESOURCES, token(meta.ndocs)));
-          final String tstamp = InfoDB.DATE.format(new Date(meta.dbtime()));
+          final String tstamp = formatDate(new Date(meta.dbtime()), Dtm.FORMAT);
           res.add(new FAttr(MDATE, token(tstamp)));
-          if(ctx.context.perm(User.CREATE, meta))
+          if(ctx.context.perm(Perm.CREATE, meta))
             res.add(new FAttr(PATH, token(meta.original)));
           res.add(new FTxt(token(name)));
         } catch(final IOException ex) {
-          NODB.thrw(input, name);
+          NODB.thrw(info, name);
         } finally {
           if(di != null) try { di.close(); } catch(final IOException ex) { }
         }
@@ -413,7 +378,7 @@ public final class FNDb extends StandardFunc {
     final String path = path(1, ctx);
     if(data.resources.doc(path) != -1) return Str.get(MimeTypes.APP_XML);
     final IOFile io = data.meta.binary(path);
-    if(!io.exists() || io.isDir()) RESFNF.thrw(input, path);
+    if(!io.exists() || io.isDir()) RESFNF.thrw(info, path);
     return Str.get(MimeTypes.get(path));
   }
 
@@ -429,11 +394,12 @@ public final class FNDb extends StandardFunc {
   static FNode resource(final byte[] path, final boolean raw,
       final long size, final byte[] ctype, final long mdate) {
 
+    final String tstamp = formatDate(new Date(mdate), Dtm.FORMAT);
     final FElem res = new FElem(RESOURCE).
         add(new FTxt(path)).
         add(new FAttr(RAW, token(raw))).
         add(new FAttr(CTYPE, ctype)).
-        add(new FAttr(MDATE, token(mdate)));
+        add(new FAttr(MDATE, token(tstamp)));
     return raw ? res.add(new FAttr(SIZE, token(size))) : res;
   }
 
@@ -454,7 +420,7 @@ public final class FNDb extends StandardFunc {
    */
   private ANode info(final QueryContext ctx) throws QueryException {
     final Data data = data(0, ctx);
-    final boolean create = ctx.context.user.perm(User.CREATE);
+    final boolean create = ctx.context.user.has(Perm.CREATE);
     return toNode(InfoDB.db(data.meta, false, true, create), DATABASE);
   }
 
@@ -497,7 +463,7 @@ public final class FNDb extends StandardFunc {
     final Item it = checkItem(expr[1], ctx);
     final String path = expr.length < 3 ? "" : path(2, ctx);
 
-    ctx.updates.add(new DBAdd(data, input, it, path, ctx.context), ctx);
+    ctx.updates.add(new DBAdd(data, info, it, path, ctx.context), ctx);
     return null;
   }
 
@@ -518,18 +484,18 @@ public final class FNDb extends StandardFunc {
     final Resources res = data.resources;
     final int pre = res.doc(path);
     if(pre != -1) {
-      if(res.docs(path).size() != 1) DOCTRGMULT.thrw(input);
-      ctx.updates.add(new DeleteNode(pre, data, input), ctx);
+      if(res.docs(path).size() != 1) DOCTRGMULT.thrw(info);
+      ctx.updates.add(new DeleteNode(pre, data, info), ctx);
     }
     // delete binary resources
     final IOFile bin = data.meta.binary(path);
-    if(bin != null) ctx.updates.add(new DBDelete(data, path, input), ctx);
-    ctx.updates.add(new DBAdd(data, input, doc, path, ctx.context), ctx);
+    if(bin != null) ctx.updates.add(new DBDelete(data, path, info), ctx);
+    ctx.updates.add(new DBAdd(data, info, doc, path, ctx.context), ctx);
 
     final IOFile file = data.meta.binary(path);
     if(file != null && file.exists() && !file.isDir()) {
       final Item it = checkItem(doc, ctx);
-      ctx.updates.add(new DBStore(data, token(path), it, input), ctx);
+      ctx.updates.add(new DBStore(data, token(path), it, info), ctx);
     }
     return null;
   }
@@ -549,12 +515,12 @@ public final class FNDb extends StandardFunc {
     // delete XML resources
     final IntList docs = data.resources.docs(path);
     for(int i = 0, is = docs.size(); i < is; i++) {
-      ctx.updates.add(new DeleteNode(docs.get(i), data, input), ctx);
+      ctx.updates.add(new DeleteNode(docs.get(i), data, info), ctx);
     }
     // delete raw resources
     final IOFile bin = data.meta.binary(path);
-    if(bin == null) UPDBDELERR.thrw(input, path);
-    ctx.updates.add(new DBDelete(data, path, input), ctx);
+    if(bin == null) UPDBDELERR.thrw(info, path);
+    ctx.updates.add(new DBDelete(data, path, info), ctx);
     return null;
   }
 
@@ -576,15 +542,15 @@ public final class FNDb extends StandardFunc {
     for(int i = 0, is = il.size(); i < is; i++) {
       final int pre = il.get(i);
       final String trg = Rename.target(data, pre, source, target);
-      if(trg.isEmpty()) EMPTYPATH.thrw(input, this);
-      ctx.updates.add(new ReplaceValue(pre, data, input, token(trg)), ctx);
+      if(trg.isEmpty()) EMPTYPATH.thrw(info, this);
+      ctx.updates.add(new ReplaceValue(pre, data, info, token(trg)), ctx);
     }
     // rename files
     final IOFile src = data.meta.binary(source);
     final IOFile trg = data.meta.binary(target);
-    if(src == null || trg == null) UPDBRENAMEERR.thrw(input, src);
+    if(src == null || trg == null) UPDBRENAMEERR.thrw(info, src);
 
-    ctx.updates.add(new DBRename(data, src.path(), trg.path(), input), ctx);
+    ctx.updates.add(new DBRename(data, src.path(), trg.path(), info), ctx);
     return null;
   }
 
@@ -599,7 +565,7 @@ public final class FNDb extends StandardFunc {
 
     final Data data = data(0, ctx);
     final boolean all = expr.length == 2 && checkBln(expr[1], ctx);
-    ctx.updates.add(new DBOptimize(data, ctx.context, all, input), ctx);
+    ctx.updates.add(new DBOptimize(data, ctx.context, all, info), ctx);
     return null;
   }
 
@@ -615,10 +581,10 @@ public final class FNDb extends StandardFunc {
     final Data data = data(0, ctx);
     final String path = path(1, ctx);
     final IOFile file = data.meta.binary(path);
-    if(file == null || file.isDir()) RESINV.thrw(input, path);
+    if(file == null || file.isDir()) RESINV.thrw(info, path);
 
     final Item it = checkItem(expr[2], ctx);
-    ctx.updates.add(new DBStore(data, token(path), it, input), ctx);
+    ctx.updates.add(new DBStore(data, token(path), it, info), ctx);
     return null;
   }
 
@@ -632,7 +598,7 @@ public final class FNDb extends StandardFunc {
     final Data data = data(0, ctx);
     final String path = path(1, ctx);
     final IOFile file = data.meta.binary(path);
-    if(file == null || !file.exists() || file.isDir()) RESFNF.thrw(input, path);
+    if(file == null || !file.exists() || file.isDir()) RESFNF.thrw(info, path);
     return new B64Stream(file, DBERR);
   }
 
@@ -675,13 +641,13 @@ public final class FNDb extends StandardFunc {
       for(Item it; (it = ir.next()) != null;) it.serialize(ser);
       ser.close();
     } catch(final SerializerException ex) {
-      throw ex.getCause(input);
+      throw ex.getCause(info);
     } catch(final IOException ex) {
-      SERANY.thrw(input, ex);
+      SERANY.thrw(info, ex);
     }
     // throw exception if event is unknown
     if(!ctx.context.events.notify(ctx.context, name, ao.toArray())) {
-      NOEVENT.thrw(input, name);
+      NOEVENT.thrw(info, name);
     }
     return null;
   }
@@ -727,7 +693,7 @@ public final class FNDb extends StandardFunc {
 
     final String path = string(checkStr(expr[i], ctx));
     final String norm = MetaData.normPath(path);
-    if(norm == null) RESINV.thrw(input, path);
+    if(norm == null) RESINV.thrw(info, path);
     return norm;
   }
 }

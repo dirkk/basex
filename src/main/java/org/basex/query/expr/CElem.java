@@ -65,9 +65,9 @@ public final class CElem extends CName {
       // create and check QName
       final QNm nm = qname(ctx, ii);
       final byte[] cp = nm.prefix(), cu = nm.uri();
-      if(eq(cp, XML) ^ eq(cu, XMLURI)) CEXML.thrw(input, cu, cp);
-      if(eq(cu, XMLNSURI)) CEINV.thrw(input, cu);
-      if(eq(cp, XMLNS)) CEINV.thrw(input, cp);
+      if(eq(cp, XML) ^ eq(cu, XMLURI)) CEXML.thrw(info, cu, cp);
+      if(eq(cu, XMLNSURI)) CEINV.thrw(info, cu);
+      if(eq(cp, XMLNS)) CEINV.thrw(info, cp);
 
       // analyze element namespace unless it is "xml"
       if(!eq(cp, XML)) {
@@ -88,11 +88,10 @@ public final class CElem extends CName {
 
       // create child and attribute nodes
       final Constr constr = new Constr(ii, ctx).add(expr);
-      if(constr.errAtt) NOATTALL.thrw(input);
-      if(constr.errNS) NONSALL.thrw(input);
-      if(constr.duplAtt != null)
-        (comp ? CATTDUPL : ATTDUPL).thrw(input, constr.duplAtt);
-      if(constr.duplNS != null) DUPLNSCONS.thrw(input, constr.duplNS);
+      if(constr.errAtt) NOATTALL.thrw(info);
+      if(constr.errNS) NONSALL.thrw(info);
+      if(constr.duplAtt != null) (comp ? CATTDUPL : ATTDUPL).thrw(info, constr.duplAtt);
+      if(constr.duplNS != null) DUPLNSCONS.thrw(info, constr.duplNS);
 
       // create node
       final FElem node = new FElem(nm, constr.children, constr.atts, ns);
@@ -103,10 +102,8 @@ public final class CElem extends CName {
         addNS(cns.name(a), cns.string(a), ns);
       }
 
-      // update parent references of attributes and add namespaces
+      // add namespaces
       for(int a = 0; a < constr.atts.size(); ++a) {
-        constr.atts.get(a).parent(node);
-
         final ANode att = constr.atts.get(a);
         final QNm qnm = att.qname();
         // skip attributes without prefixes or URIs
@@ -133,7 +130,7 @@ public final class CElem extends CName {
 
       // update parent references of children
       for(int c = 0; c < constr.children.size(); ++c) {
-        final ANode child = constr.children.get(c).parent(node);
+        final ANode child = constr.children.get(c);
         // add inherited and remove unused namespaces
         if(child.type == NodeType.ELM) {
           if(ctx.sc.nsInherit) inherit(child, ns);
