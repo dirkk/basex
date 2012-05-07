@@ -8,6 +8,7 @@ import java.util.Locale;
 import org.basex.core.Commands.Cmd;
 import org.basex.core.Commands.CmdAlter;
 import org.basex.core.Commands.CmdCreate;
+import org.basex.core.Commands.CmdDistribution;
 import org.basex.core.Commands.CmdDrop;
 import org.basex.core.Commands.CmdIndex;
 import org.basex.core.Commands.CmdIndexInfo;
@@ -16,58 +17,7 @@ import org.basex.core.Commands.CmdOptimize;
 import org.basex.core.Commands.CmdPerm;
 import org.basex.core.Commands.CmdRepo;
 import org.basex.core.Commands.CmdShow;
-import org.basex.core.cmd.Add;
-import org.basex.core.cmd.AlterDB;
-import org.basex.core.cmd.AlterUser;
-import org.basex.core.cmd.Check;
-import org.basex.core.cmd.Close;
-import org.basex.core.cmd.Copy;
-import org.basex.core.cmd.CreateBackup;
-import org.basex.core.cmd.CreateDB;
-import org.basex.core.cmd.CreateEvent;
-import org.basex.core.cmd.CreateIndex;
-import org.basex.core.cmd.CreateUser;
-import org.basex.core.cmd.Cs;
-import org.basex.core.cmd.Delete;
-import org.basex.core.cmd.DropBackup;
-import org.basex.core.cmd.DropDB;
-import org.basex.core.cmd.DropEvent;
-import org.basex.core.cmd.DropIndex;
-import org.basex.core.cmd.DropUser;
-import org.basex.core.cmd.Exit;
-import org.basex.core.cmd.Export;
-import org.basex.core.cmd.Find;
-import org.basex.core.cmd.Flush;
-import org.basex.core.cmd.Get;
-import org.basex.core.cmd.Grant;
-import org.basex.core.cmd.Help;
-import org.basex.core.cmd.Info;
-import org.basex.core.cmd.InfoDB;
-import org.basex.core.cmd.InfoIndex;
-import org.basex.core.cmd.InfoStorage;
-import org.basex.core.cmd.Kill;
-import org.basex.core.cmd.List;
-import org.basex.core.cmd.ListDB;
-import org.basex.core.cmd.Open;
-import org.basex.core.cmd.Optimize;
-import org.basex.core.cmd.OptimizeAll;
-import org.basex.core.cmd.Password;
-import org.basex.core.cmd.Rename;
-import org.basex.core.cmd.Replace;
-import org.basex.core.cmd.RepoDelete;
-import org.basex.core.cmd.RepoInstall;
-import org.basex.core.cmd.RepoList;
-import org.basex.core.cmd.Restore;
-import org.basex.core.cmd.Retrieve;
-import org.basex.core.cmd.Run;
-import org.basex.core.cmd.Set;
-import org.basex.core.cmd.ShowBackups;
-import org.basex.core.cmd.ShowDatabases;
-import org.basex.core.cmd.ShowEvents;
-import org.basex.core.cmd.ShowSessions;
-import org.basex.core.cmd.ShowUsers;
-import org.basex.core.cmd.Store;
-import org.basex.core.cmd.XQuery;
+import org.basex.core.cmd.*;
 import org.basex.io.IOFile;
 import org.basex.query.QueryContext;
 import org.basex.query.QueryException;
@@ -299,6 +249,8 @@ public final class CommandParser extends InputParser {
             return new ShowBackups();
           case EVENTS:
             return new ShowEvents();
+          case NETWORK:
+            return new ShowNetwork();
           default:
         }
         break;
@@ -308,6 +260,18 @@ public final class CommandParser extends InputParser {
         final String db = key(ON, null) ? glob(cmd) : null;
         key(C_TO, cmd);
         return new Grant(perm, glob(cmd), db);
+      case DISTRIBUTION:
+        switch (consume(CmdDistribution.class, cmd)) {
+          case NEW:
+            return new Distribute(string(cmd), string(cmd));
+          case JOIN:
+            return new Distribute(string(cmd), string(cmd), string(cmd), string(cmd));
+          case JOIN_SUPERPEER:
+            return new Distribute(string(cmd), string(cmd), string(cmd), string(cmd),
+                true);
+          default:
+        }
+        break;
       case REPO:
         switch(consume(CmdRepo.class, cmd)) {
           case INSTALL:

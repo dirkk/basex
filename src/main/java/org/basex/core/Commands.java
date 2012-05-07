@@ -19,7 +19,7 @@ public interface Commands {
   /** Optimize commands. */
   enum CmdOptimize { NULL, ALL }
   /** Show commands. */
-  enum CmdShow { DATABASES, SESSIONS, USERS, BACKUPS, EVENTS }
+  enum CmdShow { DATABASES, SESSIONS, USERS, BACKUPS, EVENTS, NETWORK }
   /** Permission commands. */
   enum CmdPerm { NONE, READ, WRITE, CREATE, ADMIN }
   /** Index types. */
@@ -30,7 +30,9 @@ public interface Commands {
   enum CmdAlter { DATABASE, DB, USER }
   /** Repo types. */
   enum CmdRepo { INSTALL, DELETE, LIST }
-
+  /** Distribution types. */
+  enum CmdDistribution { NEW, JOIN, JOIN_SUPERPEER, SHOW }
+  
   /** Command definitions. */
   enum Cmd {
     ADD(HELPADD), ALTER(HELPALTER), CHECK(HELPCHECK), CLOSE(HELPCLOSE),
@@ -41,7 +43,8 @@ public interface Commands {
     OPTIMIZE(HELPOPTIMIZE), PASSWORD(HELPPASSWORD), RENAME(HELPRENAME),
     REPLACE(HELPREPLACE), REPO(HELPREPO), RESTORE(HELPRESTORE),
     RETRIEVE(HELPRETRIEVE), RUN(HELPRUN), SET(HELPSET),
-    SHOW(HELPSHOW), STORE(HELPSTORE), XQUERY(HELPXQUERY);
+    SHOW(HELPSHOW), STORE(HELPSTORE), XQUERY(HELPXQUERY),
+    DISTRIBUTION(HELPDISTRIBUTE);
 
     /** Help texts. */
     private final String[] help;

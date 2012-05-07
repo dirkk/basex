@@ -5,6 +5,7 @@ import static org.basex.core.Text.*;
 import java.util.*;
 
 import org.basex.data.*;
+import org.basex.dist.*;
 import org.basex.index.*;
 import org.basex.io.random.*;
 import org.basex.query.util.pkg.*;
@@ -25,6 +26,8 @@ public final class Context {
   public final ClientListener listener;
   /** Client-related properties. */
   public final Prop prop = new Prop();
+  /** Distributed node. */
+  public NetworkPeer nNode;
   /** Main properties. */
   public final MainProp mprop;
   /** Client connections. */
@@ -91,6 +94,7 @@ public final class Context {
     repo = ctx.repo;
     databases = ctx.databases();
     listener = cl;
+    nNode = null;
   }
 
   /**
@@ -107,6 +111,7 @@ public final class Context {
     repo = new Repo(this);
     user = users.get(ADMIN);
     listener = null;
+    nNode = null;
   }
 
   /**

@@ -150,6 +150,10 @@ public final class GUIProp extends AProp {
 
   /** Server user. */
   public static final Object[] SERVERUSER = { "SERVERUSER", "admin" };
+  
+
+  /** Host name for distributed BaseX version. */
+  public static final Object[] DISTRIBUTE_HOST = { "DISTRIBUTE_HOST", "" };
 
   /** Maximum text size to be displayed. */
   public static final Object[] MAXTEXT = { "MAXTEXT", 1 << 21 };

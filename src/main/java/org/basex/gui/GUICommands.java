@@ -122,6 +122,15 @@ public enum GUICommands implements GUICommand {
       new DialogServer(gui);
     }
   },
+  
+  /** Distribution Dialog. */
+  C_DISTRIBUTION(DISTRIBUTION + DOTS, null, H_DISTRIBUTION, false, false) {
+    @Override
+    public void execute(final GUI gui) {
+      // open file chooser for XML creation
+      new DialogDistribution(gui);
+    }
+  },
 
   /** Opens a query file. */
   C_EDITNEW(NEW + DOTS, "% shift N", H_NEW_FILE, false, false) {

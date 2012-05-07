@@ -431,6 +431,10 @@ public interface Text {
   String[] HELPEXIT = {
     "", lang("c_exit1", Prop.NAME), lang("c_exit2", Prop.NAME)
   };
+  /** Command help. */
+  String[] HELPDISTRIBUTE = {
+    "", lang("c_distribute1"), lang("c_distribute2")
+  };
 
   // COMMAND INFOS ============================================================
 
@@ -1030,6 +1034,17 @@ public interface Text {
   /** File description: XQuery files. */
   String XQUERY_FILES = "XQuery Files";
 
+  /** Dialog title for distribution options. */
+  String DIALOG_DISTRIBUTION = lang("dialog_distribution");
+  /** Create a new network. */
+  String CREATE_NETWORK = lang("create_network");
+  /** This node should be a super-peer */
+  String NEW_SUPERPEER = lang("new_superpeer");
+  /** Create a new network node. */
+  String DISTRIBUTION_INCOMING_HOST = lang("dist_incoming_host");
+  /** Join an existing network. */
+  String DISTRIBUTION_JOINING_NODE = lang("join_node");
+  
   /** Dialog title for database options. */
   String CREATE_DATABASE = lang("create_database");
   /** Whitespaces information. */
@@ -1398,6 +1413,9 @@ public interface Text {
   String H_HTML_PARSER = lang("h_html_parser");
   /** No HTML Parser. */
   String H_NO_HTML_PARSER = lang("h_no_html_parser");
+  
+  /** Distribution */
+  String H_DISTRIBUTION = lang("h_distribution");
 
   // SERVER TEXTS =============================================================
 
@@ -1441,6 +1459,11 @@ public interface Text {
   String S_SERVER_ADMIN = lang("s_server_admin");
   /** Command info. */
   String S_H_SERVER_ADMIN = lang("s_h_server_admin");
+  
+  // DISTRIBUTION RELATED TEXTS
+  
+  /** Distribution */
+  String DISTRIBUTION = lang("distribution");
 
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);

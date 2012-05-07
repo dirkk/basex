@@ -57,6 +57,12 @@ public final class MainProp extends AProp {
   public static final Object[] TIMEOUT = { "TIMEOUT", 0 };
   /** Keep alive time of clients; deactivated if set to 0. */
   public static final Object[] KEEPALIVE = { "KEEPALIVE", 0 };
+  
+  /** P2P: host name used for incoming request from other P2P clients. */
+  public static final Object[] P2PHOST = { "P2PHOST", Text.LOCALHOST };
+  /** P2P: port number used for incoming request from other P2P clients. */
+  public static final Object[] P2PPORT = { "P2PPORT", 3960 };
+  
   /** Debug mode. */
   public static final Object[] DEBUG = { "DEBUG", false };
   /** Defines the number of parallel readers. */
