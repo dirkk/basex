@@ -160,8 +160,15 @@ public final class NetworkOverlayTest {
     @Override
     public void run() {
       try {
-        sleep(500);
-        new ShowNetwork().execute(ctx);
+        synchronized(this) {
+          wait(1000);
+        }
+        String output = new ShowNetwork().execute(ctx);
+        if (output.contains("State: DISCONNECTED") || output.contains("State: PENDING")
+            ) {
+          throw new BaseXException("A peer did not susccessfully connect",
+              new Exception());
+        }
         close();
       } catch(final Exception ex) {
         Util.stack(ex);

@@ -80,7 +80,13 @@ public final class Distribute extends Command {
       } catch(UnknownHostException e) {
         return false;
       }
-      new Thread(context.nNode).start();
+      Thread t = new Thread(context.nNode);
+      t.start();
+      try {
+        t.join();
+      } catch(InterruptedException e) {
+        e.printStackTrace();
+      }
       return true;
     }
 

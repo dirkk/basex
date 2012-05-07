@@ -67,7 +67,7 @@ public class NetworkPeer implements Runnable {
 
     try {
       serverSocket = new ServerSocket();
-      serverSocket.setReuseAddress(true);
+      serverSocket.setReuseAddress(false);
       serverSocket.setSoTimeout(5000);
       serverSocket.bind(new InetSocketAddress(host, port));
       running = true;
@@ -114,6 +114,7 @@ public class NetworkPeer implements Runnable {
   @Override
   public void run() {
     connectTo(connectHost, connectPort);
+    running = false;
 
     while(running) {
       try {
@@ -173,7 +174,7 @@ public class NetworkPeer implements Runnable {
       if(!notifyPeer.getIdentifier().equalsIgnoreCase(cn.getIdentifier())) {
         try {
           socketOut = new Socket(notifyPeer.host, notifyPeer.port);
-          socketOut.setReuseAddress(true);
+          socketOut.setReuseAddress(false);
           out = new DataOutputStream(socketOut.getOutputStream());
 
           DataInputStream inFromRemote = new DataInputStream(socketOut.getInputStream());
@@ -217,8 +218,8 @@ public class NetworkPeer implements Runnable {
     if(socketOut == null || cHost != socketOut.getInetAddress()
         || cPort != socketOut.getPort()) {
       try {
-        socketOut = new Socket(cHost, cPort, host, port + 2);
-        socketOut.setReuseAddress(true);
+        socketOut = new Socket(cHost, cPort, host, port + 1);
+        socketOut.setReuseAddress(false);
         out = new DataOutputStream(socketOut.getOutputStream());
         DataInputStream inFromRemote = new DataInputStream(socketOut.getInputStream());
 
@@ -235,7 +236,7 @@ public class NetworkPeer implements Runnable {
                 inFromRemote.readInt(), true);
 
             socketOut = new Socket(superPeer.host, superPeer.port, host, port + 1);
-            socketOut.setReuseAddress(true);
+            socketOut.setReuseAddress(false);
             out = new DataOutputStream(socketOut.getOutputStream());
             inFromRemote = new DataInputStream(socketOut.getInputStream());
 
@@ -300,13 +301,13 @@ public class NetworkPeer implements Runnable {
     // send a message to notify of the disconnect to all connected nodes
     // free resources
     try {
-      if (serverSocket.isBound()) {
+      if (serverSocket != null && serverSocket.isBound()) {
         serverSocket.close();
       }
-      if (socketIn.isBound()) {
+      if (socketIn != null && socketIn.isBound()) {
         socketIn.close();
       }
-      if (socketOut.isBound()) {
+      if (socketOut != null && socketOut.isBound()) {
         socketOut.close();
       }
     } catch (IOException e) {
