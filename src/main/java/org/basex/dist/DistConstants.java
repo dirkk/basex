@@ -8,35 +8,22 @@ package org.basex.dist;
  *
  */
 public final class DistConstants {
-  /** Packet message: Connect to a cluster. */
+  /** Packet message: Connect to a cluster. Should just be sent to a super-peer. */
   public static final byte P_CONNECT = 0x01;
   /** Packet message: Connect as a new super-peer to the network. */
-  public static final byte P_CONNECT_SUPER = 0x08;
-  /**
-   * Packet message: Connection attempt successful as super-peer, connect to the following
-   * super-peer now.
-   */
-  public static final byte P_AVAILABLE_SUPERPEER = 0x09;
+  public static final byte P_CONNECT_SUPER = 0x02;
+  /** Packet message: Connect a normal peer to another normal peer. */
+  public static final byte P_CONNECT_NORMAL = 0x03;
+  /** Packet message: Connect normal-to-normal was successful. */
+  public static final byte P_CONNECT_NORMAL_ACK = 0x04;
   /** Packet message: Connect successful. */
-  public static final byte P_CONNECT_ACK = 0x02;
-  /** packet message: Connect failed. */
-  public static final byte P_CONNECT_FAILED = 0x03;
-  /** Packet message: Send all cluster nodes to the new node. */
-  public static final byte P_CONNECT_NODES = 0x04;
+  public static final byte P_CONNECT_ACK = 0x05;
   /** Packet message: Got all cluster nodes successfully. */
-  public static final byte P_CONNECT_NODES_ACK = 0x05;
-  /** Packet message: A new node has been added to the cluster. */
-  public static final byte P_NEW_NODE = 0x06;
-  /** Packet message: Node successfully added. */
-  public static final byte P_NEW_NODE_ACK = 0x07;
-  /** Packet message: I am a super-peer. */
-  public static final byte P_SUPERPEER_ME = 0x0A;
+  public static final byte P_CONNECT_NODES_ACK = 0x06;
   /** Packet message: The following peer is a super-peer. */
-  public static final byte P_SUPERPEER_ADDR = 0x0B;
-  /** Packet message: Are you a super-peer, if not, who is your super-peer? */
-  public static final byte P_SUPERPEER_NEAREST = 0x0C;
-  /** Packet message: add me to your cluster. */
-  public static final byte P_SUPERPEER_ADD_ME = 0x0D;
+  public static final byte P_SUPERPEER_ADDR = 0x07;
+  /** Packet message: this is my host + port for connection attempts. */
+  public static final byte P_CONNECTION_ATTEMPTS = 0x08;
 
   /** connection status of this network node within the cluster */
   public enum status {

@@ -1,5 +1,6 @@
 package org.basex.dist;
 
+import java.io.*;
 import java.net.*;
 
 /**
@@ -9,64 +10,63 @@ import java.net.*;
  * @author Dirk Kirsten
  *
  */
-public class ClusterPeer {
-  /** Host name of the node. */
-  public final InetAddress host;
-  /** Port number of the node. */
-  public final int port;
-  /** Is this peer a super-peer? */
-  private boolean superPeer;
+public class ClusterPeer implements Runnable {
+  /** Is this a super-peer? */
+  protected boolean superPeer;
+  /** Commanding network-peer. */
+  protected NetworkPeer commandingPeer;
   /** status of this node. */
-  private DistConstants.status status;
+  protected DistConstants.status status;
+  /** connection socket. */
+  protected Socket socket;
+  /** data input stream. */
+  protected DataInputStream in;
+  /** data output stream. */
+  protected DataOutputStream out;
+  /** is this peer still active? */
+  protected boolean running;
+  /** connect to a cluster. */
+  public boolean doConnect;
+  /** handle an incoming connection. */
+  public boolean doHandleConnect;
+  /** The host name for new connection attempts for this peer. */
+  protected InetAddress connectionHost;
+  /** The port number for new connection attempts for this peer. */
+  protected int connectionPort;
 
   /**
    * Default constructor.
-   * @param newHost Host name of the node.
-   * @param newPort Port number of the node.
-   * @throws UnknownHostException host is unknown.
+   * @param c The commanding peer for this peer in the cluster.
+   * @param s The connection to talk to this peer.
    */
-  public ClusterPeer(final String newHost, final int newPort)
-      throws UnknownHostException {
-    this(InetAddress.getByName(newHost), newPort, false);
+  public ClusterPeer(final NetworkPeer c, final Socket s) {
+    this(c, s, false);
   }
 
   /**
    * Default constructor.
-   * @param newHost Host name of the node.
-   * @param newPort Port number of the node.
+   * @param c The commanding peer for this peer in the cluster.
+   * @param s The connection to talk to this peer.
+   * @param newSuperPeer Reference to the super-peer. If no super-peer, null.
    */
-  public ClusterPeer(final InetAddress newHost, final int newPort) {
-    this(newHost, newPort, false);
-  }
-
-  /**
-   * Default constructor.
-   * @param newHost Host name of the node.
-   * @param newPort Port number of the node.
-   * @param newSuperPeer true, if this peer is the super-peer of this cluster
-   */
-  public ClusterPeer(final InetAddress newHost, final int newPort,
+  public ClusterPeer(final NetworkPeer c, final Socket s,
       final boolean newSuperPeer) {
-    host = newHost;
-    port = newPort;
+    socket = s;
     superPeer = newSuperPeer;
-    status = DistConstants.status.DISCONNECTED;
+    status = DistConstants.status.PENDING;
+    commandingPeer = c;
+    running = true;
+
+    try {
+      in = new DataInputStream(socket.getInputStream());
+      out = new DataOutputStream(socket.getOutputStream());
+    } catch (IOException e) {
+      commandingPeer.log.write("Could not create I/O on the socket.");
+    }
   }
 
   /**
-   * Default constructor.
-   * @param newHost Host name of the node.
-   * @param newPort Port number of the node.
-   * @param newSuperPeer true, if this peer is the super-peer of this cluster
-   * @throws UnknownHostException host is unknown.
-   */
-  public ClusterPeer(final String newHost, final int newPort,
-      final boolean newSuperPeer) throws UnknownHostException {
-    this(InetAddress.getByName(newHost), newPort, newSuperPeer);
-  }
-
-  /**
-   * Sets whether this is a super-peer or not.
+   * Sets, if this is a super-peer or not.
    *
    * @param v is this a super-peer?
    */
@@ -110,15 +110,128 @@ public class ClusterPeer {
    * @return A unique identifier.
    */
   public String getIdentifier() {
-    return host.getHostAddress() + ":" + port;
+    return socket.getInetAddress().getHostAddress() + ":" + socket.getLocalPort();
   }
 
   /**
-   * Return the host name as byte array.
+   * Returns the host name to be used for connection attempts to
+   * this peer as byte array.
    *
    * @return host name
    */
-  public byte[] getHostAsByte() {
-    return host.getAddress();
+  public byte[] getConnectionHostAsByte() {
+    return connectionHost.getAddress();
+  }
+
+  /**
+   * Returns the port number to be used for connection attempts to
+   * this peer.
+   * @return port number.
+   */
+  public int getConnectionPort() {
+    return connectionPort;
+  }
+
+  /**
+   * Handle incoming connects from other normal peers
+   * and establishes the connection.
+   */
+  protected void handleIncomingConnect() {
+    try {
+      byte packetIn = in.readByte();
+      if(packetIn == DistConstants.P_CONNECT_NORMAL) {
+        status = DistConstants.status.CONNECTED;
+
+        out.write(DistConstants.P_CONNECT_NORMAL_ACK);
+      } else if (packetIn == DistConstants.P_CONNECT) {
+        out.write(DistConstants.P_SUPERPEER_ADDR);
+        byte[] bHost = commandingPeer.superPeer.connectionHost.getAddress();
+        out.writeInt(bHost.length);
+        out.write(bHost, 0, bHost.length);
+        out.writeInt(commandingPeer.superPeer.connectionPort);
+      } else {
+        running = false;
+      }
+    } catch (IOException e) {
+      commandingPeer.log.write("I/O error on the socket connection to " +
+          getIdentifier());
+    }
+  }
+
+  /**
+   * Connect to the peer on the other side of the already
+   * opened socket.
+   *
+   * @return success
+   */
+  protected boolean connect() {
+    try {
+      if (superPeer) {
+        out.write(DistConstants.P_CONNECTION_ATTEMPTS);
+        byte[] bHost = commandingPeer.host.getAddress();
+        out.writeInt(bHost.length);
+        out.write(bHost, 0, bHost.length);
+        out.writeInt(commandingPeer.port);
+
+        int nnodes = in.readInt();
+        for (int i = 0; i < nnodes; ++i) {
+          int length = in.readInt();
+          byte[] nbHost = new byte[length];
+          in.read(nbHost, 0, length);
+          InetAddress cHost = InetAddress.getByAddress(nbHost);
+          int cPort = in.readInt();
+          commandingPeer.connectToNormalPeer(cHost, cPort);
+        }
+
+        out.write(DistConstants.P_CONNECT_NODES_ACK);
+        status = DistConstants.status.CONNECTED;
+        return true;
+      }
+
+      // not a super-peer
+      out.write(DistConstants.P_CONNECT_NORMAL);
+      if(in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
+        status = DistConstants.status.CONNECTED;
+        return true;
+      }
+      return false;
+    } catch(IOException e) {
+      commandingPeer.log.write("I/O error");
+      return false;
+    }
+  }
+
+  /**
+   * Closes all open connections of this peer.
+   */
+  public void close() {
+    try {
+      status = DistConstants.status.DISCONNECTED;
+
+      if (in != null)
+        in.close();
+      if (out != null)
+        out.close();
+      if (socket != null && socket.isBound())
+        socket.close();
+    } catch(IOException e) {
+      commandingPeer.log.write("Could not close the connection in a clean way.");
+    }
+  }
+
+  @Override
+  public void run() {
+    while (running) {
+      if (doHandleConnect) {
+        doHandleConnect = false;
+        handleIncomingConnect();
+      }
+      if (doConnect) {
+        doConnect = false;
+        connect();
+      }
+    }
+
+    close();
   }
 }

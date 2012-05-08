@@ -44,9 +44,8 @@ public class SuperPeer extends NetworkPeer {
   }
 
   @Override
-  public boolean connectTo(final InetAddress cHost, final int cPort) {
+  public void connectTo(final InetAddress cHost, final int cPort) {
     // TODO everything
-    return true;
   }
 
   @Override
@@ -60,77 +59,12 @@ public class SuperPeer extends NetworkPeer {
           continue;
         }
 
-        in = new DataInputStream(socketIn.getInputStream());
-        DataOutputStream cOut = new DataOutputStream(socketIn.getOutputStream());
-
-        byte packetIn = in.readByte();
-        if(packetIn == DistConstants.P_CONNECT) {
-          InetAddress newHost = socketIn.getInetAddress();
-          int newPort = socketIn.getPort() - 1;
-          ClusterPeer cn = new ClusterPeer(newHost, newPort);
-
-          addNodeToNetwork(cn);
-          cOut.write(DistConstants.P_CONNECT_ACK);
-
-          if(in.readByte() == DistConstants.P_SUPERPEER_NEAREST) {
-            cOut.write(DistConstants.P_SUPERPEER_ME);
-
-            // send all nodes to the new node
-            cOut.write(DistConstants.P_CONNECT_NODES);
-
-            // count the number of nodes to send
-            int numberPeers = 0;
-            for(ClusterPeer n : nodes.values()) {
-              if(n.getStatus() == DistConstants.status.CONNECTED) {
-                ++numberPeers;
-              }
-            }
-            cOut.writeInt(numberPeers);
-
-            for(ClusterPeer n : nodes.values()) {
-              if(n.getStatus() == DistConstants.status.CONNECTED) {
-                byte[] bHost = n.getHostAsByte();
-                cOut.writeInt(bHost.length);
-                cOut.write(bHost, 0, bHost.length);
-                cOut.writeInt(n.port);
-              }
-            }
-
-            if(in.readByte() == DistConstants.P_CONNECT_NODES_ACK) {
-              cn.changeStatus(DistConstants.status.CONNECTED);
-              propagateNewPeer(cn);
-            }
-          }
-
-        } else if(packetIn == DistConstants.P_CONNECT_SUPER) {
-          String newHost = socketIn.getRemoteSocketAddress().toString();
-          int newPort = socketIn.getPort();
-          cOut.write(DistConstants.P_CONNECT_ACK);
-
-          if(packetIn == DistConstants.P_SUPERPEER_ADDR) {
-            cOut.write(DistConstants.P_SUPERPEER_ME);
-          }
-
-          ClusterPeer cn = new ClusterPeer(newHost, newPort);
-          addSuperPeerToNetwork(cn);
-
-          // send all super-peers to the new super-peer
-          cOut.write(DistConstants.P_CONNECT_NODES);
-          cOut.writeInt(superPeers.size());
-          for(ClusterPeer n : superPeers.values()) {
-            byte[] bHost = n.getHostAsByte();
-            cOut.writeInt(bHost.length);
-            cOut.write(bHost, 0, bHost.length);
-            cOut.writeInt(n.port);
-          }
-
-          if(in.readByte() == DistConstants.P_CONNECT_ACK) {
-            cn.changeStatus(DistConstants.status.CONNECTED);
-            propagateNewPeer(cn);
-          }
-        }
-      } catch(IOException e) {
-        e.printStackTrace();
+        SuperClusterPeer cn = new SuperClusterPeer(this, socketIn);
+        Thread t = new Thread(cn);
+        t.start();
+        cn.doHandleConnect = true;
+      } catch (IOException e) {
+        log.write("I/O socket error.");
       }
     }
   }
