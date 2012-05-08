@@ -136,7 +136,7 @@ public class ClusterPeer implements Runnable {
    * Handle incoming connects from other normal peers
    * and establishes the connection.
    */
-  protected void handleIncomingConnect() {
+  protected void handleConnectFromNormalpeer() {
     try {
       byte packetIn = in.readByte();
       if(packetIn == DistConstants.P_CONNECT_NORMAL) {
@@ -144,6 +144,8 @@ public class ClusterPeer implements Runnable {
 
         out.write(DistConstants.P_CONNECT_NORMAL_ACK);
       } else if (packetIn == DistConstants.P_CONNECT) {
+        // this is a normal peer, but he has to connect to the super-peer,
+        // so the address of the super-peer is sent.
         out.write(DistConstants.P_SUPERPEER_ADDR);
         byte[] bHost = commandingPeer.superPeer.connectionHost.getAddress();
         out.writeInt(bHost.length);
@@ -159,6 +161,26 @@ public class ClusterPeer implements Runnable {
   }
 
   /**
+   * Handle the incoming connection attempt from a super-peer.
+   * As this is a normal peer, the new super-peer has to talk to an
+   * already existing super-peer, so the super-peer of this peer is sent.
+   */
+  protected void handleConnectFromSuperpeer() {
+    try {
+      // this is a normal peer, but he has to connect to a super-peer,
+      // so the address of the super-peer of this cluster is sent.
+      out.write(DistConstants.P_SUPERPEER_ADDR);
+      byte[] bHost = commandingPeer.superPeer.connectionHost.getAddress();
+      out.writeInt(bHost.length);
+      out.write(bHost, 0, bHost.length);
+      out.writeInt(commandingPeer.superPeer.connectionPort);
+    } catch (IOException e) {
+      commandingPeer.log.write("I/O error on the socket connection to " +
+          getIdentifier());
+    }
+  }
+
+  /**
    * Connect to the peer on the other side of the already
    * opened socket.
    *
@@ -167,7 +189,6 @@ public class ClusterPeer implements Runnable {
   protected boolean connect() {
     try {
       if (superPeer) {
-        out.write(DistConstants.P_CONNECTION_ATTEMPTS);
         byte[] bHost = commandingPeer.host.getAddress();
         out.writeInt(bHost.length);
         out.write(bHost, 0, bHost.length);
@@ -180,7 +201,7 @@ public class ClusterPeer implements Runnable {
           in.read(nbHost, 0, length);
           InetAddress cHost = InetAddress.getByAddress(nbHost);
           int cPort = in.readInt();
-          commandingPeer.connectToNormalPeer(cHost, cPort);
+          commandingPeer.connectToPeer(cHost, cPort);
         }
 
         out.write(DistConstants.P_CONNECT_NODES_ACK);
@@ -216,6 +237,24 @@ public class ClusterPeer implements Runnable {
         socket.close();
     } catch(IOException e) {
       commandingPeer.log.write("Could not close the connection in a clean way.");
+    }
+  }
+
+  /**
+   * Handle incoming connects from other peers
+   * and establishes the connection.
+   */
+  protected void handleIncomingConnect() {
+    try {
+      byte packetIn = in.readByte();
+      if(packetIn == DistConstants.P_CONNECT) {
+        handleConnectFromNormalpeer();
+      } else if (packetIn == DistConstants.P_CONNECT_SUPER) {
+        handleConnectFromSuperpeer();
+      }
+    } catch (IOException e) {
+      commandingPeer.log.write("I/O error on the socket connection to " +
+          getIdentifier());
     }
   }
 

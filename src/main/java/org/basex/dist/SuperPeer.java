@@ -15,7 +15,7 @@ import org.basex.core.*;
  */
 public class SuperPeer extends NetworkPeer {
   /** All super-peers in the network. */
-  private Map<String, ClusterPeer> superPeers;
+  public Map<String, ClusterPeer> superPeers;
 
   /**
    * Default constructor.
@@ -43,9 +43,67 @@ public class SuperPeer extends NetworkPeer {
     superPeers = new LinkedHashMap<String, ClusterPeer>();
   }
 
+  /**
+   * Join a BaseX network.. Connect to any one of the super-peers.
+   *
+   * @param cHost the name of the peer to connect to.
+   * @param cPort the port number of the peer to connect to.
+   */
   @Override
-  public void connectTo(final InetAddress cHost, final int cPort) {
-    // TODO everything
+  protected void connectTo(final InetAddress cHost, final int cPort) {
+    // open socket (if needed) for outgoing packets
+    if(socketOut == null || cHost != socketOut.getInetAddress()
+        || cPort != socketOut.getPort()) {
+      try {
+        //TODO synchronized!!
+        socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
+        out = new DataOutputStream(socketOut.getOutputStream());
+        DataInputStream inFromRemote = new DataInputStream(socketOut.getInputStream());
+
+        out.write(DistConstants.P_CONNECT_SUPER);
+
+        byte packetIn = inFromRemote.readByte();
+        if(packetIn == DistConstants.P_CONNECT_ACK) {
+          SuperClusterPeer spc = new SuperClusterPeer(this, socketOut, true);
+          new Thread(spc).start();
+          spc.doConnect = true;
+        } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
+            int length = inFromRemote.readInt();
+            byte[] nHost = new byte[length];
+            inFromRemote.read(nHost, 0, length);
+            connectTo(InetAddress.getByAddress(nHost), inFromRemote.readInt());
+          }
+      } catch(BindException e) {
+        log.write("Could not bind to this address.");
+        log.write(e.getMessage());
+      } catch(IOException e) {
+        log.write("I/O error while trying to connect to the node cluster.");
+      }
+    }
+  }
+
+  /**
+   * Connects this super-peer with the given super-peer.
+   *
+   * @param cHost The host name to connect to
+   * @param cPort The port number to connect to.
+   * @return success.
+   */
+  @Override
+  public boolean connectToPeer(final InetAddress cHost, final int cPort) {
+    try {
+      Socket s = new Socket(cHost, cPort, host,
+          port + nodes.values().size() + 2);
+      ClusterPeer newPeer = new ClusterPeer(this, s);
+
+      addSuperPeerToNetwork(newPeer);
+      new Thread(newPeer).start();
+      newPeer.doConnect = true;
+      return true;
+    } catch (IOException e) {
+      log.write("Could not connect to peer " + cHost.getHostAddress());
+      return false;
+    }
   }
 
   @Override

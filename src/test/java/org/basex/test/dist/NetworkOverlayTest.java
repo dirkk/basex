@@ -166,7 +166,7 @@ public final class NetworkOverlayTest {
         String output = new ShowNetwork().execute(ctx);
         if (output.contains("State: DISCONNECTED") || output.contains("State: PENDING")
             ) {
-          throw new BaseXException("A peer did not susccessfully connect",
+          throw new BaseXException("A peer did not successfully connect",
               new Exception());
         }
         close();

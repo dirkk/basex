@@ -144,7 +144,7 @@ public class NetworkPeer implements Runnable {
    *
    * @param cn The node to add.
    */
-  protected void addNodeToNetwork(final ClusterPeer cn) {
+  protected void addPeerToNetwork(final ClusterPeer cn) {
     cn.changeStatus(DistConstants.status.PENDING);
     nodes.put(cn.getIdentifier(), cn);
   }
@@ -156,12 +156,12 @@ public class NetworkPeer implements Runnable {
    * @param cPort The port number to connect to.
    * @return success.
    */
-  public boolean connectToNormalPeer(final InetAddress cHost, final int cPort) {
+  public boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       Socket s = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
       ClusterPeer newPeer = new ClusterPeer(this, s);
 
-      addNodeToNetwork(newPeer);
+      addPeerToNetwork(newPeer);
       new Thread(newPeer).start();
       newPeer.doConnect = true;
       return true;
