@@ -44,6 +44,17 @@ public class SuperPeer extends NetworkPeer {
   }
 
   /**
+   * Adds a new super-peer to the network cluster. This is just used for the internal
+   * table of this peer and has no effect on the recognition of this node in the
+   * overall network.
+   * @param cp The peer to add
+   */
+  protected void addSuperPeerToNetwork(final ClusterPeer cp) {
+    cp.changeStatus(DistConstants.status.PENDING);
+    superPeers.put(cp.getIdentifier(), cp);
+  }
+
+  /**
    * Join a BaseX network.. Connect to any one of the super-peers.
    *
    * @param cHost the name of the peer to connect to.
@@ -51,34 +62,33 @@ public class SuperPeer extends NetworkPeer {
    */
   @Override
   protected void connectTo(final InetAddress cHost, final int cPort) {
-    // open socket (if needed) for outgoing packets
-    if(socketOut == null || cHost != socketOut.getInetAddress()
-        || cPort != socketOut.getPort()) {
-      try {
-        //TODO synchronized!!
-        socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
-        out = new DataOutputStream(socketOut.getOutputStream());
-        DataInputStream inFromRemote = new DataInputStream(socketOut.getInputStream());
+    try {
+      Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
+      socketOut.setReuseAddress(true);
+      out = new DataOutputStream(socketOut.getOutputStream());
+      DataInputStream inLocal = new DataInputStream(socketOut.getInputStream());
 
-        out.write(DistConstants.P_CONNECT_SUPER);
+      out.write(DistConstants.P_CONNECT_SUPER);
 
-        byte packetIn = inFromRemote.readByte();
-        if(packetIn == DistConstants.P_CONNECT_ACK) {
-          SuperClusterPeer spc = new SuperClusterPeer(this, socketOut, true);
-          new Thread(spc).start();
-          spc.doConnect = true;
-        } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
-            int length = inFromRemote.readInt();
-            byte[] nHost = new byte[length];
-            inFromRemote.read(nHost, 0, length);
-            connectTo(InetAddress.getByAddress(nHost), inFromRemote.readInt());
-          }
-      } catch(BindException e) {
-        log.write("Could not bind to this address.");
-        log.write(e.getMessage());
-      } catch(IOException e) {
-        log.write("I/O error while trying to connect to the node cluster.");
-      }
+      byte packetIn = inLocal.readByte();
+      if(packetIn == DistConstants.P_CONNECT_ACK) {
+        SuperClusterPeer spc = new SuperClusterPeer(this, socketOut, true);
+        new Thread(spc).start();
+        spc.doConnect = true;
+        spc.lock.lock();
+        spc.action.signalAll();
+        spc.lock.unlock();
+      } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
+          int length = inLocal.readInt();
+          byte[] nHost = new byte[length];
+          inLocal.read(nHost, 0, length);
+          connectTo(InetAddress.getByAddress(nHost), inLocal.readInt());
+        }
+    } catch(BindException e) {
+      log.write("Could not bind to this address.");
+      log.write(e.getMessage());
+    } catch(IOException e) {
+      log.write("I/O error while trying to connect to the node cluster.");
     }
   }
 
@@ -94,11 +104,15 @@ public class SuperPeer extends NetworkPeer {
     try {
       Socket s = new Socket(cHost, cPort, host,
           port + nodes.values().size() + 2);
+      s.setReuseAddress(true);
       ClusterPeer newPeer = new ClusterPeer(this, s);
 
       addSuperPeerToNetwork(newPeer);
       new Thread(newPeer).start();
       newPeer.doConnect = true;
+      newPeer.lock.lock();
+      newPeer.action.signalAll();
+      newPeer.lock.unlock();
       return true;
     } catch (IOException e) {
       log.write("Could not connect to peer " + cHost.getHostAddress());
@@ -108,36 +122,30 @@ public class SuperPeer extends NetworkPeer {
 
   @Override
   public void run() {
+    System.err.println("Thread SuperPeer runs.");
     while(true) {
       try {
         /* Waiting for another node to connect */
         try {
           socketIn = serverSocket.accept();
+          socketIn.setReuseAddress(true);
         } catch(SocketTimeoutException e) {
           continue;
         }
 
         SuperClusterPeer cn = new SuperClusterPeer(this, socketIn);
         Thread t = new Thread(cn);
-        t.start();
         cn.doHandleConnect = true;
+        t.start();
+        cn.lock.lock();
+        cn.action.signalAll();
+        cn.lock.unlock();
       } catch (IOException e) {
         log.write("I/O socket error.");
       }
     }
   }
 
-  /**
-   * Adds a new super-peer to the network cluster. This is just used for the internal
-   * table of this peer and has no effect on the recognition of this peer in the overall
-   * network.
-   *
-   * @param cn The super-peer to add.
-   */
-  protected void addSuperPeerToNetwork(final ClusterPeer cn) {
-    cn.changeStatus(DistConstants.status.PENDING);
-    superPeers.put(cn.getIdentifier(), cn);
-  }
 
   /**
    * Gives information about this peer and connected peers.

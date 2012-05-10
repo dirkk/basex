@@ -21,8 +21,6 @@ public class NetworkPeer implements Runnable {
   protected Socket socketIn;
   /** data input stream. */
   protected DataInputStream in;
-  /** socket for outgoing packets. */
-  protected Socket socketOut;
   /** data output stream. */
   protected DataOutputStream out;
   /** already running? */
@@ -67,7 +65,7 @@ public class NetworkPeer implements Runnable {
 
     try {
       serverSocket = new ServerSocket();
-      serverSocket.setReuseAddress(false);
+      serverSocket.setReuseAddress(true);
       serverSocket.setSoTimeout(5000);
       serverSocket.bind(new InetSocketAddress(host, port));
       running = true;
@@ -91,7 +89,6 @@ public class NetworkPeer implements Runnable {
     running = old.running;
     socketIn = old.socketIn;
     in = old.in;
-    socketOut = old.socketOut;
     out = old.out;
     nodes = old.nodes;
     log = old.log;
@@ -113,14 +110,15 @@ public class NetworkPeer implements Runnable {
 
   @Override
   public void run() {
+    System.err.println("Thread NetworkPeer runs.");
     connectTo(connectHost, connectPort);
-    running = false;
 
-    while(running) {
+    while (running) {
       try {
         /* Waiting for another node to connect */
         try {
           socketIn = serverSocket.accept();
+          socketIn.setReuseAddress(true);
         } catch(SocketTimeoutException e) {
           continue;
         }
@@ -130,8 +128,12 @@ public class NetworkPeer implements Runnable {
         t.start();
 
         cn.doHandleConnect = true;
+        cn.lock.lock();
+        cn.action.signalAll();
+        cn.lock.unlock();
       } catch(IOException e) {
-        e.printStackTrace();
+        log.write("I/O Exception");
+        running = false;
       }
     }
 
@@ -140,13 +142,12 @@ public class NetworkPeer implements Runnable {
 
   /**
    * Adds a new node to the network cluster. This is just used for the internal table of
-   * this node and has no effect on the recognotion of this node in the overall network.
-   *
-   * @param cn The node to add.
+   * this node and has no effect on the recognition of this node in the overall network.
+   * @param cp The peer to add
    */
-  protected void addPeerToNetwork(final ClusterPeer cn) {
-    cn.changeStatus(DistConstants.status.PENDING);
-    nodes.put(cn.getIdentifier(), cn);
+  protected void addPeerToNetwork(final ClusterPeer cp) {
+    cp.changeStatus(DistConstants.status.PENDING);
+    nodes.put(cp.getIdentifier(), cp);
   }
 
   /**
@@ -159,11 +160,15 @@ public class NetworkPeer implements Runnable {
   public boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       Socket s = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
+      s.setReuseAddress(true);
       ClusterPeer newPeer = new ClusterPeer(this, s);
 
       addPeerToNetwork(newPeer);
       new Thread(newPeer).start();
       newPeer.doConnect = true;
+      newPeer.lock.lock();
+      newPeer.action.signalAll();
+      newPeer.lock.unlock();
       return true;
     } catch (IOException e) {
       log.write("Could not connect to peer " + cHost.getHostAddress());
@@ -178,34 +183,34 @@ public class NetworkPeer implements Runnable {
    * @param cPort the port number of the node to connect to.
    */
   protected void connectTo(final InetAddress cHost, final int cPort) {
-    // open socket (if needed) for outgoing packets
-    if(socketOut == null || cHost != socketOut.getInetAddress()
-        || cPort != socketOut.getPort()) {
-      try {
-        //TODO synchronized!!
-        socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
-        out = new DataOutputStream(socketOut.getOutputStream());
-        DataInputStream inFromRemote = new DataInputStream(socketOut.getInputStream());
+    try {
+      //TODO synchronized!!
+      Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 1);
+      socketOut.setReuseAddress(true);
+      out = new DataOutputStream(socketOut.getOutputStream());
+      DataInputStream inNow = new DataInputStream(socketOut.getInputStream());
 
-        out.write(DistConstants.P_CONNECT);
+      out.write(DistConstants.P_CONNECT);
 
-        byte packetIn = inFromRemote.readByte();
-        if(packetIn == DistConstants.P_CONNECT_ACK) {
-          superPeer = new ClusterPeer(this, socketOut, true);
-          new Thread(superPeer).start();
-          superPeer.doConnect = true;
-        } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
-            int length = inFromRemote.readInt();
-            byte[] nHost = new byte[length];
-            inFromRemote.read(nHost, 0, length);
-            connectTo(InetAddress.getByAddress(nHost), inFromRemote.readInt());
-          }
-      } catch(BindException e) {
-        log.write("Could not bind to this address.");
-        log.write(e.getMessage());
-      } catch(IOException e) {
-        log.write("I/O error while trying to connect to the node cluster.");
-      }
+      byte packetIn = inNow.readByte();
+      if(packetIn == DistConstants.P_CONNECT_ACK) {
+        superPeer = new ClusterPeer(this, socketOut, true);
+        superPeer.doConnect = true;
+        new Thread(superPeer).start();
+        superPeer.lock.lock();
+        superPeer.action.signalAll();
+        superPeer.lock.unlock();
+      } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
+          int length = inNow.readInt();
+          byte[] nHost = new byte[length];
+          inNow.read(nHost, 0, length);
+          connectTo(InetAddress.getByAddress(nHost), inNow.readInt());
+        }
+    } catch(BindException e) {
+      log.write("Could not bind to this address.");
+      log.write(e.getMessage());
+    } catch(IOException e) {
+      log.write("I/O error while trying to connect to the node cluster.");
     }
   }
 
@@ -222,9 +227,6 @@ public class NetworkPeer implements Runnable {
       }
       if (socketIn != null && socketIn.isBound()) {
         socketIn.close();
-      }
-      if (socketOut != null && socketOut.isBound()) {
-        socketOut.close();
       }
     } catch (IOException e) {
       log.write("Could not free a socket.");
@@ -248,7 +250,8 @@ public class NetworkPeer implements Runnable {
   public String info() {
     String o = new String("Normal peer\r\n");
     if (superPeer != null) {
-      o += "Super-Peer: " + superPeer.getIdentifier() + "\r\n";
+      o += "Super-Peer: " + superPeer.socket.getInetAddress().toString() + ":" +
+          superPeer.socket.getPort() + "\r\n";
     } else {
       o += "Super-Peer: No super-peer registered.\r\n";
     }

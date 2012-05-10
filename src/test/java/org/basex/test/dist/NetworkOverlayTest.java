@@ -21,9 +21,9 @@ public final class NetworkOverlayTest {
   /** Number of super-peers. */
   private static final int NUM_SUPERPEERS = 1;
   /** Minimum number of peers per super-peer. */
-  private static final int MIN_PEERS = 3;
+  private static final int MIN_PEERS = 4;
   /** Maximum number of peers per super-peer. */
-  private static final int MAX_PEERS = 8;
+  private static final int MAX_PEERS = 7;
   /** starting port. */
   private static int localPort = 22000;
 
@@ -146,7 +146,7 @@ public final class NetworkOverlayTest {
      * @throws IOException I/O exception while establishing the session
      */
     public Peer(final String host, final int port, final String cHost, final int cPort,
-        final boolean superpeer) throws IOException {
+        @SuppressWarnings("unused") final boolean superpeer) throws IOException {
       synchronized(this) {
         name = Util.name(NetworkOverlayTest.class) + String.valueOf(number);
         ++number;
@@ -159,10 +159,9 @@ public final class NetworkOverlayTest {
 
     @Override
     public void run() {
+      System.err.println("Thread NetworkOverlayTest.Peer runs.");
       try {
-        synchronized(this) {
-          wait(1000);
-        }
+        sleep(1000);
         String output = new ShowNetwork().execute(ctx);
         if (output.contains("State: DISCONNECTED") || output.contains("State: PENDING")
             ) {

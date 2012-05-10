@@ -21,6 +21,7 @@ public final class ShowNetwork extends Command {
 
   @Override
   protected boolean run() throws IOException {
+    System.err.println(context.nNode.info());
     out.println(context.nNode.info());
     return true;
   }

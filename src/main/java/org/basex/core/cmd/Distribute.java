@@ -82,11 +82,6 @@ public final class Distribute extends Command {
       }
       Thread t = new Thread(context.nNode);
       t.start();
-      try {
-        t.join();
-      } catch(InterruptedException e) {
-        e.printStackTrace();
-      }
       return true;
     }
 

@@ -2,6 +2,7 @@ package org.basex.dist;
 
 import java.io.*;
 import java.net.*;
+import java.util.concurrent.locks.*;
 
 /**
  * Another node within the same cluster as this node.
@@ -25,6 +26,10 @@ public class ClusterPeer implements Runnable {
   protected DataOutputStream out;
   /** is this peer still active? */
   protected boolean running;
+  /** lock. */
+  public final Lock lock = new ReentrantLock();
+  /** to notify of new events. */
+  public Condition action = lock.newCondition();
   /** connect to a cluster. */
   public boolean doConnect;
   /** handle an incoming connection. */
@@ -110,7 +115,7 @@ public class ClusterPeer implements Runnable {
    * @return A unique identifier.
    */
   public String getIdentifier() {
-    return socket.getInetAddress().getHostAddress() + ":" + socket.getLocalPort();
+    return socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
   }
 
   /**
@@ -206,12 +211,13 @@ public class ClusterPeer implements Runnable {
 
         out.write(DistConstants.P_CONNECT_NODES_ACK);
         status = DistConstants.status.CONNECTED;
+        commandingPeer.status = DistConstants.status.CONNECTED;
         return true;
       }
 
       // not a super-peer
       out.write(DistConstants.P_CONNECT_NORMAL);
-      if(in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
+      if (in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
         status = DistConstants.status.CONNECTED;
         return true;
       }
@@ -260,14 +266,25 @@ public class ClusterPeer implements Runnable {
 
   @Override
   public void run() {
+    System.err.println("Thread (Super)ClusterPeer runs.");
     while (running) {
-      if (doHandleConnect) {
-        doHandleConnect = false;
-        handleIncomingConnect();
-      }
-      if (doConnect) {
-        doConnect = false;
-        connect();
+      lock.lock();
+      try {
+        if (!doHandleConnect && !doConnect)
+          action.await();
+
+        if (doHandleConnect) {
+          doHandleConnect = false;
+          handleIncomingConnect();
+        }
+        if (doConnect) {
+          doConnect = false;
+          connect();
+        }
+      } catch (InterruptedException e) {
+        continue;
+      } finally {
+        lock.unlock();
       }
     }
 

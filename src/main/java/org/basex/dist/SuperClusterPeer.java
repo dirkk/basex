@@ -46,18 +46,13 @@ public class SuperClusterPeer extends ClusterPeer {
       commandingPeer.addPeerToNetwork(this);
       out.write(DistConstants.P_CONNECT_ACK);
 
-      // Get the host + port of the remote peer for new connection
-      // attempts.
-      if (in.readByte() != DistConstants.P_CONNECTION_ATTEMPTS)
-        return;
-
       int length = in.readInt();
       byte[] nbHost = new byte[length];
       in.read(nbHost, 0, length);
       connectionHost = InetAddress.getByAddress(nbHost);
       connectionPort = in.readInt();
 
-      // count the number of nodes to send
+      // count the number of super-peers to send
       int numberPeers = 0;
       for(ClusterPeer n : commandingPeer.nodes.values()) {
         if(n.getStatus() == DistConstants.status.CONNECTED) {
