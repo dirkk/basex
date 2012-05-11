@@ -19,11 +19,11 @@ import org.junit.*;
  */
 public final class NetworkOverlayTest {
   /** Number of super-peers. */
-  private static final int NUM_SUPERPEERS = 1;
+  private static final int NUM_SUPERPEERS = 5;
   /** Minimum number of peers per super-peer. */
-  private static final int MIN_PEERS = 4;
+  private static final int MIN_PEERS = 1;
   /** Maximum number of peers per super-peer. */
-  private static final int MAX_PEERS = 7;
+  private static final int MAX_PEERS = 1;
   /** starting port. */
   private static int localPort = 22000;
 
@@ -39,8 +39,8 @@ public final class NetworkOverlayTest {
     Peer[] t = new Peer[(MAX_PEERS + 1) * NUM_SUPERPEERS];
     int iT = 0;
 
-    for(int i = 0; i < NUM_SUPERPEERS; ++i) {
-      if(i == 0) {
+    for (int i = 0; i < NUM_SUPERPEERS; ++i) {
+      if (i == 0) {
         // start first peer
         t[iT] = new Peer("localhost", localPort);
         t[iT].start();
@@ -48,7 +48,7 @@ public final class NetworkOverlayTest {
         ++iT;
       } else {
         // create super-peer for this cluster
-        t[iT] = new Peer("localhost", localPort, "localhost", clusterPort, true);
+        t[iT] = new Peer("localhost", localPort, "localhost", 22000, true);
         t[iT].start();
         t[iT].join();
         ++iT;
@@ -62,7 +62,7 @@ public final class NetworkOverlayTest {
         max = generator.nextInt(MAX_PEERS + 1 - MIN_PEERS) + MIN_PEERS;
       }
 
-      for(int j = 0; j < max; ++j) {
+      for (int j = 0; j < max; ++j) {
         try {
           t[iT] = new Peer("localhost", localPort, "localhost", clusterPort);
         } catch (BaseXException e) {

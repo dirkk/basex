@@ -76,7 +76,8 @@ public final class Distribute extends Command {
       }
 
       try {
-        context.nNode.setConnectHost(hostOut, portOut);
+        if (hostOut != null && portOut > 1023)
+          context.nNode.setConnectHost(hostOut, portOut);
       } catch(UnknownHostException e) {
         return false;
       }

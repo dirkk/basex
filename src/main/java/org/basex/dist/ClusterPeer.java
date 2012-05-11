@@ -30,8 +30,10 @@ public class ClusterPeer implements Runnable {
   public final Lock lock = new ReentrantLock();
   /** to notify of new events. */
   public Condition action = lock.newCondition();
-  /** connect to a cluster. */
-  public boolean doConnect;
+  /** connect to a cluster. This is the first attempt, so request some information. */
+  public boolean doFirstConnect;
+  /** connect to a peer, do not request information about the network. */
+  public boolean doSimpleConnect;
   /** handle an incoming connection. */
   public boolean doHandleConnect;
   /** The host name for new connection attempts for this peer. */
@@ -71,7 +73,7 @@ public class ClusterPeer implements Runnable {
   }
 
   /**
-   * Sets, if this is a super-peer or not.
+   * Sets if this is a super-peer or not.
    *
    * @param v is this a super-peer?
    */
@@ -145,7 +147,7 @@ public class ClusterPeer implements Runnable {
     try {
       byte packetIn = in.readByte();
       if(packetIn == DistConstants.P_CONNECT_NORMAL) {
-        status = DistConstants.status.CONNECTED;
+        commandingPeer.addPeerToNetwork(this);
 
         out.write(DistConstants.P_CONNECT_NORMAL_ACK);
       } else if (packetIn == DistConstants.P_CONNECT) {
@@ -187,13 +189,21 @@ public class ClusterPeer implements Runnable {
 
   /**
    * Connect to the peer on the other side of the already
-   * opened socket.
+   * opened socket. This is the first connect, so request information
+   * about the network and other peers.
    *
    * @return success
    */
   protected boolean connect() {
     try {
+      int length = in.readInt();
+      byte[] nbHost = new byte[length];
+      in.read(nbHost, 0, length);
+      connectionHost = InetAddress.getByAddress(nbHost);
+      connectionPort = in.readInt();
+
       if (superPeer) {
+        out.write(DistConstants.P_CONNECT_SEND_SUPERPEERS);
         byte[] bHost = commandingPeer.host.getAddress();
         out.writeInt(bHost.length);
         out.write(bHost, 0, bHost.length);
@@ -201,21 +211,48 @@ public class ClusterPeer implements Runnable {
 
         int nnodes = in.readInt();
         for (int i = 0; i < nnodes; ++i) {
-          int length = in.readInt();
-          byte[] nbHost = new byte[length];
-          in.read(nbHost, 0, length);
-          InetAddress cHost = InetAddress.getByAddress(nbHost);
+          int length2 = in.readInt();
+          byte[] nbHost2 = new byte[length2];
+          in.read(nbHost2, 0, length2);
+          InetAddress cHost = InetAddress.getByAddress(nbHost2);
           int cPort = in.readInt();
           commandingPeer.connectToPeer(cHost, cPort);
         }
 
         out.write(DistConstants.P_CONNECT_NODES_ACK);
-        status = DistConstants.status.CONNECTED;
-        commandingPeer.status = DistConstants.status.CONNECTED;
-        return true;
+        commandingPeer.addPeerToNetwork(this);
+      } else {
+        // not a super-peer
+        out.write(DistConstants.P_CONNECT_NORMAL);
+        if (in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
+          status = DistConstants.status.CONNECTED;
+          return true;
+        }
+        return false;
       }
 
-      // not a super-peer
+      return true;
+    } catch(IOException e) {
+      commandingPeer.log.write("I/O error");
+      return false;
+    }
+  }
+
+  /**
+   * Connect to the peer on the other side of the already
+   * opened socket. Do the connection simple and do not request
+   * information about the network.
+   *
+   * @return success
+   */
+  protected boolean connectSimple() {
+    try {
+      int length = in.readInt();
+      byte[] nbHost = new byte[length];
+      in.read(nbHost, 0, length);
+      connectionHost = InetAddress.getByAddress(nbHost);
+      connectionPort = in.readInt();
+
       out.write(DistConstants.P_CONNECT_NORMAL);
       if (in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
         status = DistConstants.status.CONNECTED;
@@ -266,20 +303,23 @@ public class ClusterPeer implements Runnable {
 
   @Override
   public void run() {
-    System.err.println("Thread (Super)ClusterPeer runs.");
     while (running) {
       lock.lock();
       try {
-        if (!doHandleConnect && !doConnect)
+        if (!doHandleConnect && !doFirstConnect && !doSimpleConnect)
           action.await();
 
         if (doHandleConnect) {
           doHandleConnect = false;
           handleIncomingConnect();
         }
-        if (doConnect) {
-          doConnect = false;
+        if (doFirstConnect) {
+          doFirstConnect = false;
           connect();
+        }
+        if (doSimpleConnect) {
+          doSimpleConnect = false;
+          connectSimple();
         }
       } catch (InterruptedException e) {
         continue;

@@ -35,8 +35,6 @@ public class NetworkPeer implements Runnable {
   protected final int port;
   /** database context. */
   protected final Context ctx;
-  /** connections status of this node. */
-  protected DistConstants.status status;
   /** Reference to the super-peer, null if super-peer itself. */
   protected ClusterPeer superPeer;
   /** Host this peer should connect to. */
@@ -58,7 +56,6 @@ public class NetworkPeer implements Runnable {
     log = new Log(ctx, false);
 
     port = nPort;
-    status = DistConstants.status.DISCONNECTED;
 
     // open socket for incoming packets
     host = nHost.isEmpty() ? null : InetAddress.getByName(nHost);
@@ -84,7 +81,6 @@ public class NetworkPeer implements Runnable {
   public NetworkPeer(final NetworkPeer old) {
     host = old.host;
     port = old.port;
-    status = old.status;
     serverSocket = old.serverSocket;
     running = old.running;
     socketIn = old.socketIn;
@@ -110,7 +106,6 @@ public class NetworkPeer implements Runnable {
 
   @Override
   public void run() {
-    System.err.println("Thread NetworkPeer runs.");
     connectTo(connectHost, connectPort);
 
     while (running) {
@@ -146,8 +141,8 @@ public class NetworkPeer implements Runnable {
    * @param cp The peer to add
    */
   protected void addPeerToNetwork(final ClusterPeer cp) {
-    cp.changeStatus(DistConstants.status.PENDING);
     nodes.put(cp.getIdentifier(), cp);
+    cp.changeStatus(DistConstants.status.CONNECTED);
   }
 
   /**
@@ -163,9 +158,8 @@ public class NetworkPeer implements Runnable {
       s.setReuseAddress(true);
       ClusterPeer newPeer = new ClusterPeer(this, s);
 
-      addPeerToNetwork(newPeer);
       new Thread(newPeer).start();
-      newPeer.doConnect = true;
+      newPeer.doSimpleConnect = true;
       newPeer.lock.lock();
       newPeer.action.signalAll();
       newPeer.lock.unlock();
@@ -177,14 +171,14 @@ public class NetworkPeer implements Runnable {
   }
 
   /**
-   * Join an already established cluster of BaseX nodes. Connect to any one of the nodes.
+   * Join an already established cluster of a BaseX network. Connect to any one of the
+   * peers.
    *
    * @param cHost the name of the node to connect to.
    * @param cPort the port number of the node to connect to.
    */
   protected void connectTo(final InetAddress cHost, final int cPort) {
     try {
-      //TODO synchronized!!
       Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 1);
       socketOut.setReuseAddress(true);
       out = new DataOutputStream(socketOut.getOutputStream());
@@ -195,7 +189,7 @@ public class NetworkPeer implements Runnable {
       byte packetIn = inNow.readByte();
       if(packetIn == DistConstants.P_CONNECT_ACK) {
         superPeer = new ClusterPeer(this, socketOut, true);
-        superPeer.doConnect = true;
+        superPeer.doFirstConnect = true;
         new Thread(superPeer).start();
         superPeer.lock.lock();
         superPeer.action.signalAll();
@@ -255,8 +249,6 @@ public class NetworkPeer implements Runnable {
     } else {
       o += "Super-Peer: No super-peer registered.\r\n";
     }
-
-    o += "State: " + status.toString() + "\r\n";
 
     for(ClusterPeer c : nodes.values()) {
       o += "|--- " + c.getIdentifier() + "\r\n";
