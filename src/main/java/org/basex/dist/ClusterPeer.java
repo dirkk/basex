@@ -145,11 +145,17 @@ public class ClusterPeer implements Runnable {
    */
   protected void handleConnectFromNormalpeer() {
     try {
-      byte packetIn = in.readByte();
-      if(packetIn == DistConstants.P_CONNECT_NORMAL) {
-        commandingPeer.addPeerToNetwork(this);
+      out.write(DistConstants.P_CONNECT_ACK);
 
-        out.write(DistConstants.P_CONNECT_NORMAL_ACK);
+      byte packetIn = in.readByte();
+      if (packetIn == DistConstants.P_CONNECT_NORMAL) {
+        byte[] sendHost = commandingPeer.serverSocket.getInetAddress().getAddress();
+        out.writeInt(sendHost.length);
+        out.write(sendHost);
+        out.writeInt(commandingPeer.serverSocket.getLocalPort());
+
+        out.write(DistConstants.P_CONNECT_ACK);
+        commandingPeer.addPeerToNetwork(this);
       } else if (packetIn == DistConstants.P_CONNECT) {
         // this is a normal peer, but he has to connect to the super-peer,
         // so the address of the super-peer is sent.
@@ -203,7 +209,7 @@ public class ClusterPeer implements Runnable {
       connectionPort = in.readInt();
 
       if (superPeer) {
-        out.write(DistConstants.P_CONNECT_SEND_SUPERPEERS);
+        out.write(DistConstants.P_CONNECT_SEND_PEERS);
         byte[] bHost = commandingPeer.host.getAddress();
         out.writeInt(bHost.length);
         out.write(bHost, 0, bHost.length);
@@ -247,17 +253,19 @@ public class ClusterPeer implements Runnable {
    */
   protected boolean connectSimple() {
     try {
+      out.write(DistConstants.P_CONNECT_NORMAL);
+
       int length = in.readInt();
       byte[] nbHost = new byte[length];
       in.read(nbHost, 0, length);
       connectionHost = InetAddress.getByAddress(nbHost);
       connectionPort = in.readInt();
 
-      out.write(DistConstants.P_CONNECT_NORMAL);
-      if (in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
-        status = DistConstants.status.CONNECTED;
+      if (in.readByte() == DistConstants.P_CONNECT_ACK) {
+        commandingPeer.addPeerToNetwork(this);
         return true;
       }
+
       return false;
     } catch(IOException e) {
       commandingPeer.log.write("I/O error");

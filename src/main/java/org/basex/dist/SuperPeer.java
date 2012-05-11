@@ -110,7 +110,7 @@ public class SuperPeer extends NetworkPeer {
 
       out.write(DistConstants.P_CONNECT_SUPER);
 
-      if(inNow.readByte() == DistConstants.P_CONNECT_ACK) {
+      if (inNow.readByte() == DistConstants.P_CONNECT_ACK) {
         ClusterPeer pc = new ClusterPeer(this, s, true);
         addSuperPeerToNetwork(pc);
         pc.doSimpleConnect = true;

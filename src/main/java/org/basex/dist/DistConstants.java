@@ -26,7 +26,7 @@ public final class DistConstants {
   public static final byte P_CONNECTION_ATTEMPTS = 0x08;
   /** Packet message: From super-peer to super-peer and requests to send all connected
    * super-peers. */
-  public static final byte P_CONNECT_SEND_SUPERPEERS = 0x09;
+  public static final byte P_CONNECT_SEND_PEERS = 0x09;
 
   /** connection status of this network node within the cluster */
   public enum status {

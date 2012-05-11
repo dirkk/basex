@@ -157,13 +157,20 @@ public class NetworkPeer implements Runnable {
       Socket s = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
       s.setReuseAddress(true);
       ClusterPeer newPeer = new ClusterPeer(this, s);
+      out = new DataOutputStream(s.getOutputStream());
+      DataInputStream inNow = new DataInputStream(s.getInputStream());
 
-      new Thread(newPeer).start();
-      newPeer.doSimpleConnect = true;
-      newPeer.lock.lock();
-      newPeer.action.signalAll();
-      newPeer.lock.unlock();
-      return true;
+      out.write(DistConstants.P_CONNECT);
+      if (inNow.readByte() == DistConstants.P_CONNECT_ACK) {
+        newPeer.doSimpleConnect = true;
+        new Thread(newPeer).start();
+        newPeer.lock.lock();
+        newPeer.action.signalAll();
+        newPeer.lock.unlock();
+        return true;
+      }
+
+      return false;
     } catch (IOException e) {
       log.write("Could not connect to peer " + cHost.getHostAddress());
       return false;
