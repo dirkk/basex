@@ -152,7 +152,7 @@ public class NetworkPeer implements Runnable {
    * @param cPort The port number to connect to.
    * @return success.
    */
-  public boolean connectToPeer(final InetAddress cHost, final int cPort) {
+  public synchronized boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       Socket s = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
       s.setReuseAddress(true);
@@ -184,7 +184,7 @@ public class NetworkPeer implements Runnable {
    * @param cHost the name of the node to connect to.
    * @param cPort the port number of the node to connect to.
    */
-  protected void connectTo(final InetAddress cHost, final int cPort) {
+  protected synchronized void connectTo(final InetAddress cHost, final int cPort) {
     try {
       Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 1);
       socketOut.setReuseAddress(true);

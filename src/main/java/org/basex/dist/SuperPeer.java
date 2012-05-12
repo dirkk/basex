@@ -61,7 +61,7 @@ public class SuperPeer extends NetworkPeer {
    * @param cPort the port number of the peer to connect to.
    */
   @Override
-  protected void connectTo(final InetAddress cHost, final int cPort) {
+  protected synchronized void connectTo(final InetAddress cHost, final int cPort) {
     try {
       Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 1);
       socketOut.setReuseAddress(true);
@@ -100,7 +100,7 @@ public class SuperPeer extends NetworkPeer {
    * @return success.
    */
   @Override
-  public boolean connectToPeer(final InetAddress cHost, final int cPort) {
+  public synchronized boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       Socket s = new Socket(cHost, cPort, host,
           port + nodes.values().size() + superPeers.size() + 3);

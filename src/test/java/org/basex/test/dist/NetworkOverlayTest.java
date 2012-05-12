@@ -21,9 +21,9 @@ public final class NetworkOverlayTest {
   /** Number of super-peers. */
   private static final int NUM_SUPERPEERS = 1;
   /** Minimum number of peers per super-peer. */
-  private static final int MIN_PEERS = 4;
+  private static final int MIN_PEERS = 3;
   /** Maximum number of peers per super-peer. */
-  private static final int MAX_PEERS = 4;
+  private static final int MAX_PEERS = 5;
   /** starting port. */
   private static int localPort = 22000;
 
@@ -66,7 +66,7 @@ public final class NetworkOverlayTest {
       for (int j = 0; j < max; ++j) {
         try {
           t[iT] = new Peer("localhost", localPort, "localhost", clusterPort);
-          Thread.sleep(500);
+          Thread.sleep(1000);
         } catch (BaseXException e) {
           System.err.println("Exception");
           System.err.println(e.getMessage());

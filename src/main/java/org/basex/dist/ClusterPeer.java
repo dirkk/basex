@@ -143,7 +143,7 @@ public class ClusterPeer implements Runnable {
    * Handle incoming connects from other normal peers
    * and establishes the connection.
    */
-  protected void handleConnectFromNormalpeer() {
+  protected synchronized void handleConnectFromNormalpeer() {
     try {
       out.write(DistConstants.P_CONNECT_ACK);
 
@@ -178,7 +178,7 @@ public class ClusterPeer implements Runnable {
    * As this is a normal peer, the new super-peer has to talk to an
    * already existing super-peer, so the super-peer of this peer is sent.
    */
-  protected void handleConnectFromSuperpeer() {
+  protected synchronized void handleConnectFromSuperpeer() {
     try {
       // this is a normal peer, but he has to connect to a super-peer,
       // so the address of the super-peer of this cluster is sent.
@@ -200,7 +200,7 @@ public class ClusterPeer implements Runnable {
    *
    * @return success
    */
-  protected boolean connect() {
+  protected synchronized boolean connect() {
     try {
       int length = in.readInt();
       byte[] nbHost = new byte[length];
@@ -251,7 +251,7 @@ public class ClusterPeer implements Runnable {
    *
    * @return success
    */
-  protected boolean connectSimple() {
+  protected synchronized boolean connectSimple() {
     try {
       out.write(DistConstants.P_CONNECT_NORMAL);
 
@@ -295,7 +295,7 @@ public class ClusterPeer implements Runnable {
    * Handle incoming connects from other peers
    * and establishes the connection.
    */
-  protected void handleIncomingConnect() {
+  protected synchronized void handleIncomingConnect() {
     try {
       byte packetIn = in.readByte();
       if(packetIn == DistConstants.P_CONNECT) {

@@ -41,7 +41,7 @@ public class SuperClusterPeer extends ClusterPeer {
    * normal peer.
    */
   @Override
-  protected void handleConnectFromNormalpeer() {
+  protected synchronized void handleConnectFromNormalpeer() {
     try {
       out.write(DistConstants.P_CONNECT_ACK);
 
@@ -94,7 +94,7 @@ public class SuperClusterPeer extends ClusterPeer {
    * so this handles the connection establishment.
    */
   @Override
-  protected void handleConnectFromSuperpeer() {
+  protected synchronized void handleConnectFromSuperpeer() {
     try {
       out.write(DistConstants.P_CONNECT_ACK);
 
@@ -147,7 +147,7 @@ public class SuperClusterPeer extends ClusterPeer {
    * @return success
    */
   @Override
-  protected boolean connect() {
+  protected synchronized boolean connect() {
     try {
         int length = in.readInt();
         byte[] nbHost = new byte[length];
