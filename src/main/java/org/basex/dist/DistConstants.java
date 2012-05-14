@@ -30,6 +30,6 @@ public final class DistConstants {
 
   /** connection status of this network node within the cluster */
   public enum status {
-    DISCONNECTED, PENDING, CONNECTED
+    DISCONNECTED, PENDING, CONNECTED, CONNECT_FAILED
   };
 }

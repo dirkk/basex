@@ -43,6 +43,7 @@ public class SuperClusterPeer extends ClusterPeer {
   @Override
   protected synchronized void handleConnectFromNormalpeer() {
     try {
+      status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT_ACK);
 
       byte[] sendHost = commandingSuperPeer.serverSocket.getInetAddress().getAddress();
@@ -96,6 +97,7 @@ public class SuperClusterPeer extends ClusterPeer {
   @Override
   protected synchronized void handleConnectFromSuperpeer() {
     try {
+      status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT_ACK);
 
       byte[] sendHost = commandingSuperPeer.serverSocket.getInetAddress().getAddress();
@@ -149,6 +151,7 @@ public class SuperClusterPeer extends ClusterPeer {
   @Override
   protected synchronized boolean connect() {
     try {
+        status = DistConstants.status.PENDING;
         int length = in.readInt();
         byte[] nbHost = new byte[length];
         in.read(nbHost, 0, length);

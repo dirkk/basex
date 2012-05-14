@@ -83,6 +83,16 @@ public final class Distribute extends Command {
       }
       Thread t = new Thread(context.nNode);
       t.start();
+
+      context.nNode.lock.lock();
+      try {
+        context.nNode.connected.await();
+      } catch (InterruptedException e) {
+        return false;
+      } finally {
+        context.nNode.lock.unlock();
+      }
+
       return true;
     }
 

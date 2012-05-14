@@ -19,11 +19,11 @@ import org.junit.*;
  */
 public final class NetworkOverlayTest {
   /** Number of super-peers. */
-  private static final int NUM_SUPERPEERS = 1;
+  private static final int NUM_SUPERPEERS = 4;
   /** Minimum number of peers per super-peer. */
   private static final int MIN_PEERS = 3;
   /** Maximum number of peers per super-peer. */
-  private static final int MAX_PEERS = 5;
+  private static final int MAX_PEERS = 6;
   /** starting port. */
   private static int localPort = 22000;
 

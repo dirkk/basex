@@ -3,6 +3,8 @@ package org.basex.dist;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
 
 import org.basex.core.*;
 import org.basex.server.*;
@@ -41,6 +43,10 @@ public class NetworkPeer implements Runnable {
   protected InetAddress connectHost;
   /** port number this peer should connect to. */
   protected int connectPort;
+  /** lock. */
+  public Lock lock;
+  /** wait to be connected. */
+  public Condition connected;
 
   /**
    * Makes this instance of BaseX to a node in a clustered BaseX network.
@@ -54,6 +60,8 @@ public class NetworkPeer implements Runnable {
       throws UnknownHostException {
     ctx = context;
     log = new Log(ctx, false);
+    lock = new ReentrantLock();
+    connected = lock.newCondition();
 
     port = nPort;
 
@@ -123,9 +131,9 @@ public class NetworkPeer implements Runnable {
         t.start();
 
         cn.doHandleConnect = true;
-        cn.lock.lock();
+        cn.actionLock.lock();
         cn.action.signalAll();
-        cn.lock.unlock();
+        cn.actionLock.unlock();
       } catch(IOException e) {
         log.write("I/O Exception");
         running = false;
@@ -152,7 +160,7 @@ public class NetworkPeer implements Runnable {
    * @param cPort The port number to connect to.
    * @return success.
    */
-  public synchronized boolean connectToPeer(final InetAddress cHost, final int cPort) {
+  public boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       Socket s = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
       s.setReuseAddress(true);
@@ -164,9 +172,17 @@ public class NetworkPeer implements Runnable {
       if (inNow.readByte() == DistConstants.P_CONNECT_ACK) {
         newPeer.doSimpleConnect = true;
         new Thread(newPeer).start();
-        newPeer.lock.lock();
+        newPeer.actionLock.lock();
         newPeer.action.signalAll();
-        newPeer.lock.unlock();
+        newPeer.actionLock.unlock();
+
+        newPeer.connectionLock.lock();
+        try {
+          newPeer.connected.await();
+        } catch(InterruptedException e) {
+          log.write("Interrupt exception");
+        }
+        newPeer.connectionLock.unlock();
         return true;
       }
 
@@ -198,9 +214,26 @@ public class NetworkPeer implements Runnable {
         superPeer = new ClusterPeer(this, socketOut, true);
         superPeer.doFirstConnect = true;
         new Thread(superPeer).start();
-        superPeer.lock.lock();
+
+        superPeer.actionLock.lock();
         superPeer.action.signalAll();
-        superPeer.lock.unlock();
+        superPeer.actionLock.unlock();
+
+        superPeer.connectionLock.lock();
+        try {
+          if (superPeer.status != DistConstants.status.CONNECTED &&
+              superPeer.status != DistConstants.status.CONNECT_FAILED) {
+            superPeer.connected.await();
+          }
+        } catch (InterruptedException e) {
+          return;
+        } finally {
+          superPeer.connectionLock.unlock();
+        }
+
+        lock.lock();
+        connected.signalAll();
+        lock.unlock();
       } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
           int length = inNow.readInt();
           byte[] nHost = new byte[length];

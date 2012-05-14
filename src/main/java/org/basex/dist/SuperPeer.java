@@ -75,9 +75,9 @@ public class SuperPeer extends NetworkPeer {
         SuperClusterPeer spc = new SuperClusterPeer(this, socketOut, true);
         spc.doFirstConnect = true;
         new Thread(spc).start();
-        spc.lock.lock();
+        spc.actionLock.lock();
         spc.action.signalAll();
-        spc.lock.unlock();
+        spc.actionLock.unlock();
       } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
           int length = inNow.readInt();
           byte[] nHost = new byte[length];
@@ -115,9 +115,9 @@ public class SuperPeer extends NetworkPeer {
         addSuperPeerToNetwork(pc);
         pc.doSimpleConnect = true;
         new Thread(pc).start();
-        pc.lock.lock();
+        pc.actionLock.lock();
         pc.action.signalAll();
-        pc.lock.unlock();
+        pc.actionLock.unlock();
         return true;
       }
 
@@ -130,8 +130,12 @@ public class SuperPeer extends NetworkPeer {
 
   @Override
   public void run() {
-    if (connectHost != null && connectPort > 1023)
+    if (connectHost != null && connectPort > 1023) {
       connectTo(connectHost, connectPort);
+      lock.lock();
+      connected.signalAll();
+      lock.unlock();
+    }
 
     while(true) {
       try {
@@ -147,9 +151,9 @@ public class SuperPeer extends NetworkPeer {
         Thread t = new Thread(cn);
         cn.doHandleConnect = true;
         t.start();
-        cn.lock.lock();
+        cn.actionLock.lock();
         cn.action.signalAll();
-        cn.lock.unlock();
+        cn.actionLock.unlock();
       } catch (IOException e) {
         log.write("I/O socket error.");
       }

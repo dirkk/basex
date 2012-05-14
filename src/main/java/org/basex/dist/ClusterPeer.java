@@ -26,10 +26,14 @@ public class ClusterPeer implements Runnable {
   protected DataOutputStream out;
   /** is this peer still active? */
   protected boolean running;
-  /** lock. */
-  public final Lock lock = new ReentrantLock();
+  /** action lock. */
+  public final Lock actionLock = new ReentrantLock();
   /** to notify of new events. */
-  public Condition action = lock.newCondition();
+  public Condition action = actionLock.newCondition();
+  /** connection lock. */
+  public final Lock connectionLock = new ReentrantLock();
+  /** connect condition. */
+  public Condition connected = connectionLock.newCondition();
   /** connect to a cluster. This is the first attempt, so request some information. */
   public boolean doFirstConnect;
   /** connect to a peer, do not request information about the network. */
@@ -60,7 +64,7 @@ public class ClusterPeer implements Runnable {
       final boolean newSuperPeer) {
     socket = s;
     superPeer = newSuperPeer;
-    status = DistConstants.status.PENDING;
+    status = DistConstants.status.DISCONNECTED;
     commandingPeer = c;
     running = true;
 
@@ -149,6 +153,7 @@ public class ClusterPeer implements Runnable {
 
       byte packetIn = in.readByte();
       if (packetIn == DistConstants.P_CONNECT_NORMAL) {
+        status = DistConstants.status.PENDING;
         byte[] sendHost = commandingPeer.serverSocket.getInetAddress().getAddress();
         out.writeInt(sendHost.length);
         out.write(sendHost);
@@ -202,6 +207,7 @@ public class ClusterPeer implements Runnable {
    */
   protected synchronized boolean connect() {
     try {
+      status = DistConstants.status.PENDING;
       int length = in.readInt();
       byte[] nbHost = new byte[length];
       in.read(nbHost, 0, length);
@@ -253,6 +259,7 @@ public class ClusterPeer implements Runnable {
    */
   protected synchronized boolean connectSimple() {
     try {
+      status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT_NORMAL);
 
       int length = in.readInt();
@@ -312,7 +319,7 @@ public class ClusterPeer implements Runnable {
   @Override
   public void run() {
     while (running) {
-      lock.lock();
+      actionLock.lock();
       try {
         if (!doHandleConnect && !doFirstConnect && !doSimpleConnect)
           action.await();
@@ -323,16 +330,24 @@ public class ClusterPeer implements Runnable {
         }
         if (doFirstConnect) {
           doFirstConnect = false;
+
+          connectionLock.lock();
           connect();
+          connected.signalAll();
+          connectionLock.unlock();
         }
         if (doSimpleConnect) {
           doSimpleConnect = false;
           connectSimple();
+
+          connectionLock.lock();
+          connected.signalAll();
+          connectionLock.unlock();
         }
       } catch (InterruptedException e) {
         continue;
       } finally {
-        lock.unlock();
+        actionLock.unlock();
       }
     }
 
