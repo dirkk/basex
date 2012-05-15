@@ -130,7 +130,7 @@ public class NetworkPeer implements Runnable {
         Thread t = new Thread(cn);
         t.start();
 
-        cn.doHandleConnect = true;
+        cn.actionType = DistConstants.action.HANDLE_CONNECT;
         cn.actionLock.lock();
         cn.action.signalAll();
         cn.actionLock.unlock();
@@ -170,7 +170,7 @@ public class NetworkPeer implements Runnable {
 
       out.write(DistConstants.P_CONNECT);
       if (inNow.readByte() == DistConstants.P_CONNECT_ACK) {
-        newPeer.doSimpleConnect = true;
+        newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
         new Thread(newPeer).start();
         newPeer.actionLock.lock();
         newPeer.action.signalAll();
@@ -212,7 +212,7 @@ public class NetworkPeer implements Runnable {
       byte packetIn = inNow.readByte();
       if(packetIn == DistConstants.P_CONNECT_ACK) {
         superPeer = new ClusterPeer(this, socketOut, true);
-        superPeer.doFirstConnect = true;
+        superPeer.actionType = DistConstants.action.FIRST_CONNECT;
         new Thread(superPeer).start();
 
         superPeer.actionLock.lock();

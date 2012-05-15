@@ -35,11 +35,7 @@ public class ClusterPeer implements Runnable {
   /** connect condition. */
   public Condition connected = connectionLock.newCondition();
   /** connect to a cluster. This is the first attempt, so request some information. */
-  public boolean doFirstConnect;
-  /** connect to a peer, do not request information about the network. */
-  public boolean doSimpleConnect;
-  /** handle an incoming connection. */
-  public boolean doHandleConnect;
+  public DistConstants.action actionType;
   /** The host name for new connection attempts for this peer. */
   protected InetAddress connectionHost;
   /** The port number for new connection attempts for this peer. */
@@ -321,23 +317,23 @@ public class ClusterPeer implements Runnable {
     while (running) {
       actionLock.lock();
       try {
-        if (!doHandleConnect && !doFirstConnect && !doSimpleConnect)
+        if (actionType == DistConstants.action.NONE)
           action.await();
 
-        if (doHandleConnect) {
-          doHandleConnect = false;
+        if (actionType == DistConstants.action.HANDLE_CONNECT) {
+          actionType = DistConstants.action.NONE;
           handleIncomingConnect();
         }
-        if (doFirstConnect) {
-          doFirstConnect = false;
+        if (actionType == DistConstants.action.FIRST_CONNECT) {
+          actionType = DistConstants.action.NONE;
 
           connectionLock.lock();
           connect();
           connected.signalAll();
           connectionLock.unlock();
         }
-        if (doSimpleConnect) {
-          doSimpleConnect = false;
+        if (actionType == DistConstants.action.SIMPLE_CONNECT) {
+          actionType = DistConstants.action.NONE;
           connectSimple();
 
           connectionLock.lock();

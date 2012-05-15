@@ -73,7 +73,7 @@ public class SuperPeer extends NetworkPeer {
       byte packetIn = inNow.readByte();
       if(packetIn == DistConstants.P_CONNECT_ACK) {
         SuperClusterPeer spc = new SuperClusterPeer(this, socketOut, true);
-        spc.doFirstConnect = true;
+        spc.actionType = DistConstants.action.FIRST_CONNECT;
         new Thread(spc).start();
         spc.actionLock.lock();
         spc.action.signalAll();
@@ -113,7 +113,8 @@ public class SuperPeer extends NetworkPeer {
       if (inNow.readByte() == DistConstants.P_CONNECT_ACK) {
         ClusterPeer pc = new ClusterPeer(this, s, true);
         addSuperPeerToNetwork(pc);
-        pc.doSimpleConnect = true;
+        pc.actionType = DistConstants.action.SIMPLE_CONNECT;
+
         new Thread(pc).start();
         pc.actionLock.lock();
         pc.action.signalAll();
@@ -149,7 +150,7 @@ public class SuperPeer extends NetworkPeer {
 
         SuperClusterPeer cn = new SuperClusterPeer(this, socketIn);
         Thread t = new Thread(cn);
-        cn.doHandleConnect = true;
+        cn.actionType = DistConstants.action.HANDLE_CONNECT;
         t.start();
         cn.actionLock.lock();
         cn.action.signalAll();

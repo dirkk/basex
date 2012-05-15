@@ -27,9 +27,16 @@ public final class DistConstants {
   /** Packet message: From super-peer to super-peer and requests to send all connected
    * super-peers. */
   public static final byte P_CONNECT_SEND_PEERS = 0x09;
+  /** Packet message: execute XQuery. */
+  public static final byte P_XQUERY = 0x0A;
 
   /** connection status of this network node within the cluster */
   public enum status {
     DISCONNECTED, PENDING, CONNECTED, CONNECT_FAILED
   };
+
+  /** action to execute for a peer. */
+  public enum action {
+    NONE, FIRST_CONNECT, SIMPLE_CONNECT, HANDLE_CONNECT, XQUERY
+  }
 }
