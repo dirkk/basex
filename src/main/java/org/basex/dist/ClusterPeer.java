@@ -325,6 +325,8 @@ public class ClusterPeer implements Runnable {
 
   protected boolean connectSimple() {
     try {
+      status = DistConstants.status.PENDING;
+      commandingPeer.addPeerToNetwork(this);
       out.write(DistConstants.P_CONNECT_NORMAL);
 
       int length = in.readInt();

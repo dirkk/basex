@@ -103,7 +103,6 @@ public class SuperPeer extends NetworkPeer {
     try {
       SuperClusterPeer pc = new SuperClusterPeer(this, host, port
           + nodes.values().size() + superPeers.size() + 1, cHost, cPort, true);
-      addSuperPeerToNetwork(pc);
       pc.actionType = DistConstants.action.SIMPLE_CONNECT;
 
       new Thread(pc).start();
