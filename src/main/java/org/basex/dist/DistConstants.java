@@ -37,6 +37,6 @@ public final class DistConstants {
 
   /** action to execute for a peer. */
   public enum action {
-    NONE, FIRST_CONNECT, SIMPLE_CONNECT, HANDLE_CONNECT, XQUERY
+    NONE, FIRST_CONNECT, SIMPLE_CONNECT, HANDLE_CONNECT, XQUERY, HANDLE_XQUERY
   }
 }

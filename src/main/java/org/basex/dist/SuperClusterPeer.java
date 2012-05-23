@@ -4,7 +4,8 @@ import java.io.*;
 import java.net.*;
 
 /**
- * A cluster peer for a super-peer.
+ * A cluster peer for a super-peer. This class represents another peer (super-peer or
+ * not) in the network.
  *
  * @author Dirk Kirsten
  *
@@ -17,20 +18,10 @@ public class SuperClusterPeer extends ClusterPeer {
    * Default constructor.
    * @param c The commanding peer for this peer in the cluster.
    * @param s The connection to talk to this peer.
-   */
-  public SuperClusterPeer(final SuperPeer c, final Socket s) {
-    super(c, s);
-
-    commandingSuperPeer = c;
-  }
-
-  /**
-   * Default constructor.
-   * @param c The commanding peer for this peer in the cluster.
-   * @param s The connection to talk to this peer.
    * @param superpeer is this a super-peer?
+   * @throws IOException 
    */
-  public SuperClusterPeer(final SuperPeer c, final Socket s, final boolean superpeer) {
+  public SuperClusterPeer(final SuperPeer c, final Socket s, final boolean superpeer) throws IOException {
     super(c, s, superpeer);
 
     commandingSuperPeer = c;
@@ -41,7 +32,7 @@ public class SuperClusterPeer extends ClusterPeer {
    * normal peer.
    */
   @Override
-  protected synchronized void handleConnectFromNormalpeer() {
+  protected void handleConnectFromNormalpeer() {
     try {
       status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT_ACK);
@@ -56,8 +47,8 @@ public class SuperClusterPeer extends ClusterPeer {
         int length = in.readInt();
         byte[] nbHost = new byte[length];
         in.read(nbHost, 0, length);
-        connectionHost = InetAddress.getByAddress(nbHost);
-        connectionPort = in.readInt();
+        connectHost = InetAddress.getByAddress(nbHost);
+        connectPort = in.readInt();
 
         // count the number of super-peers to send
         int numberPeers = 0;
@@ -78,7 +69,7 @@ public class SuperClusterPeer extends ClusterPeer {
         }
 
         if(in.readByte() == DistConstants.P_CONNECT_NODES_ACK) {
-          commandingPeer.addPeerToNetwork(this);
+          commandingSuperPeer.addPeerToNetwork(this);
         }
       } else if(packetIn == DistConstants.P_CONNECT_NORMAL) {
         commandingSuperPeer.addSuperPeerToNetwork(this);
@@ -95,7 +86,7 @@ public class SuperClusterPeer extends ClusterPeer {
    * so this handles the connection establishment.
    */
   @Override
-  protected synchronized void handleConnectFromSuperpeer() {
+  protected void handleConnectFromSuperpeer() {
     try {
       status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT_ACK);
@@ -110,8 +101,8 @@ public class SuperClusterPeer extends ClusterPeer {
         int length = in.readInt();
         byte[] nbHost = new byte[length];
         in.read(nbHost, 0, length);
-        connectionHost = InetAddress.getByAddress(nbHost);
-        connectionPort = in.readInt();
+        connectHost = InetAddress.getByAddress(nbHost);
+        connectPort = in.readInt();
 
         // count the number of nodes to send
         int numberPeers = 0;
@@ -149,14 +140,14 @@ public class SuperClusterPeer extends ClusterPeer {
    * @return success
    */
   @Override
-  protected synchronized boolean connect() {
+  protected boolean initiateConnect() {
     try {
         status = DistConstants.status.PENDING;
         int length = in.readInt();
         byte[] nbHost = new byte[length];
         in.read(nbHost, 0, length);
-        connectionHost = InetAddress.getByAddress(nbHost);
-        connectionPort = in.readInt();
+        connectHost = InetAddress.getByAddress(nbHost);
+        connectPort = in.readInt();
 
         out.write(DistConstants.P_CONNECT_SEND_PEERS);
 

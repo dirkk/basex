@@ -1,6 +1,6 @@
 package org.basex.core.cmd;
 
-import java.net.UnknownHostException;
+import java.net.*;
 
 import org.basex.core.*;
 import org.basex.dist.*;
@@ -76,22 +76,15 @@ public final class Distribute extends Command {
       }
 
       try {
-        if (hostOut != null && portOut > 1023)
-          context.nNode.setConnectHost(hostOut, portOut);
+        if (hostOut != null && portOut > 1023) {
+          context.nNode.connectTo(InetAddress.getByName(hostOut), portOut);
+        }
       } catch(UnknownHostException e) {
         return false;
       }
       Thread t = new Thread(context.nNode);
       t.start();
 
-      context.nNode.lock.lock();
-      try {
-        context.nNode.connected.await();
-      } catch (InterruptedException e) {
-        return false;
-      } finally {
-        context.nNode.lock.unlock();
-      }
 
       return true;
     }

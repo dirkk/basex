@@ -3,7 +3,6 @@ package org.basex.dist;
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.concurrent.locks.*;
 
 import org.basex.core.*;
@@ -21,10 +20,6 @@ public class NetworkPeer implements Runnable {
   protected ServerSocket serverSocket;
   /** listening socket. */
   protected Socket socketIn;
-  /** data input stream. */
-  protected DataInputStream in;
-  /** data output stream. */
-  protected DataOutputStream out;
   /** already running? */
   public volatile boolean running;
   /** List of connected nodes. */
@@ -39,14 +34,14 @@ public class NetworkPeer implements Runnable {
   protected final Context ctx;
   /** Reference to the super-peer, null if super-peer itself. */
   protected ClusterPeer superPeer;
-  /** Host this peer should connect to. */
-  protected InetAddress connectHost;
-  /** port number this peer should connect to. */
-  protected int connectPort;
   /** lock. */
-  public Lock lock;
+  public Lock connectionLock;
   /** wait to be connected. */
   public Condition connected;
+  /** XQuery to be executed. */
+  public String xquery;
+  /** Lock to execute only one xquery at a time. */
+  public Lock xqueryLock;
 
   /**
    * Makes this instance of BaseX to a node in a clustered BaseX network.
@@ -60,8 +55,9 @@ public class NetworkPeer implements Runnable {
       throws UnknownHostException {
     ctx = context;
     log = new Log(ctx, false);
-    lock = new ReentrantLock();
-    connected = lock.newCondition();
+    connectionLock = new ReentrantLock();
+    connected = connectionLock.newCondition();
+    xqueryLock = new ReentrantLock();
 
     port = nPort;
 
@@ -92,60 +88,14 @@ public class NetworkPeer implements Runnable {
     serverSocket = old.serverSocket;
     running = old.running;
     socketIn = old.socketIn;
-    in = old.in;
-    out = old.out;
     nodes = old.nodes;
     log = old.log;
     ctx = old.ctx;
   }
 
   /**
-   * Sets the address of the peer to connect to.
-   *
-   * @param cHost host to connect to
-   * @param cPort port number to connect to
-   * @throws UnknownHostException  unknown host
-   */
-  public void setConnectHost(final String cHost, final int cPort)
-      throws UnknownHostException {
-    connectHost = InetAddress.getByName(cHost);
-    connectPort = cPort;
-  }
-
-  @Override
-  public void run() {
-    connectTo(connectHost, connectPort);
-
-    while (running) {
-      try {
-        /* Waiting for another node to connect */
-        try {
-          socketIn = serverSocket.accept();
-          socketIn.setReuseAddress(true);
-        } catch(SocketTimeoutException e) {
-          continue;
-        }
-
-        ClusterPeer cn = new ClusterPeer(this, socketIn);
-        Thread t = new Thread(cn);
-        t.start();
-
-        cn.actionType = DistConstants.action.HANDLE_CONNECT;
-        cn.actionLock.lock();
-        cn.action.signalAll();
-        cn.actionLock.unlock();
-      } catch(IOException e) {
-        log.write("I/O Exception");
-        running = false;
-      }
-    }
-
-    close();
-  }
-
-  /**
-   * Adds a new node to the network cluster. This is just used for the internal table of
-   * this node and has no effect on the recognition of this node in the overall network.
+   * Adds a new peer to the network cluster. This is just used for the internal table of
+   * this peer and has no effect on the recognition of this peer in the overall network.
    * @param cp The peer to add
    */
   protected void addPeerToNetwork(final ClusterPeer cp) {
@@ -162,33 +112,32 @@ public class NetworkPeer implements Runnable {
    */
   public boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
-      Socket s = new Socket(cHost, cPort, host, port + nodes.values().size() + 2);
-      s.setReuseAddress(true);
-      ClusterPeer newPeer = new ClusterPeer(this, s);
-      out = new DataOutputStream(s.getOutputStream());
-      DataInputStream inNow = new DataInputStream(s.getInputStream());
+      ClusterPeer newPeer = new ClusterPeer(this, host, port +
+            nodes.values().size() + 2, cHost, cPort, false);
+      newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
+      new Thread(newPeer).start();
+      newPeer.actionLock.lock();
+      newPeer.action.signalAll();
+      newPeer.actionLock.unlock();
 
-      out.write(DistConstants.P_CONNECT);
-      if (inNow.readByte() == DistConstants.P_CONNECT_ACK) {
-        newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
-        new Thread(newPeer).start();
-        newPeer.actionLock.lock();
-        newPeer.action.signalAll();
-        newPeer.actionLock.unlock();
-
-        newPeer.connectionLock.lock();
-        try {
-          newPeer.connected.await();
-        } catch(InterruptedException e) {
-          log.write("Interrupt exception");
-        }
+      newPeer.connectionLock.lock();
+      try {
+        newPeer.connected.await();
+      } catch(InterruptedException e) {
+        log.write("Interrupt exception");
+        return false;
+      } finally {
         newPeer.connectionLock.unlock();
+      }
+
+      if (newPeer.getStatus() == DistConstants.status.CONNECTED) {
+        addPeerToNetwork(newPeer);
         return true;
       }
 
       return false;
     } catch (IOException e) {
-      log.write("Could not connect to peer " + cHost.getHostAddress());
+      log.write("Could not create I/O on the socket.");
       return false;
     }
   }
@@ -200,51 +149,31 @@ public class NetworkPeer implements Runnable {
    * @param cHost the name of the node to connect to.
    * @param cPort the port number of the node to connect to.
    */
-  protected synchronized void connectTo(final InetAddress cHost, final int cPort) {
+  public boolean connectTo(final InetAddress cHost, final int cPort) {
     try {
-      Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 1);
-      socketOut.setReuseAddress(true);
-      out = new DataOutputStream(socketOut.getOutputStream());
-      DataInputStream inNow = new DataInputStream(socketOut.getInputStream());
+      ClusterPeer newPeer = new ClusterPeer(this, host, port +
+            nodes.values().size() + 1, cHost, cPort, true);
 
-      out.write(DistConstants.P_CONNECT);
+      newPeer.actionType = DistConstants.action.FIRST_CONNECT;
+      new Thread(newPeer).start();
+      newPeer.actionLock.lock();
+      newPeer.action.signalAll();
+      newPeer.actionLock.unlock();
 
-      byte packetIn = inNow.readByte();
-      if(packetIn == DistConstants.P_CONNECT_ACK) {
-        superPeer = new ClusterPeer(this, socketOut, true);
-        superPeer.actionType = DistConstants.action.FIRST_CONNECT;
-        new Thread(superPeer).start();
+      newPeer.connectionLock.lock();
+      try {
+        newPeer.connected.await();
+      } catch(InterruptedException e) {
+        log.write("Interrupt exception");
+        return false;
+      } finally {
+        newPeer.connectionLock.unlock();
+      }
 
-        superPeer.actionLock.lock();
-        superPeer.action.signalAll();
-        superPeer.actionLock.unlock();
-
-        superPeer.connectionLock.lock();
-        try {
-          if (superPeer.status != DistConstants.status.CONNECTED &&
-              superPeer.status != DistConstants.status.CONNECT_FAILED) {
-            superPeer.connected.await();
-          }
-        } catch (InterruptedException e) {
-          return;
-        } finally {
-          superPeer.connectionLock.unlock();
-        }
-
-        lock.lock();
-        connected.signalAll();
-        lock.unlock();
-      } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
-          int length = inNow.readInt();
-          byte[] nHost = new byte[length];
-          inNow.read(nHost, 0, length);
-          connectTo(InetAddress.getByAddress(nHost), inNow.readInt());
-        }
-    } catch(BindException e) {
-      log.write("Could not bind to this address.");
-      log.write(e.getMessage());
-    } catch(IOException e) {
-      log.write("I/O error while trying to connect to the node cluster.");
+      return true;
+    } catch (IOException e) {
+      log.write("Could not create I/O on the socket.");
+      return false;
     }
   }
 
@@ -304,5 +233,47 @@ public class NetworkPeer implements Runnable {
    */
   public String getIdentifier() {
     return host.getHostAddress() + ":" + port;
+  }
+
+  /**
+   * Executes the provided XQuery on all connected peers.
+   * @param q XQuery to execute.
+   */
+  public void executeXQuery(final String q) {
+    xquery = q;
+
+    Iterator<ClusterPeer> i = nodes.values().iterator();
+    while (i.hasNext()) {
+      ClusterPeer cp = i.next();
+      cp.actionType = DistConstants.action.XQUERY;
+
+      cp.actionLock.lock();
+      cp.action.signalAll();
+      cp.actionLock.unlock();
+    }
+  }
+
+  @Override
+  public void run() {
+    while (running) {
+      try {
+        /* Waiting for another node to connect */
+        try {
+          socketIn = serverSocket.accept();
+          socketIn.setReuseAddress(true);
+        } catch(SocketTimeoutException e) {
+          continue;
+        }
+
+        ClusterPeer cn = new ClusterPeer(this, socketIn, false);
+        Thread t = new Thread(cn);
+        t.start();
+      } catch(IOException e) {
+        log.write("I/O Exception");
+        running = false;
+      }
+    }
+
+    close();
   }
 }
