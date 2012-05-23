@@ -100,7 +100,6 @@ public class NetworkPeer implements Runnable {
    */
   protected void addPeerToNetwork(final ClusterPeer cp) {
     nodes.put(cp.getIdentifier(), cp);
-    cp.changeStatus(DistConstants.status.CONNECTED);
   }
 
   /**
@@ -113,7 +112,7 @@ public class NetworkPeer implements Runnable {
   public boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       ClusterPeer newPeer = new ClusterPeer(this, host, port +
-            nodes.values().size() + 2, cHost, cPort, false);
+            nodes.values().size() + 1, cHost, cPort, false);
       newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
       new Thread(newPeer).start();
       newPeer.actionLock.lock();
@@ -130,12 +129,7 @@ public class NetworkPeer implements Runnable {
         newPeer.connectionLock.unlock();
       }
 
-      if (newPeer.getStatus() == DistConstants.status.CONNECTED) {
-        addPeerToNetwork(newPeer);
-        return true;
-      }
-
-      return false;
+      return true;
     } catch (IOException e) {
       log.write("Could not create I/O on the socket.");
       return false;

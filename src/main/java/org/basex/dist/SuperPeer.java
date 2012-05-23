@@ -51,7 +51,6 @@ public class SuperPeer extends NetworkPeer {
    */
   protected void addSuperPeerToNetwork(final ClusterPeer cp) {
     superPeers.put(cp.getIdentifier(), cp);
-    cp.changeStatus(DistConstants.status.CONNECTED);
   }
 
   /**
@@ -63,29 +62,25 @@ public class SuperPeer extends NetworkPeer {
   @Override
   public boolean connectTo(final InetAddress cHost, final int cPort) {
     try {
-      Socket socketOut = new Socket(cHost, cPort, host, port + nodes.values().size() + 1);
-      socketOut.setReuseAddress(true);
-      DataOutputStream out = new DataOutputStream(socketOut.getOutputStream());
-      DataInputStream in = new DataInputStream(socketOut.getInputStream());
+      SuperClusterPeer spc = new SuperClusterPeer(this, host,
+          port + nodes.values().size() + 1, cHost, cPort, true);
+      spc.actionType = DistConstants.action.FIRST_CONNECT;
+      new Thread(spc).start();
+      spc.actionLock.lock();
+      spc.action.signalAll();
+      spc.actionLock.unlock();
 
-      out.write(DistConstants.P_CONNECT_SUPER);
-
-      byte packetIn = in.readByte();
-      if(packetIn == DistConstants.P_CONNECT_ACK) {
-        SuperClusterPeer spc = new SuperClusterPeer(this, socketOut, true);
-        spc.actionType = DistConstants.action.FIRST_CONNECT;
-        new Thread(spc).start();
-        spc.actionLock.lock();
-        spc.action.signalAll();
-        spc.actionLock.unlock();
-        return true;
-      } else if (packetIn == DistConstants.P_SUPERPEER_ADDR) {
-        int length = in.readInt();
-        byte[] nHost = new byte[length];
-        in.read(nHost, 0, length);
-        return connectTo(InetAddress.getByAddress(nHost), in.readInt());
+      spc.connectionLock.lock();
+      try {
+        spc.connected.await();
+      } catch(InterruptedException e) {
+        log.write("Interrupt exception");
+        return false;
+      } finally {
+        spc.connectionLock.unlock();
       }
-      return false;
+
+      return true;
     } catch(BindException e) {
       log.write("Could not bind to this address.");
       log.write(e.getMessage());
@@ -106,27 +101,27 @@ public class SuperPeer extends NetworkPeer {
   @Override
   public synchronized boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
-      Socket s = new Socket(cHost, cPort, host,
-          port + nodes.values().size() + superPeers.size() + 1);
-      s.setReuseAddress(true);
-      DataOutputStream out = new DataOutputStream(s.getOutputStream());
-      DataInputStream in = new DataInputStream(s.getInputStream());
+      SuperClusterPeer pc = new SuperClusterPeer(this, host, port
+          + nodes.values().size() + superPeers.size() + 1, cHost, cPort, true);
+      addSuperPeerToNetwork(pc);
+      pc.actionType = DistConstants.action.SIMPLE_CONNECT;
 
-      out.write(DistConstants.P_CONNECT_SUPER);
+      new Thread(pc).start();
+      pc.actionLock.lock();
+      pc.action.signalAll();
+      pc.actionLock.unlock();
 
-      if (in.readByte() == DistConstants.P_CONNECT_ACK) {
-        ClusterPeer pc = new ClusterPeer(this, s, true);
-        addSuperPeerToNetwork(pc);
-        pc.actionType = DistConstants.action.SIMPLE_CONNECT;
-
-        new Thread(pc).start();
-        pc.actionLock.lock();
-        pc.action.signalAll();
-        pc.actionLock.unlock();
-        return true;
+      pc.connectionLock.lock();
+      try {
+        pc.connected.await();
+      } catch(InterruptedException e) {
+        log.write("Interrupt exception");
+        return false;
+      } finally {
+        pc.connectionLock.unlock();
       }
 
-      return false;
+      return true;
     } catch (IOException e) {
       log.write("Could not connect to peer " + cHost.getHostAddress());
       return false;

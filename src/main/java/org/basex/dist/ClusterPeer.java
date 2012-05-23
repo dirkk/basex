@@ -91,11 +91,7 @@ public class ClusterPeer implements Runnable {
     commandingPeer = c;
     running = true;
 
-    try {
-      socket = new Socket(connectHost, connectPort, host, port);
-    } catch(IOException e) {
-      commandingPeer.log.write("Could not create I/O on the socket.");
-    }
+    socket = new Socket(connectHost, connectPort, host, port);
     initialiseSocket();
   }
 
@@ -188,13 +184,15 @@ public class ClusterPeer implements Runnable {
       byte packetIn = in.readByte();
       if (packetIn == DistConstants.P_CONNECT_NORMAL) {
         status = DistConstants.status.PENDING;
+        commandingPeer.addPeerToNetwork(this);
+
         byte[] sendHost = commandingPeer.serverSocket.getInetAddress().getAddress();
         out.writeInt(sendHost.length);
         out.write(sendHost);
         out.writeInt(commandingPeer.serverSocket.getLocalPort());
 
         out.write(DistConstants.P_CONNECT_ACK);
-        commandingPeer.addPeerToNetwork(this);
+        changeStatus(DistConstants.status.CONNECTED);
       } else if (packetIn == DistConstants.P_CONNECT) {
         // this is a normal peer, but he has to connect to the super-peer,
         // so the address of the super-peer is sent.
@@ -260,6 +258,7 @@ public class ClusterPeer implements Runnable {
       connectPort = in.readInt();
 
       if (superPeer) {
+        commandingPeer.addPeerToNetwork(this);
         out.write(DistConstants.P_CONNECT_SEND_PEERS);
         byte[] bHost = commandingPeer.host.getAddress();
         out.writeInt(bHost.length);
@@ -277,7 +276,7 @@ public class ClusterPeer implements Runnable {
         }
 
         out.write(DistConstants.P_CONNECT_NODES_ACK);
-        commandingPeer.addPeerToNetwork(this);
+        changeStatus(DistConstants.status.CONNECTED);
         commandingPeer.superPeer = this;
       }
 
@@ -312,32 +311,34 @@ public class ClusterPeer implements Runnable {
    *
    * @return success
    */
+  protected boolean initiateSimpleConnect() {
+    try {
+      status = DistConstants.status.PENDING;
+      out.write(DistConstants.P_CONNECT);
+
+      return true;
+    } catch(IOException e) {
+      commandingPeer.log.write("I/O error");
+      return false;
+    }
+  }
+
   protected boolean connectSimple() {
     try {
-      //Socket s = new Socket(connectHost, connectPort, host, port +
-      //    commandingPeer.nodes.values().size() + 1);
-      Socket s = new Socket(connectHost, connectPort);
-      s.setReuseAddress(true);
-      out = new DataOutputStream(s.getOutputStream());
-      in = new DataInputStream(s.getInputStream());
+      out.write(DistConstants.P_CONNECT_NORMAL);
 
-      out.write(DistConstants.P_CONNECT);
-      if (in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
-        status = DistConstants.status.PENDING;
-        out.write(DistConstants.P_CONNECT_NORMAL);
+      int length = in.readInt();
+      byte[] nbHost = new byte[length];
+      in.read(nbHost, 0, length);
+      connectHost = InetAddress.getByAddress(nbHost);
+      connectPort = in.readInt();
 
-        int length = in.readInt();
-        byte[] nbHost = new byte[length];
-        in.read(nbHost, 0, length);
-        connectHost = InetAddress.getByAddress(nbHost);
-        connectPort = in.readInt();
-
-        if (in.readByte() == DistConstants.P_CONNECT_ACK) {
-          commandingPeer.addPeerToNetwork(this);
-          return true;
-        }
+      if (in.readByte() == DistConstants.P_CONNECT_ACK) {
+        changeStatus(DistConstants.status.CONNECTED);
+        return true;
       }
 
+      changeStatus(DistConstants.status.CONNECT_FAILED);
       return false;
     } catch(IOException e) {
       commandingPeer.log.write("I/O error");
@@ -404,13 +405,8 @@ public class ClusterPeer implements Runnable {
         if (actionType == DistConstants.action.FIRST_CONNECT) {
           initiateConnect();
         } else if (actionType == DistConstants.action.SIMPLE_CONNECT) {
-          connectSimple();
-
-          connectionLock.lock();
-          connected.signalAll();
-          connectionLock.unlock();
+          initiateSimpleConnect();
         } else if (actionType == DistConstants.action.XQUERY) {
-
           executeXQuery();
         } else if (actionType == DistConstants.action.HANDLE_XQUERY) {
           handleXQuery();
@@ -460,6 +456,11 @@ public class ClusterPeer implements Runnable {
           } else if (packetIn == DistConstants.P_CONNECT_ACK) {
             connectionLock.lock();
             connect();
+            connected.signalAll();
+            connectionLock.unlock();
+          } else if (packetIn == DistConstants.P_CONNECT_NORMAL_ACK) {
+            connectionLock.lock();
+            connectSimple();
             connected.signalAll();
             connectionLock.unlock();
           } else if(packetIn == DistConstants.P_SUPERPEER_ADDR) {
