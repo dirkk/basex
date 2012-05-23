@@ -53,7 +53,7 @@ public final class Distribute extends Command {
   @Override
   protected boolean run() {
     if (context.nNode != null) {
-      context.nNode.close();
+      context.nNode.stop();
     }
 
     String host = args[0];
@@ -77,7 +77,7 @@ public final class Distribute extends Command {
 
       try {
         if (hostOut != null && portOut > 1023) {
-          context.nNode.connectTo(InetAddress.getByName(hostOut), portOut);
+          context.nNode.connectToCluster(InetAddress.getByName(hostOut), portOut);
         }
       } catch(UnknownHostException e) {
         return false;

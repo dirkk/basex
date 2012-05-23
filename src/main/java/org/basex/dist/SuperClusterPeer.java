@@ -18,11 +18,10 @@ public class SuperClusterPeer extends ClusterPeer {
    * Default constructor.
    * @param c The commanding peer for this peer in the cluster.
    * @param s The connection to talk to this peer.
-   * @param superpeer is this a super-peer?
    * @throws IOException 
    */
-  public SuperClusterPeer(final SuperPeer c, final Socket s, final boolean superpeer) throws IOException {
-    super(c, s, superpeer);
+  public SuperClusterPeer(final SuperPeer c, final Socket s) throws IOException {
+    super(c, s);
 
     commandingSuperPeer = c;
   }
@@ -70,14 +69,14 @@ public class SuperClusterPeer extends ClusterPeer {
 
         // count the number of super-peers to send
         int numberPeers = 0;
-        for(ClusterPeer n : commandingPeer.nodes.values()) {
+        for(ClusterPeer n : commandingPeer.peers.values()) {
           if(n.getStatus() == DistConstants.status.CONNECTED) {
             ++numberPeers;
           }
         }
         out.writeInt(numberPeers);
 
-        for(ClusterPeer n : commandingPeer.nodes.values()) {
+        for(ClusterPeer n : commandingPeer.peers.values()) {
           if(n.getStatus() == DistConstants.status.CONNECTED) {
             byte[] bHost = n.getConnectionHostAsByte();
             out.writeInt(bHost.length);

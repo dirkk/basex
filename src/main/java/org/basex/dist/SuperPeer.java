@@ -33,17 +33,6 @@ public class SuperPeer extends NetworkPeer {
   }
 
   /**
-   * Constructor by using a normal peer.
-   * @param peer A normal peer.
-   */
-  public SuperPeer(final NetworkPeer peer) {
-    super(peer);
-
-    superPeer = null;
-    superPeers = new LinkedHashMap<String, ClusterPeer>();
-  }
-
-  /**
    * Adds a new super-peer to the network cluster. This is just used for the internal
    * table of this peer and has no effect on the recognition of this node in the
    * overall network.
@@ -60,10 +49,10 @@ public class SuperPeer extends NetworkPeer {
    * @param cPort the port number of the peer to connect to.
    */
   @Override
-  public boolean connectTo(final InetAddress cHost, final int cPort) {
+  public boolean connectToCluster(final InetAddress cHost, final int cPort) {
     try {
       SuperClusterPeer spc = new SuperClusterPeer(this, host,
-          port + nodes.values().size() + 1, cHost, cPort, true);
+          port + peers.values().size() + 1, cHost, cPort, true);
       spc.actionType = DistConstants.action.FIRST_CONNECT;
       new Thread(spc).start();
       spc.actionLock.lock();
@@ -102,7 +91,7 @@ public class SuperPeer extends NetworkPeer {
   public synchronized boolean connectToPeer(final InetAddress cHost, final int cPort) {
     try {
       SuperClusterPeer pc = new SuperClusterPeer(this, host, port
-          + nodes.values().size() + superPeers.size() + 1, cHost, cPort, true);
+          + peers.values().size() + superPeers.size() + 1, cHost, cPort, true);
       pc.actionType = DistConstants.action.SIMPLE_CONNECT;
 
       new Thread(pc).start();
@@ -133,15 +122,15 @@ public class SuperPeer extends NetworkPeer {
       try {
         /* Waiting for another node to connect */
         try {
-          socketIn = serverSocket.accept();
+          Socket socketIn = serverSocket.accept();
           socketIn.setReuseAddress(true);
+
+          SuperClusterPeer cn = new SuperClusterPeer(this, socketIn);
+          Thread t = new Thread(cn);
+          t.start();
         } catch(SocketTimeoutException e) {
           continue;
         }
-
-        SuperClusterPeer cn = new SuperClusterPeer(this, socketIn, false);
-        Thread t = new Thread(cn);
-        t.start();
       } catch (IOException e) {
         log.write("I/O socket error.");
       }
@@ -157,7 +146,7 @@ public class SuperPeer extends NetworkPeer {
   public String info() {
     String o = new String("Super peer\r\n\r\nThis cluster:\r\n");
     o += getIdentifier() + "\r\n";
-    for(ClusterPeer c : nodes.values()) {
+    for(ClusterPeer c : peers.values()) {
       o += "|--- " + c.getIdentifier() + "\r\n";
     }
 
