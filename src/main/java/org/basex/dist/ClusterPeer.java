@@ -4,6 +4,11 @@ import java.io.*;
 import java.net.*;
 import java.util.concurrent.locks.*;
 
+import org.basex.core.*;
+import org.basex.util.*;
+
+import static org.basex.core.Text.*;
+
 /**
  * Another node within the same cluster as this node.
  *
@@ -12,48 +17,47 @@ import java.util.concurrent.locks.*;
  *
  */
 public class ClusterPeer implements Runnable {
-  /** Is this a super-peer? */
+  /** Does this represent a connection to a super-peer? */
   protected boolean superPeer;
   /** Commanding network-peer. */
   protected NetworkPeer commandingPeer;
-  /** status of this node. */
+  /** Current state of this node. */
   protected DistConstants.status status;
-  /** connection socket. */
+  /** Connection socket. */
   protected Socket socket;
-  /** data input stream. */
+  /** Data input stream. */
   protected DataInputStream in;
-  /** data output stream. */
+  /** Data output stream. */
   protected DataOutputStream out;
-  /** is this peer still active? */
+  /** Is this peer still active? */
   protected boolean running;
-  /** host name. */
+  /** Host name. */
   protected final InetAddress host;
-  /** port number. */
+  /** Port number. */
   protected final int port;
   /** Host this peer should connect to. */
   protected InetAddress connectHost;
-  /** port number this peer should connect to. */
+  /** Port number this peer should connect to. */
   protected int connectPort;
-  /** action lock. */
+  /** Action lock. */
   public final Lock actionLock = new ReentrantLock();
-  /** to notify of new events. */
+  /** To notify of new events. */
   public Condition action = actionLock.newCondition();
-  /** connection lock. */
+  /** Connection lock. */
   public final Lock connectionLock = new ReentrantLock();
-  /** connect condition. */
+  /** Connect condition. */
   public Condition connected = connectionLock.newCondition();
-  /** connect to a cluster. This is the first attempt, so request some information. */
+  /** Execute this action next. */
   public DistConstants.action actionType;
-  /** Listener for incoming requests from the other peer. */
+  /** Listener for incoming requests from the other endpoint. */
   protected ClusterPeerListener listener;
 
   /**
    * Default constructor.
    * @param c The commanding peer for this peer in the cluster.
    * @param s The socket to communicate to.
-   * @throws IOException Socket error
    */
-  public ClusterPeer(final NetworkPeer c, final Socket s) throws IOException {
+  public ClusterPeer(final NetworkPeer c, final Socket s) {
     host = s.getLocalAddress();
     port = s.getLocalPort();
     connectHost = s.getInetAddress();
@@ -75,12 +79,10 @@ public class ClusterPeer implements Runnable {
    * @param nPort port number to bind to.
    * @param nConnHost host name to connect to.
    * @param nConnPort port number to connect to.
-   * @param newSuperPeer is this a super-peer?
-   * @throws IOException Socket error
+   * @param newSuperPeer is this a connection to a super-peer?
    */
   public ClusterPeer(final NetworkPeer c, final InetAddress nHost, final int nPort,
-      final InetAddress nConnHost, final int nConnPort, final boolean newSuperPeer)
-          throws IOException {
+      final InetAddress nConnHost, final int nConnPort, final boolean newSuperPeer) {
     host = nHost;
     connectHost = nConnHost;
     port = nPort;
@@ -91,19 +93,30 @@ public class ClusterPeer implements Runnable {
     commandingPeer = c;
     running = true;
 
-    socket = new Socket(connectHost, connectPort, host, port);
+    try {
+      socket = new Socket(connectHost, connectPort, host, port);
+    } catch(BindException e) {
+      Util.outln(D_BIND_ERROR_X, host.toString() + port);
+    } catch(IOException e) {
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+    }
     initialiseSocket();
   }
 
   /**
    * Creates the communication socket to the other peer.
-   * @throws IOException Socket error
    */
-  private void initialiseSocket() throws IOException {
-    in = new DataInputStream(socket.getInputStream());
-    out = new DataOutputStream(socket.getOutputStream());
-    listener = new ClusterPeerListener();
-    new Thread(listener).start();
+  private void initialiseSocket() {
+    try {
+      in = new DataInputStream(socket.getInputStream());
+      out = new DataOutputStream(socket.getOutputStream());
+      listener = new ClusterPeerListener();
+      new Thread(listener).start();
+    } catch(IOException e) {
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+    }
   }
 
   /**
@@ -116,16 +129,16 @@ public class ClusterPeer implements Runnable {
   }
 
   /**
-   * Returns true, if this node is a super-peer.
+   * Returns true if this a connection to a super-peer.
    *
-   * @return true, if super-peer
+   * @return true if super-peer
    */
   public boolean isSuperPeer() {
     return superPeer;
   }
 
   /**
-   * Changes the status of this peer and returns the former value.
+   * Changes the status of this peer and returns the old value.
    *
    * @param s new status
    * @return old status value
@@ -137,7 +150,7 @@ public class ClusterPeer implements Runnable {
   }
 
   /**
-   * Returns the status of this peer.
+   * Returns the current status of this peer.
    *
    * @return Status of this peer.
    */
@@ -146,7 +159,7 @@ public class ClusterPeer implements Runnable {
   }
 
   /**
-   * Returns a unique identifier for this peer.
+   * Returns a unique identifier for this connection.
    *
    * @return A unique identifier.
    */
@@ -183,9 +196,11 @@ public class ClusterPeer implements Runnable {
 
       byte packetIn = in.readByte();
       if (packetIn == DistConstants.P_CONNECT_NORMAL) {
+        /* This peer really wants to connect to us */
         status = DistConstants.status.PENDING;
         commandingPeer.addPeerToNetwork(this);
 
+        /* Send the host and port to connect to this port  for new connections */
         byte[] sendHost = commandingPeer.serverSocket.getInetAddress().getAddress();
         out.writeInt(sendHost.length);
         out.write(sendHost);
@@ -194,19 +209,34 @@ public class ClusterPeer implements Runnable {
         out.write(DistConstants.P_CONNECT_ACK);
         changeStatus(DistConstants.status.CONNECTED);
       } else if (packetIn == DistConstants.P_CONNECT) {
-        // this is a normal peer, but he has to connect to the super-peer,
-        // so the address of the super-peer is sent.
-        out.write(DistConstants.P_SUPERPEER_ADDR);
-        byte[] bHost = commandingPeer.superPeer.connectHost.getAddress();
-        out.writeInt(bHost.length);
-        out.write(bHost, 0, bHost.length);
-        out.writeInt(commandingPeer.superPeer.connectPort);
+        /* this is a normal peer, but he has to connect to the super-peer,
+         * so the address of the super-peer is sent. */
+        sendAddressSuperPeer();
+        changeStatus(DistConstants.status.DISCONNECTED);
       } else {
-        running = false;
+        changeStatus(DistConstants.status.CONNECT_FAILED);
       }
-    } catch (IOException e) {
-      commandingPeer.log.write("I/O error on the socket connection to " +
-          getIdentifier());
+    } catch(IOException e) {
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.CONNECT_FAILED);
+    }
+  }
+
+  /**
+   * Sends the address of the super-peer of this normal peer to the
+   * connected other peer.
+   */
+  protected void sendAddressSuperPeer() {
+    try {
+      out.write(DistConstants.P_SUPERPEER_ADDR);
+      byte[] bHost = commandingPeer.superPeer.connectHost.getAddress();
+      out.writeInt(bHost.length);
+      out.write(bHost);
+      out.writeInt(commandingPeer.superPeer.connectPort);
+    } catch(IOException e) {
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
     }
   }
 
@@ -216,81 +246,78 @@ public class ClusterPeer implements Runnable {
    * already existing super-peer, so the super-peer of this peer is sent.
    */
   protected void handleConnectFromSuperpeer() {
-    try {
-      // this is a normal peer, but he has to connect to a super-peer,
-      // so the address of the super-peer of this cluster is sent.
-      out.write(DistConstants.P_SUPERPEER_ADDR);
-      byte[] bHost = commandingPeer.superPeer.connectHost.getAddress();
-      out.writeInt(bHost.length);
-      out.write(bHost, 0, bHost.length);
-      out.writeInt(commandingPeer.superPeer.connectPort);
-    } catch (IOException e) {
-      commandingPeer.log.write("I/O error on the socket connection to " +
-          getIdentifier());
-    }
+    sendAddressSuperPeer();
   }
 
   /**
    * Connect to the peer on the other side of the already
    * opened socket. This is the first connect, so request information
-   * about the network and other peers.
-   *
-   * @return success
+   * about the network and other peers. This just initiates the connection,
+   * the response is handled by the {@link ClusterPeerListener} class.
    */
-  protected boolean initiateConnect() {
+  protected void initiateConnect()  {
     try {
       status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT);
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
-      return false;
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.CONNECT_FAILED);
     }
-
-    return true;
   }
 
   /**
    * Connection establishment between this peer and a super-peer. The super-peer
    * will send a list of all the peers within the cluster and this will be used
    * to connect to these normal peers.
-   *
-   * @return success
+   * The state of this ClusterPeer will be changed accordingly to the success or
+   * failure of the connection establishment.
    */
-  protected boolean connect() {
+  protected void connect() {
     try {
       int length = in.readInt();
       byte[] nbHost = new byte[length];
-      in.read(nbHost, 0, length);
+      in.read(nbHost);
       connectHost = InetAddress.getByAddress(nbHost);
       connectPort = in.readInt();
 
       if (superPeer) {
+        /* The first connection has to be done to a super-peer */
         commandingPeer.addPeerToNetwork(this);
+
         out.write(DistConstants.P_CONNECT_SEND_PEERS);
+
+        /* Send the public host and port for new incoming connections to the
+         * other peer. */
         byte[] bHost = commandingPeer.host.getAddress();
         out.writeInt(bHost.length);
-        out.write(bHost, 0, bHost.length);
+        out.write(bHost);
         out.writeInt(commandingPeer.port);
 
+        /* Reads a list of all the other normal peers within this cluster and
+         * establishes a connection to them. */
         int nnodes = in.readInt();
         for(int i = 0; i < nnodes; ++i) {
           int length2 = in.readInt();
           byte[] nbHost2 = new byte[length2];
-          in.read(nbHost2, 0, length2);
+          in.read(nbHost2);
           InetAddress cHost = InetAddress.getByAddress(nbHost2);
           int cPort = in.readInt();
-          commandingPeer.connectToPeer(cHost, cPort);
+          if (!commandingPeer.connectToPeer(cHost, cPort)) {
+            changeStatus(DistConstants.status.DISCONNECTED);
+            return;
+          }
         }
 
         out.write(DistConstants.P_CONNECT_NODES_ACK);
         changeStatus(DistConstants.status.CONNECTED);
         commandingPeer.superPeer = this;
+      } else {
+        changeStatus(DistConstants.status.DISCONNECTED);
       }
-
-      return true;
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
-      return false;
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
     }
   }
 
@@ -299,11 +326,11 @@ public class ClusterPeer implements Runnable {
    * has to be to the super-peer. As this is a normal peer, the peer now send the
    * address of the actual super-peer of this cluster.
    */
-  protected void otherAddress() {
+  protected void handleNewSuperPeerAddress() {
     try {
       int length = in.readInt();
       byte[] nHost = new byte[length];
-      in.read(nHost, 0, length);
+      in.read(nHost);
 
       // set a new host to connect to, which should be a super-peer
       connectHost = InetAddress.getByAddress(nHost);
@@ -312,7 +339,9 @@ public class ClusterPeer implements Runnable {
 
       initiateConnect();
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.DISCONNECTED);
     }
   }
 
@@ -320,27 +349,22 @@ public class ClusterPeer implements Runnable {
    * Connect to the peer on the other side of the already
    * opened socket. Do the connection simple and do not request
    * information about the network.
-   *
-   * @return success
    */
-  protected boolean initiateSimpleConnect() {
+  protected void initiateSimpleConnect() {
     try {
       status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT);
-
-      return true;
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
-      return false;
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.CONNECT_FAILED);
     }
   }
 
   /**
    * Connects this peer with another normal peer.
-   *
-   * @return success
    */
-  protected boolean connectSimple() {
+  protected void connectSimple() {
     try {
       status = DistConstants.status.PENDING;
       commandingPeer.addPeerToNetwork(this);
@@ -354,14 +378,13 @@ public class ClusterPeer implements Runnable {
 
       if (in.readByte() == DistConstants.P_CONNECT_ACK) {
         changeStatus(DistConstants.status.CONNECTED);
-        return true;
+      } else {
+        changeStatus(DistConstants.status.CONNECT_FAILED);
       }
-
-      changeStatus(DistConstants.status.CONNECT_FAILED);
-      return false;
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
-      return false;
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.CONNECT_FAILED);
     }
   }
 
@@ -372,7 +395,8 @@ public class ClusterPeer implements Runnable {
     try {
       out.write(DistConstants.P_DISCONNECT);
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
     }
   }
 
@@ -393,7 +417,9 @@ public class ClusterPeer implements Runnable {
       out.write(commandingPeer.xquery.length());
       out.writeBytes(commandingPeer.xquery);
     } catch(IOException e) {
-      commandingPeer.log.write("Failed to execute a remote XQuery.");
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.DISCONNECTED);
     }
   }
 
@@ -403,6 +429,7 @@ public class ClusterPeer implements Runnable {
   public void close() {
     try {
       status = DistConstants.status.DISCONNECTED;
+      running = false;
 
       if (in != null)
         in.close();
@@ -411,7 +438,8 @@ public class ClusterPeer implements Runnable {
       if (socket != null && socket.isBound())
         socket.close();
     } catch(IOException e) {
-      commandingPeer.log.write("Could not close the connection in a clean way.");
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
     }
   }
 
@@ -427,8 +455,10 @@ public class ClusterPeer implements Runnable {
 
       Query q = new Query(query.toString(), commandingPeer.ctx);
       q.execute(false, out, false);
-    } catch (IOException e) {
-      commandingPeer.log.write("Connection error.");
+    } catch(IOException e) {
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.DISCONNECTED);
     }
   }
 
@@ -472,33 +502,39 @@ public class ClusterPeer implements Runnable {
     @Override
     public void run() {
       while (running) {
+        byte packetIn = 0;
         try {
-          byte packetIn = in.readByte();
-          if (packetIn == DistConstants.P_XQUERY) {
-            actionType = DistConstants.action.HANDLE_XQUERY;
+          packetIn = in.readByte();
 
-            handleXQuery();
-          } else if (packetIn == DistConstants.P_CONNECT) {
-            handleConnectFromNormalpeer();
-          } else if (packetIn == DistConstants.P_CONNECT_SUPER) {
-            handleConnectFromSuperpeer();
-          } else if (packetIn == DistConstants.P_CONNECT_ACK) {
-            connectionLock.lock();
-            connect();
-            connected.signalAll();
-            connectionLock.unlock();
-          } else if (packetIn == DistConstants.P_CONNECT_NORMAL_ACK) {
-            connectionLock.lock();
-            connectSimple();
-            connected.signalAll();
-            connectionLock.unlock();
-          } else if(packetIn == DistConstants.P_SUPERPEER_ADDR) {
-            otherAddress();
-          } else if(packetIn == DistConstants.P_DISCONNECT) {
-            handleDisconnect();
-          }
         } catch(IOException e) {
           commandingPeer.log.write("Lost connection to other peer.");
+        }
+        if (packetIn == DistConstants.P_XQUERY) {
+          actionType = DistConstants.action.HANDLE_XQUERY;
+
+          handleXQuery();
+        } else if (packetIn == DistConstants.P_CONNECT) {
+          handleConnectFromNormalpeer();
+          if (getStatus() != DistConstants.status.CONNECTED)
+            running = false;
+        } else if (packetIn == DistConstants.P_CONNECT_SUPER) {
+          handleConnectFromSuperpeer();
+          if (getStatus() != DistConstants.status.CONNECTED)
+            running = false;
+        } else if (packetIn == DistConstants.P_CONNECT_ACK) {
+          connectionLock.lock();
+          connect();
+          connected.signalAll();
+          connectionLock.unlock();
+        } else if (packetIn == DistConstants.P_CONNECT_NORMAL_ACK) {
+          connectionLock.lock();
+          connectSimple();
+          connected.signalAll();
+          connectionLock.unlock();
+        } else if(packetIn == DistConstants.P_SUPERPEER_ADDR) {
+          handleNewSuperPeerAddress();
+        } else if(packetIn == DistConstants.P_DISCONNECT) {
+          handleDisconnect();
         }
       }
     }

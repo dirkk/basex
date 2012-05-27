@@ -77,8 +77,10 @@ public final class Distribute extends Command {
 
       try {
         if (hostOut != null && portOut > 1023) {
-          context.nNode.connectToCluster(InetAddress.getByName(hostOut), portOut);
-        }
+          if (!context.nNode.connectToCluster(InetAddress.getByName(hostOut), portOut))
+            return false;
+        } else
+          return false;
       } catch(UnknownHostException e) {
         return false;
       }

@@ -1,7 +1,11 @@
 package org.basex.dist;
 
+import static org.basex.core.Text.*;
+
 import java.io.*;
 import java.net.*;
+
+import org.basex.util.*;
 
 /**
  * A cluster peer for a super-peer. This class represents another peer (super-peer or
@@ -18,9 +22,8 @@ public class SuperClusterPeer extends ClusterPeer {
    * Default constructor.
    * @param c The commanding peer for this peer in the cluster.
    * @param s The connection to talk to this peer.
-   * @throws IOException 
    */
-  public SuperClusterPeer(final SuperPeer c, final Socket s) throws IOException {
+  public SuperClusterPeer(final SuperPeer c, final Socket s) {
     super(c, s);
 
     commandingSuperPeer = c;
@@ -34,10 +37,9 @@ public class SuperClusterPeer extends ClusterPeer {
    * @param nConnHost host name to connect to.
    * @param nConnPort port number to connect to.
    * @param newSuperPeer is this a super-peer?
-   * @throws IOException 
    */
   public SuperClusterPeer(final SuperPeer c, final InetAddress nHost, final int nPort,
-      final InetAddress nConnHost, final int nConnPort, final boolean newSuperPeer) throws IOException {
+      final InetAddress nConnHost, final int nConnPort, final boolean newSuperPeer) {
     super(c, nHost, nPort, nConnHost, nConnPort, newSuperPeer);
 
     commandingSuperPeer = c;
@@ -63,7 +65,7 @@ public class SuperClusterPeer extends ClusterPeer {
       if (packetIn == DistConstants.P_CONNECT_SEND_PEERS) {
         int length = in.readInt();
         byte[] nbHost = new byte[length];
-        in.read(nbHost, 0, length);
+        in.read(nbHost);
         connectHost = InetAddress.getByAddress(nbHost);
         connectPort = in.readInt();
 
@@ -80,7 +82,7 @@ public class SuperClusterPeer extends ClusterPeer {
           if(n.getStatus() == DistConstants.status.CONNECTED) {
             byte[] bHost = n.getConnectionHostAsByte();
             out.writeInt(bHost.length);
-            out.write(bHost, 0, bHost.length);
+            out.write(bHost);
             out.writeInt(n.getConnectionPort());
           }
         }
@@ -95,8 +97,8 @@ public class SuperClusterPeer extends ClusterPeer {
         changeStatus(DistConstants.status.CONNECTED);
       }
     } catch (IOException e) {
-      commandingPeer.log.write("I/O error on the socket connection to " +
-          getIdentifier());
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
       changeStatus(DistConstants.status.CONNECT_FAILED);
     }
   }
@@ -121,7 +123,7 @@ public class SuperClusterPeer extends ClusterPeer {
       if (packetIn == DistConstants.P_CONNECT_SEND_PEERS) {
         int length = in.readInt();
         byte[] nbHost = new byte[length];
-        in.read(nbHost, 0, length);
+        in.read(nbHost);
         connectHost = InetAddress.getByAddress(nbHost);
         connectPort = in.readInt();
 
@@ -138,7 +140,7 @@ public class SuperClusterPeer extends ClusterPeer {
           if (n.getStatus() == DistConstants.status.CONNECTED) {
             byte[] bHost = n.getConnectionHostAsByte();
             out.writeInt(bHost.length);
-            out.write(bHost, 0, bHost.length);
+            out.write(bHost);
             out.writeInt(n.getConnectionPort());
           }
         }
@@ -153,30 +155,29 @@ public class SuperClusterPeer extends ClusterPeer {
         out.write(DistConstants.P_CONNECT_NORMAL_ACK);
       }
     } catch (IOException e) {
-      commandingPeer.log.write("I/O exception.");
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.CONNECT_FAILED);
     }
   }
 
   /**
    * Connect to another super-peer to join the network.
-   *
-   * @return success
    */
   @Override
-  protected boolean initiateConnect() {
+  protected void initiateConnect() {
     try {
       status = DistConstants.status.PENDING;
       out.write(DistConstants.P_CONNECT_SUPER);
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
-      return false;
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.CONNECT_FAILED);
     }
-
-    return true;
   }
 
   @Override
-  protected boolean connect() {
+  protected void connect() {
     try {
       commandingSuperPeer.addSuperPeerToNetwork(this);
 
@@ -201,30 +202,30 @@ public class SuperClusterPeer extends ClusterPeer {
           in.read(nbHost2, 0, length);
           InetAddress cHost = InetAddress.getByAddress(nbHost2);
           int cPort = in.readInt();
-          commandingSuperPeer.connectToPeer(cHost, cPort);
+          if (commandingSuperPeer.connectToPeer(cHost, cPort)) {
+            changeStatus(DistConstants.status.DISCONNECTED);
+            return;
+          }
         }
 
         out.write(DistConstants.P_CONNECT_NODES_ACK);
         changeStatus(DistConstants.status.CONNECTED);
-        return true;
+      } else {
+        out.write(DistConstants.P_CONNECT_NORMAL);
+        if(in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
+          changeStatus(DistConstants.status.CONNECTED);
+        } else {
+          changeStatus(DistConstants.status.CONNECT_FAILED);
+        }
       }
-
-      out.write(DistConstants.P_CONNECT_NORMAL);
-      if(in.readByte() == DistConstants.P_CONNECT_NORMAL_ACK) {
-        changeStatus(DistConstants.status.CONNECTED);
-        return true;
-      }
-
-      changeStatus(DistConstants.status.CONNECT_FAILED);
-      return false;
     } catch(IOException e) {
-      commandingPeer.log.write("I/O error");
-      return false;
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
     }
   }
 
   @Override
-  protected boolean initiateSimpleConnect() {
-    return initiateConnect();
+  protected void initiateSimpleConnect() {
+    initiateConnect();
   }
 }

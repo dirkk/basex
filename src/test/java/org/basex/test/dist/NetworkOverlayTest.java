@@ -53,7 +53,7 @@ public final class NetworkOverlayTest {
         t[iT].join();
         ++iT;
       }
-      Thread.sleep(500);
+
       clusterPort = localPort;
       localPort += 10;
       int max;
@@ -66,7 +66,6 @@ public final class NetworkOverlayTest {
       for (int j = 0; j < max; ++j) {
         try {
           t[iT] = new Peer("localhost", localPort, "localhost", clusterPort);
-          Thread.sleep(1000);
         } catch (BaseXException e) {
           System.err.println("Exception");
           System.err.println(e.getMessage());

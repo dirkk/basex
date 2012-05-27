@@ -1038,13 +1038,13 @@ public interface Text {
   String DIALOG_DISTRIBUTION = lang("dialog_distribution");
   /** Create a new network. */
   String CREATE_NETWORK = lang("create_network");
-  /** This node should be a super-peer */
+  /** This node should be a super-peer. */
   String NEW_SUPERPEER = lang("new_superpeer");
   /** Create a new network node. */
   String DISTRIBUTION_INCOMING_HOST = lang("dist_incoming_host");
   /** Join an existing network. */
   String DISTRIBUTION_JOINING_NODE = lang("join_node");
-  
+
   /** Dialog title for database options. */
   String CREATE_DATABASE = lang("create_database");
   /** Whitespaces information. */
@@ -1413,8 +1413,8 @@ public interface Text {
   String H_HTML_PARSER = lang("h_html_parser");
   /** No HTML Parser. */
   String H_NO_HTML_PARSER = lang("h_no_html_parser");
-  
-  /** Distribution */
+
+  /** Distribution. */
   String H_DISTRIBUTION = lang("h_distribution");
 
   // SERVER TEXTS =============================================================
@@ -1459,11 +1459,19 @@ public interface Text {
   String S_SERVER_ADMIN = lang("s_server_admin");
   /** Command info. */
   String S_H_SERVER_ADMIN = lang("s_h_server_admin");
-  
+
   // DISTRIBUTION RELATED TEXTS
-  
-  /** Distribution */
+
+  /** Distribution. */
   String DISTRIBUTION = lang("distribution");
+  /** I/O on the connection socket broke down. */
+  String D_SOCKET_CLOSED_X = lang("d_socket_closed_%");
+  /** An I/O error occured during waiting for a new incoming socket connection. */
+  String D_SOCKET_WAIT_ERROR_X = lang("d_socket_wait_error_%");
+  /** Failed to close a socket in a clean way. */
+  String D_SOCKET_FREE_FAILED_X = lang("d_socket_free_failed_%");
+  /** Could not bindthe provided address. */
+  String D_BIND_ERROR_X = lang("d_bind_error_%");
 
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);

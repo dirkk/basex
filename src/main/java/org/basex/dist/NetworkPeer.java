@@ -1,5 +1,7 @@
 package org.basex.dist;
 
+import static org.basex.core.Text.*;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -7,6 +9,7 @@ import java.util.concurrent.locks.*;
 
 import org.basex.core.*;
 import org.basex.server.*;
+import org.basex.util.*;
 
 /**
  * Class to join a distributed BaseX network as a normal peer. This peer is connected to
@@ -68,8 +71,11 @@ public class NetworkPeer implements Runnable {
       serverSocket.setSoTimeout(5000);
       serverSocket.bind(new InetSocketAddress(host, port));
       running = true;
+    } catch(BindException e) {
+      Util.outln(D_BIND_ERROR_X, host.toString() + port);
     } catch(IOException e) {
-      log.write("Error while binding socket.");
+      Util.outln(D_SOCKET_WAIT_ERROR_X, serverSocket.getInetAddress().toString()
+          + serverSocket.getLocalPort());
     }
 
     peers = new LinkedHashMap<String, ClusterPeer>();
@@ -92,33 +98,49 @@ public class NetworkPeer implements Runnable {
    * @return success.
    */
   public boolean connectToPeer(final InetAddress cHost, final int cPort) {
+    ClusterPeer newPeer = new ClusterPeer(this, host, getNextFreePort(), cHost,
+        cPort, false);
+    newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
+    return connectClusterPeer(newPeer);
+  }
+
+  /**
+   * Starts a new Thread based on a given peer within the cluster
+   * and connect to this peer.
+   *
+   * @param cp The peer to connect to
+   * @return connection establishment successful
+   */
+  protected boolean connectClusterPeer(final ClusterPeer cp) {
+    new Thread(cp).start();
+    cp.actionLock.lock();
+    cp.action.signalAll();
+    cp.actionLock.unlock();
+
+    cp.connectionLock.lock();
     try {
-      ClusterPeer newPeer = new ClusterPeer(this, host, port +
-            peers.values().size() + 1, cHost, cPort, false);
-      newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
-      new Thread(newPeer).start();
-      newPeer.actionLock.lock();
-      newPeer.action.signalAll();
-      newPeer.actionLock.unlock();
-
-      newPeer.connectionLock.lock();
-      try {
-        newPeer.connected.await();
-      } catch(InterruptedException e) {
-        log.write("Interrupt exception");
-        return false;
-      } finally {
-        newPeer.connectionLock.unlock();
-      }
-
-      if (newPeer.getStatus() == DistConstants.status.CONNECTED)
-        return true;
-
+      cp.connected.await();
+    } catch(InterruptedException e) {
+      log.write("Interrupt exception");
       return false;
-    } catch (IOException e) {
-      log.write("Could not create I/O on the socket.");
-      return false;
+    } finally {
+      cp.connectionLock.unlock();
     }
+
+    if (cp.getStatus() == DistConstants.status.CONNECTED)
+      return true;
+
+    return false;
+  }
+
+  /**
+   * Returns the next free port, starting from the initial port of
+   * this peer.
+   *
+   * @return next free port.
+   */
+  protected int getNextFreePort() {
+    return port + peers.values().size() + 1;
   }
 
   /**
@@ -131,34 +153,12 @@ public class NetworkPeer implements Runnable {
    * @return success
    */
   public boolean connectToCluster(final InetAddress cHost, final int cPort) {
-    try {
-      ClusterPeer newPeer = new ClusterPeer(this, host, port +
-            peers.values().size() + 1, cHost, cPort, true);
+    ClusterPeer newPeer = new ClusterPeer(this, host, port +
+          peers.values().size() + 1, cHost, cPort, true);
 
-      newPeer.actionType = DistConstants.action.FIRST_CONNECT;
-      new Thread(newPeer).start();
-      newPeer.actionLock.lock();
-      newPeer.action.signalAll();
-      newPeer.actionLock.unlock();
+    newPeer.actionType = DistConstants.action.FIRST_CONNECT;
 
-      newPeer.connectionLock.lock();
-      try {
-        newPeer.connected.await();
-      } catch(InterruptedException e) {
-        log.write("Interrupt exception");
-        return false;
-      } finally {
-        newPeer.connectionLock.unlock();
-      }
-
-      if (newPeer.getStatus() == DistConstants.status.CONNECTED)
-        return true;
-
-      return false;
-    } catch (IOException e) {
-      log.write("Could not create I/O on the socket.");
-      return false;
-    }
+    return connectClusterPeer(newPeer);
   }
 
   /**
@@ -176,7 +176,8 @@ public class NetworkPeer implements Runnable {
         serverSocket.close();
       }
     } catch (IOException e) {
-      log.write("Could not free a socket.");
+      Util.outln(D_SOCKET_FREE_FAILED_X, serverSocket.getInetAddress().toString()
+          + serverSocket.getLocalPort());
     }
   }
 
@@ -212,7 +213,7 @@ public class NetworkPeer implements Runnable {
       o += "Super-Peer: No super-peer registered.\r\n";
     }
 
-    o += "Normal peer \r\n" + getIdentifier();
+    o += "Normal peer: " + getIdentifier() + "\r\n";
     for(ClusterPeer c : peers.values()) {
       o += "|--- " + c.getIdentifier() + "\r\n";
     }
@@ -263,8 +264,9 @@ public class NetworkPeer implements Runnable {
           continue;
         }
       } catch(IOException e) {
-        log.write("I/O Exception");
-        running = false;
+        Util.outln(D_SOCKET_WAIT_ERROR_X, serverSocket.getInetAddress().toString()
+            + serverSocket.getLocalPort());
+        stop();
       }
     }
 

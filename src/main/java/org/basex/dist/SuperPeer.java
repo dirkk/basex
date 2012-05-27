@@ -1,10 +1,13 @@
 package org.basex.dist;
 
+import static org.basex.core.Text.*;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
 import org.basex.core.*;
+import org.basex.util.*;
 
 /**
  * A super-peer within the network. Acts as superior
@@ -50,34 +53,11 @@ public class SuperPeer extends NetworkPeer {
    */
   @Override
   public boolean connectToCluster(final InetAddress cHost, final int cPort) {
-    try {
-      SuperClusterPeer spc = new SuperClusterPeer(this, host,
-          port + peers.values().size() + 1, cHost, cPort, true);
-      spc.actionType = DistConstants.action.FIRST_CONNECT;
-      new Thread(spc).start();
-      spc.actionLock.lock();
-      spc.action.signalAll();
-      spc.actionLock.unlock();
+    SuperClusterPeer spc = new SuperClusterPeer(this, host,
+        getNextFreePort(), cHost, cPort, true);
+    spc.actionType = DistConstants.action.FIRST_CONNECT;
 
-      spc.connectionLock.lock();
-      try {
-        spc.connected.await();
-      } catch(InterruptedException e) {
-        log.write("Interrupt exception");
-        return false;
-      } finally {
-        spc.connectionLock.unlock();
-      }
-
-      return true;
-    } catch(BindException e) {
-      log.write("Could not bind to this address.");
-      log.write(e.getMessage());
-      return false;
-    } catch(IOException e) {
-      log.write("I/O error while trying to connect to the node cluster.");
-      return false;
-    }
+    return connectClusterPeer(spc);
   }
 
   /**
@@ -89,31 +69,22 @@ public class SuperPeer extends NetworkPeer {
    */
   @Override
   public synchronized boolean connectToPeer(final InetAddress cHost, final int cPort) {
-    try {
-      SuperClusterPeer pc = new SuperClusterPeer(this, host, port
-          + peers.values().size() + superPeers.size() + 1, cHost, cPort, true);
+      SuperClusterPeer pc = new SuperClusterPeer(this, host, getNextFreePort(), cHost,
+          cPort, true);
       pc.actionType = DistConstants.action.SIMPLE_CONNECT;
 
-      new Thread(pc).start();
-      pc.actionLock.lock();
-      pc.action.signalAll();
-      pc.actionLock.unlock();
+      return connectClusterPeer(pc);
+  }
 
-      pc.connectionLock.lock();
-      try {
-        pc.connected.await();
-      } catch(InterruptedException e) {
-        log.write("Interrupt exception");
-        return false;
-      } finally {
-        pc.connectionLock.unlock();
-      }
-
-      return true;
-    } catch (IOException e) {
-      log.write("Could not connect to peer " + cHost.getHostAddress());
-      return false;
-    }
+  /**
+   * Returns the next free port, starting from the initial port of
+   * this peer.
+   *
+   * @return next free port.
+   */
+  @Override
+  protected int getNextFreePort() {
+    return port + peers.values().size() + superPeers.size() + 1;
   }
 
   @Override
@@ -132,14 +103,15 @@ public class SuperPeer extends NetworkPeer {
           continue;
         }
       } catch (IOException e) {
-        log.write("I/O socket error.");
+        Util.outln(D_SOCKET_WAIT_ERROR_X, serverSocket.getInetAddress().toString()
+            + serverSocket.getLocalPort());
       }
     }
   }
 
-
   /**
-   * Gives information about this peer and connected peers.
+   * Gives information about this peer, connected normal peers and
+   * connected super-peers.
    * @return information about this peer.
    */
   @Override
