@@ -40,10 +40,8 @@ public class NetworkPeer implements Runnable {
   public Lock connectionLock;
   /** Wait to be connected. */
   public Condition connected;
-  /** XQuery to be executed. */
-  public String xquery;
-  /** Lock to execute only one xquery at a time. */
-  public Lock xqueryLock;
+  /** Queue of XQueries to be executed. */
+  public List<String> queueXQueries;
 
   /**
    * Makes this instance of BaseX to a peer in a distributed BaseX network.
@@ -59,7 +57,7 @@ public class NetworkPeer implements Runnable {
     log = new Log(ctx, false);
     connectionLock = new ReentrantLock();
     connected = connectionLock.newCondition();
-    xqueryLock = new ReentrantLock();
+    queueXQueries = new ArrayList<String>();
 
     port = nPort;
     host = InetAddress.getByName(nHost);
@@ -235,7 +233,7 @@ public class NetworkPeer implements Runnable {
    * @param q XQuery to execute.
    */
   public void executeXQuery(final String q) {
-    xquery = q;
+    queueXQueries.add(q);
 
     Iterator<ClusterPeer> i = peers.values().iterator();
     while (i.hasNext()) {

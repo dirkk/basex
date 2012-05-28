@@ -555,3 +555,10 @@ s_sessions           = Sessions
 s_alter              = Alter
 s_server_admin       = Server Administration
 s_h_server_admin     = Display the server administration for user management and log tracing.
+
+# text for the distributed network mode
+
+d_socket_closed_%      = The following socket was closed: %
+d_socket_wait_error_%  = During waiting on the socket % there occurred an I/O error
+d_socket_free_failed_% = Freeing the socket % failed. It should be closed now nonetheless.
+d_bind_error_%         = Could not bind to the socket %. Most likely the port is already used by another process.

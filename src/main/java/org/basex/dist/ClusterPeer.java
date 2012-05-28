@@ -2,9 +2,8 @@ package org.basex.dist;
 
 import java.io.*;
 import java.net.*;
+import java.util.*;
 import java.util.concurrent.locks.*;
-
-import org.basex.core.*;
 import org.basex.util.*;
 
 import static org.basex.core.Text.*;
@@ -413,9 +412,13 @@ public class ClusterPeer implements Runnable {
    */
   protected void executeXQuery() {
     try {
-      out.write(DistConstants.P_XQUERY);
-      out.write(commandingPeer.xquery.length());
-      out.writeBytes(commandingPeer.xquery);
+      Iterator<String> it = commandingPeer.queueXQueries.iterator();
+      while (it.hasNext()) {
+        String q = it.next();
+        out.write(DistConstants.P_XQUERY);
+        out.write(q.length());
+        out.writeBytes(q);
+      }
     } catch(IOException e) {
       Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
           + socket.getPort());
@@ -453,8 +456,37 @@ public class ClusterPeer implements Runnable {
       byte[] query = new byte[length];
       in.read(query);
 
+      out.write(DistConstants.P_RESULT_XQUERY);
+      //TODO send hash of xquery
       Query q = new Query(query.toString(), commandingPeer.ctx);
       q.execute(false, out, false);
+      out.write(0xF5);
+    } catch(IOException e) {
+      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
+          + socket.getPort());
+      changeStatus(DistConstants.status.DISCONNECTED);
+    }
+  }
+
+  /**
+   * An XQuery has been processed and evaluated on the other peer.
+   * This peer now sends the serialized result and this function processes
+   * this.
+   */
+  protected void handleResultXQuery() {
+    try {
+      //TODO check for hash
+
+      String r = new String();
+      while (true) {
+        byte packetIn = in.readByte();
+        if (packetIn == 0xF5)
+          break;
+
+        r += packetIn;
+      }
+
+      System.err.println(r);
     } catch(IOException e) {
       Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
           + socket.getPort());
@@ -510,9 +542,9 @@ public class ClusterPeer implements Runnable {
           commandingPeer.log.write("Lost connection to other peer.");
         }
         if (packetIn == DistConstants.P_XQUERY) {
-          actionType = DistConstants.action.HANDLE_XQUERY;
-
           handleXQuery();
+        } else if (packetIn == DistConstants.P_RESULT_XQUERY) {
+          handleResultXQuery();
         } else if (packetIn == DistConstants.P_CONNECT) {
           handleConnectFromNormalpeer();
           if (getStatus() != DistConstants.status.CONNECTED)

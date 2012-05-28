@@ -29,8 +29,10 @@ public final class DistConstants {
   public static final byte P_CONNECT_SEND_PEERS = 0x09;
   /** Packet message: execute XQuery. */
   public static final byte P_XQUERY = 0x0A;
-  /** Packet message: disconnect this connection */
+  /** Packet message: disconnect this connection. */
   public static final byte P_DISCONNECT = 0x0B;
+  /** Packet message: result of a XQuery. */
+  public static final byte P_RESULT_XQUERY = 0x0C;
 
   /** connection status of this network node within the cluster */
   public enum status {
