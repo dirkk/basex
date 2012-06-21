@@ -35,8 +35,13 @@ public final class DistConstants {
   public static final byte P_RESULT_XQUERY = 0x0C;
 
   /** connection status of this network node within the cluster */
-  public enum status {
+  public enum state {
     DISCONNECTED, PENDING, CONNECTED, CONNECT_FAILED
+  };
+  
+  /** Processing state of a distributed XQuery. */
+  public enum queryState {
+    QUEUED, PROCESSED, SEND, RETURNED, FINISHED
   };
 
   /** action to execute for a peer. */

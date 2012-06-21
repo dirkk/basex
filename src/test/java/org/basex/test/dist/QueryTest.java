@@ -3,7 +3,6 @@ package org.basex.test.dist;
 import static org.junit.Assert.*;
 
 import java.io.*;
-import java.util.*;
 
 import org.basex.core.*;
 import org.basex.core.cmd.*;
@@ -12,7 +11,7 @@ import org.basex.util.*;
 import org.junit.*;
 
 /**
- * Test the overlay P2P network infrastructure for the distributed BaseX version.
+ * Tests a simple query for the distributed version of BaseX.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
@@ -24,27 +23,28 @@ public final class QueryTest {
   private static final int NUM_PEERS = 4;
   /** starting port. */
   private static int localPort = 22000;
+  /** Threads simulating the different peers within the network. */
+  private static Peer[] baseXThread;
 
   /**
    * Start peers and build the overlay network topology.
    * @throws Exception exception
    */
-  @SuppressWarnings("unused")
-  @Test
-  public void createNetwork() throws Exception {
-    Random generator = new Random();
+  @BeforeClass
+  public static void createNetwork() throws Exception {
     int clusterPort = 0;
-    Peer[] t = new Peer[(NUM_PEERS + 1) * NUM_SUPERPEERS];
+    baseXThread = new Peer[(NUM_PEERS + 1) * NUM_SUPERPEERS];
     int iT = 0;
 
     for (int i = 0; i < NUM_SUPERPEERS; ++i) {
       if (i == 0) {
         // start first peer
-        t[iT] = new Peer("localhost", localPort);
+        baseXThread[iT] = new Peer("localhost", localPort);
         ++iT;
       } else {
         // create super-peer for this cluster
-        t[iT] = new Peer("localhost", localPort, "localhost", clusterPort, true);
+        baseXThread[iT] = new Peer("localhost", localPort, "localhost", clusterPort,
+            true);
         ++iT;
       }
       clusterPort = localPort;
@@ -52,7 +52,7 @@ public final class QueryTest {
 
       for (int j = 0; j < NUM_PEERS; ++j) {
         try {
-          t[iT] = new Peer("localhost", localPort, "localhost", clusterPort);
+          baseXThread[iT] = new Peer("localhost", localPort, "localhost", clusterPort);
         } catch (BaseXException e) {
           System.err.println("Exception");
           System.err.println(e.getMessage());
@@ -63,9 +63,39 @@ public final class QueryTest {
         localPort += 10;
       }
     }
+  }
 
-    t[1].start();
-    t[1].join();
+  /**
+   * Destroys the threads.
+   */
+  @After
+  public void cleanup() {
+    for (int i = 0; i < baseXThread.length; ++i) {
+      baseXThread[i].close();
+    }
+  }
+
+  /**
+   * Executes the query on one of the peers within the network.
+   * @throws InterruptedException Thread interrupted.
+   */
+  @Test
+  public void executeQuery() throws InterruptedException {
+    baseXThread[1].start();
+    baseXThread[1].join();
+  }
+
+  /**
+   * Executes the query on all of the peers within the network in
+   * sequential order.
+   * @throws InterruptedException Thread interrupted.
+   */
+  @Test
+  public void executeQueryAll() throws InterruptedException {
+    for (int i = 0; i < baseXThread.length; ++i) {
+      baseXThread[i].start();
+      baseXThread[i].join();
+    }
   }
 
   /** Network peer. */
@@ -74,8 +104,6 @@ public final class QueryTest {
     public final String name;
     /** BaseX instance. */
     public Context ctx;
-    /** Clean up files. */
-    public boolean cleanup = true;
     /** number of instances. */
     public static int number = 1;
 
@@ -149,9 +177,8 @@ public final class QueryTest {
     @Override
     public void run() {
       try {
-        String result = new DiXQuery("//*").execute(ctx);
-        //System.err.println(result);
-        close();
+        String result = new DiXQuery("<li>1</li>").execute(ctx);
+        System.err.println(result);
       } catch(final Exception ex) {
         Util.stack(ex);
       }
@@ -172,10 +199,8 @@ public final class QueryTest {
      * Removes test databases and closes the database context.
      */
     public void close() {
-      if(cleanup) {
-        ctx.close();
-        assertTrue("Sandbox could not be deleted.", sandbox().delete());
-      }
+      ctx.close();
+      assertTrue("Sandbox could not be deleted.", sandbox().delete());
     }
 
     /**

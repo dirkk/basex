@@ -40,8 +40,10 @@ public class NetworkPeer implements Runnable {
   public Lock connectionLock;
   /** Wait to be connected. */
   public Condition connected;
+  /** Maximum sequence number for any XQuery. */
+  private Integer maxSeq;
   /** Queue of XQueries to be executed. */
-  public List<String> queueXQueries;
+  public Map<Integer, DistributedQuery> XQueries;
 
   /**
    * Makes this instance of BaseX to a peer in a distributed BaseX network.
@@ -57,10 +59,10 @@ public class NetworkPeer implements Runnable {
     log = new Log(ctx, false);
     connectionLock = new ReentrantLock();
     connected = connectionLock.newCondition();
-    queueXQueries = new ArrayList<String>();
-
     port = nPort;
     host = InetAddress.getByName(nHost);
+
+    maxSeq = 0;
 
     try {
       serverSocket = new ServerSocket();
@@ -77,6 +79,7 @@ public class NetworkPeer implements Runnable {
     }
 
     peers = new LinkedHashMap<String, ClusterPeer>();
+    XQueries = new LinkedHashMap<Integer, DistributedQuery>();
   }
 
   /**
@@ -125,7 +128,7 @@ public class NetworkPeer implements Runnable {
       cp.connectionLock.unlock();
     }
 
-    if (cp.getStatus() == DistConstants.status.CONNECTED)
+    if (cp.getStatus() == DistConstants.state.CONNECTED)
       return true;
 
     return false;
@@ -233,17 +236,36 @@ public class NetworkPeer implements Runnable {
    * @param q XQuery to execute.
    */
   public void executeXQuery(final String q) {
-    queueXQueries.add(q);
+    int thisSeq;
+    synchronized (maxSeq) {
+      thisSeq = maxSeq++;
+    }
 
+    DistributedQuery dq = new DistributedQuery(q, thisSeq);
+    XQueries.put(thisSeq, dq);
+
+    // TODO for now, send the query to ALL connected nodes. */
     Iterator<ClusterPeer> i = peers.values().iterator();
     while (i.hasNext()) {
       ClusterPeer cp = i.next();
+      dq.addPeer(cp);
+      cp.queueXQueries.put(thisSeq, new DistributedQuerySingle(q, thisSeq));
       cp.actionType = DistConstants.action.XQUERY;
 
       cp.actionLock.lock();
       cp.action.signalAll();
       cp.actionLock.unlock();
     }
+  }
+
+  /**
+   * This network peer got a result of a certain XQuery from
+   * another peer. This result now has to be processed.
+   * @param q
+   */
+  public void processXQueryResult(DistributedQuerySingle q) {
+    DistributedQuery dq = XQueries.get(q.seq);
+    dq.newResult(q);
   }
 
   @Override
