@@ -8,6 +8,7 @@ import java.util.*;
 import java.util.concurrent.locks.*;
 
 import org.basex.core.*;
+import org.basex.io.out.*;
 import org.basex.server.*;
 import org.basex.util.*;
 
@@ -234,14 +235,15 @@ public class NetworkPeer implements Runnable {
   /**
    * Executes the provided XQuery on all connected peers.
    * @param q XQuery to execute.
+   * @param o Output stream
    */
-  public void executeXQuery(final String q) {
+  public void executeXQuery(final String q, final PrintOutput out) {
     int thisSeq;
     synchronized (maxSeq) {
       thisSeq = maxSeq++;
     }
 
-    DistributedQuery dq = new DistributedQuery(q, thisSeq);
+    DistributedQuery dq = new DistributedQuery(q, thisSeq, out);
     XQueries.put(thisSeq, dq);
 
     // TODO for now, send the query to ALL connected nodes. */
@@ -263,9 +265,13 @@ public class NetworkPeer implements Runnable {
    * another peer. This result now has to be processed.
    * @param q
    */
-  public void processXQueryResult(DistributedQuerySingle q) {
+  public void processXQueryResult(final DistributedQuerySingle q) {
     DistributedQuery dq = XQueries.get(q.seq);
     dq.newResult(q);
+  }
+
+  public void outputXQueryResult(String result) {
+    //TODO
   }
 
   @Override

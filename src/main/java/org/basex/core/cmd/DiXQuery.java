@@ -24,7 +24,7 @@ public final class DiXQuery extends AQuery {
    * @return success flag
    */
   boolean dixquery(final String query) {
-    context.nNode.executeXQuery(query);
+    context.nNode.executeXQuery(query, out);
 
     return true;
   }
