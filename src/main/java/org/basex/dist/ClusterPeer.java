@@ -50,8 +50,6 @@ public class ClusterPeer implements Runnable {
   public DistConstants.action actionType;
   /** Listener for incoming requests from the other endpoint. */
   protected ClusterPeerListener listener;
-  /** Queue of XQueries to be executed. */
-  public Map<Integer, DistributedQuerySingle> queueXQueries;
 
   /**
    * Default constructor.
@@ -71,8 +69,6 @@ public class ClusterPeer implements Runnable {
     state = DistConstants.state.DISCONNECTED;
     commandingPeer = c;
     running = true;
-
-    queueXQueries = new LinkedHashMap<Integer, DistributedQuerySingle>();
   }
 
   /**
@@ -105,8 +101,6 @@ public class ClusterPeer implements Runnable {
           + socket.getPort());
     }
     initialiseSocket();
-
-    queueXQueries = new LinkedHashMap<Integer, DistributedQuerySingle>();
   }
 
   /**
@@ -414,27 +408,6 @@ public class ClusterPeer implements Runnable {
   }
 
   /**
-   * Sends a XQuery to the connected peer and executes it there.
-   */
-  protected synchronized void executeXQuery() {
-    try {
-      Iterator<DistributedQuerySingle> it = queueXQueries.values().iterator();
-      while (it.hasNext()) {
-        DistributedQuerySingle q = it.next();
-        out.write(DistConstants.P_XQUERY);
-        out.writeInt(q.seq);
-        out.writeInt(q.query.length());
-        out.write(q.query.getBytes());
-        q.state = DistConstants.queryState.SEND;
-      }
-    } catch(IOException e) {
-      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
-          + socket.getPort());
-      changeStatus(DistConstants.state.DISCONNECTED);
-    }
-  }
-
-  /**
    * Closes all open connections of this peer.
    */
   public void close() {
@@ -481,33 +454,6 @@ public class ClusterPeer implements Runnable {
     }
   }
 
-  /**
-   * An XQuery has been processed and evaluated on the other peer.
-   * This peer now sends the serialized result and this function processes
-   * this.
-   */
-  protected void handleResultXQuery() {
-    try {
-      int seq = in.readInt();
-      DistributedQuerySingle query = queueXQueries.get(seq);
-      String r = new String();
-      while (true) {
-        byte packetIn = in.readByte();
-        if (packetIn == 0)
-          break;
-
-        r += String.valueOf((char) packetIn);
-      }
-      query.result = r;
-      commandingPeer.processXQueryResult(query);
-      queueXQueries.remove(seq);
-    } catch(IOException e) {
-      Util.outln(D_SOCKET_CLOSED_X, socket.getInetAddress().toString()
-          + socket.getPort());
-      changeStatus(DistConstants.state.DISCONNECTED);
-    }
-  }
-
   @Override
   public void run() {
     while (running) {
@@ -520,8 +466,6 @@ public class ClusterPeer implements Runnable {
           initiateConnect();
         } else if (actionType == DistConstants.action.SIMPLE_CONNECT) {
           initiateSimpleConnect();
-        } else if (actionType == DistConstants.action.XQUERY) {
-          executeXQuery();
         }
 
         actionType = DistConstants.action.NONE;
@@ -557,8 +501,6 @@ public class ClusterPeer implements Runnable {
         }
         if (packetIn == DistConstants.P_XQUERY) {
           handleXQuery();
-        } else if (packetIn == DistConstants.P_RESULT_XQUERY) {
-          handleResultXQuery();
         } else if (packetIn == DistConstants.P_CONNECT) {
           handleConnectFromNormalpeer();
           if (getStatus() != DistConstants.state.CONNECTED)

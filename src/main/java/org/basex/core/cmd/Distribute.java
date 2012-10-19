@@ -20,7 +20,7 @@ public final class Distribute extends Command {
    * @param portIn The local socket port number.
    */
   public Distribute(final String hostIn, final String portIn) {
-    this(hostIn, portIn, null, null, true);
+    this(hostIn, portIn, null, null);
   }
 
   /**
@@ -33,21 +33,7 @@ public final class Distribute extends Command {
    */
   public Distribute(final String hostIn, final String portIn, final String hostOut,
       final String portOut) {
-    this(hostIn, portIn, hostOut, portOut, false);
-  }
-
-  /**
-   * Default constructor.
-   *
-   * @param hostIn The host name of the local socket.
-   * @param portIn The local socket port number.
-   * @param hostOut Connect to this host.
-   * @param portOut Connect to this port.
-   * @param superPeer Should this peer be a super-peer or not?
-   */
-  public Distribute(final String hostIn, final String portIn, final String hostOut,
-      final String portOut, final boolean superPeer) {
-    super(Perm.ADMIN, hostIn, portIn, hostOut, portOut, String.valueOf(superPeer));
+    super(Perm.ADMIN, hostIn, portIn, hostOut, portOut);
   }
 
   @Override
@@ -64,13 +50,8 @@ public final class Distribute extends Command {
       String hostOut = args[2];
       int portOut = Integer.valueOf(args[3]);
 
-      boolean superPeer = args[4].equalsIgnoreCase("true") ? true : false;
       try {
-        if (superPeer) {
-          context.nNode = new SuperPeer(host, port, context);
-        } else {
-          context.nNode = new NetworkPeer(host, port, context);
-        }
+        context.nNode = new NetworkPeer(host, port, context);
       } catch (UnknownHostException e) {
         return false;
       }
@@ -93,7 +74,7 @@ public final class Distribute extends Command {
 
     // new network
     try {
-      context.nNode = new SuperPeer(host, port, context);
+      context.nNode = new NetworkPeer(host, port, context);
     } catch(UnknownHostException e) {
       return false;
     }

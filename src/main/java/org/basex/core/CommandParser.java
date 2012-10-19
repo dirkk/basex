@@ -266,9 +266,6 @@ public final class CommandParser extends InputParser {
             return new Distribute(string(cmd), string(cmd));
           case JOIN:
             return new Distribute(string(cmd), string(cmd), string(cmd), string(cmd));
-          case JOIN_SUPERPEER:
-            return new Distribute(string(cmd), string(cmd), string(cmd), string(cmd),
-                true);
           default:
         }
         break;
