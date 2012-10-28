@@ -1,14 +1,12 @@
 package org.basex.dist;
 
-import static org.basex.core.Text.*;
-
 import java.io.*;
 import java.net.*;
+import java.nio.channels.*;
 import java.util.*;
-import java.util.concurrent.locks.*;
 
 import org.basex.core.*;
-import org.basex.server.*;
+import org.basex.dist.work.*;
 import org.basex.util.*;
 
 /**
@@ -20,63 +18,38 @@ import org.basex.util.*;
  * @author Dirk Kirsten
  */
 public class NetworkPeer implements Runnable {
-  /** Server socket to listen for new incoming connections. */
-  protected ServerSocket serverSocket;
   /** Is this peer running? */
-  public volatile boolean running;
+  protected boolean isRunning;
   /** List of connected peers, also including the super-peer. */
   protected Map<String, ClusterPeer> peers;
-  /** Log file. */
-  protected Log log;
-  /** Host name for listening socket. */
-  protected final InetAddress host;
-  /** Port number for listening socket. */
-  protected final int port;
   /** Reference to the database context. */
   protected final Context ctx;
-  /** Reference to the super-peer, null if super-peer itself. */
-  protected ClusterPeer superPeer;
-  /** Lock to be hold during connection establishment. */
-  public Lock connectionLock;
-  /** Wait to be connected. */
-  public Condition connected;
-  /** Maximum sequence number for any XQuery. */
-  private Integer maxSeq;
+  /** Reactor to handle network I/O. */
+  protected Reactor reactor;
+  /** Work queue for actions this peer should do. */
+  protected LinkedList<WorkPacket> workQueue;
 
   /**
    * Makes this instance of BaseX to a peer in a distributed BaseX network.
    *
-   * @param nHost host to listen to
-   * @param nPort port number to listen to
+   * @param host host to listen to
+   * @param port port number to listen to
    * @param context The database context
-   * @throws UnknownHostException unknown host name.
+   * @throws IOException Server listening socket could not be bound
    */
-  public NetworkPeer(final String nHost, final int nPort, final Context context)
-      throws UnknownHostException {
+  public NetworkPeer(final String host, final int port, final Context context)
+      throws IOException {
     ctx = context;
-    log = new Log(ctx, false);
-    connectionLock = new ReentrantLock();
-    connected = connectionLock.newCondition();
-    port = nPort;
-    host = InetAddress.getByName(nHost);
-
-    maxSeq = 0;
-
-    try {
-      serverSocket = new ServerSocket();
-      serverSocket.setReuseAddress(true);
-      /* use a socket timeout to check regularly if the connection was quit */
-      serverSocket.setSoTimeout(5000);
-      serverSocket.bind(new InetSocketAddress(host, port));
-      running = true;
-    } catch(BindException e) {
-      Util.outln(D_BIND_ERROR_X, host.toString() + port);
-    } catch(IOException e) {
-      Util.outln(D_SOCKET_WAIT_ERROR_X, serverSocket.getInetAddress().toString()
-          + serverSocket.getLocalPort());
+    
+    reactor = new Reactor(host, port, this);
+    if (reactor != null) {
+      isRunning = true;
+    } else {
+      isRunning = false;
     }
 
     peers = new LinkedHashMap<String, ClusterPeer>();
+    workQueue = new LinkedList<WorkPacket>();
   }
 
   /**
@@ -87,76 +60,51 @@ public class NetworkPeer implements Runnable {
   protected void addPeerToNetwork(final ClusterPeer cp) {
     peers.put(cp.getIdentifier(), cp);
   }
-
+  
   /**
-   * Connects this peer to another normal peer.
-   *
-   * @param cHost The host name to connect to
-   * @param cPort The port number to connect to
-   * @return success.
+   * Returns a peer within the cluster with the given ID.
+   * 
+   * @param identifier ID of the wanted peer.
+   * @return cluster peer
    */
-  public boolean connectToPeer(final InetAddress cHost, final int cPort) {
-    ClusterPeer newPeer = new ClusterPeer(this, host, getNextFreePort(), cHost,
-        cPort, false);
-    newPeer.actionType = DistConstants.action.SIMPLE_CONNECT;
-    return connectClusterPeer(newPeer);
+  public ClusterPeer getPeer(final String identifier) {
+    return peers.get(identifier);
   }
 
   /**
-   * Starts a new Thread based on a given peer within the cluster
-   * and connect to this peer.
+   * Join an already established cluster of a BaseX network. The method will
+   * either successfully establish a connection or the connection attempt
+   * fails. This method is non-blocking.
    *
-   * @param cp The peer to connect to
-   * @return connection establishment successful
+   * @param remoteAddress remote host name and port
    */
-  protected boolean connectClusterPeer(final ClusterPeer cp) {
-    new Thread(cp).start();
-    cp.actionLock.lock();
-    cp.action.signalAll();
-    cp.actionLock.unlock();
-
-    cp.connectionLock.lock();
+  public void connect(final InetSocketAddress remoteAddress) {
+    ClusterPeer cp = new ClusterPeer(this, remoteAddress);
+    addAction(new Connect(cp));
+  }
+  
+  /**
+   * A incoming connection was established by the acceptor. The following
+   * connection establishment should be handled by a new cluster peer.
+   * @param ch New socket
+   */
+  public void connectionEstablished(SocketChannel ch) {
     try {
-      cp.connected.await();
-    } catch(InterruptedException e) {
-      log.write("Interrupt exception");
-      return false;
-    } finally {
-      cp.connectionLock.unlock();
+      ClusterPeer cp = new ClusterPeer(this,
+          (InetSocketAddress) ch.getRemoteAddress());
+      addAction(new ConnectionAccept(cp));
+    } catch(IOException e) {
+      e.printStackTrace();
     }
-
-    if (cp.getStatus() == DistConstants.state.CONNECTED)
-      return true;
-
-    return false;
   }
-
+  
   /**
-   * Returns the next free port, starting from the initial port of
-   * this peer.
-   *
-   * @return next free port.
+   * Returns the reactor.
+   * 
+   * @return active reactor.
    */
-  protected int getNextFreePort() {
-    return port + peers.values().size() + 1;
-  }
-
-  /**
-   * Join an already established cluster of a BaseX network. You have to connect
-   * to the super-peer of this cluster. If not a normal peer will send the address
-   * of the super-peer and the connection establishment is done again.
-   *
-   * @param cHost the name of the node to connect to.
-   * @param cPort the port number of the node to connect to.
-   * @return success
-   */
-  public boolean connectToCluster(final InetAddress cHost, final int cPort) {
-    ClusterPeer newPeer = new ClusterPeer(this, host, port +
-          peers.values().size() + 1, cHost, cPort, true);
-
-    newPeer.actionType = DistConstants.action.FIRST_CONNECT;
-
-    return connectClusterPeer(newPeer);
+  public Reactor getReactor() {
+    return reactor;
   }
 
   /**
@@ -170,12 +118,9 @@ public class NetworkPeer implements Runnable {
 
     /* Free resources. */
     try {
-      if (serverSocket != null && serverSocket.isBound()) {
-        serverSocket.close();
-      }
+      reactor.close();
     } catch (IOException e) {
-      Util.outln(D_SOCKET_FREE_FAILED_X, serverSocket.getInetAddress().toString()
-          + serverSocket.getLocalPort());
+      Util.outln(e.getStackTrace());
     }
   }
 
@@ -184,18 +129,7 @@ public class NetworkPeer implements Runnable {
    * distributed mode.
    */
   public void stop() {
-    running = false;
-  }
-
-  /**
-   * Is this a super-peer itself?
-   * @return boolean true, if super-peer.
-   */
-  public boolean isSuperPeer() {
-    if(superPeer == null)
-      return true;
-
-    return false;
+    isRunning = false;
   }
 
   /**
@@ -204,19 +138,22 @@ public class NetworkPeer implements Runnable {
    */
   public String info() {
     String o = new String();
-    if (superPeer != null) {
-      o += "Super-Peer: " + superPeer.socket.getInetAddress().toString() + ":" +
-          superPeer.socket.getPort() + "\r\n";
-    } else {
-      o += "Super-Peer: No super-peer registered.\r\n";
-    }
 
-    o += "Normal peer: " + getIdentifier() + "\r\n";
+    o += "Id: " + getIdentifier() + "\r\n";
     for(ClusterPeer c : peers.values()) {
       o += "|--- " + c.getIdentifier() + "\r\n";
     }
 
     return o;
+  }
+  
+  /**
+   * Adds a new action to the work queue to be executed.
+   *
+   * @param wp packet to be executed
+   */
+  public void addAction(WorkPacket wp) {
+    workQueue.push(wp);
   }
 
   /**
@@ -225,32 +162,22 @@ public class NetworkPeer implements Runnable {
    * @return A unique identifier.
    */
   public String getIdentifier() {
-    return host.getHostAddress() + ":" + port;
-  }
-
-  public void outputXQueryResult(String result) {
-    //TODO
+    InetSocketAddress address = reactor.getSocketAddress();
+    return address.getHostString() + ":" + address.getPort();
   }
 
   @Override
   public void run() {
-    while (running) {
-      try {
-        /* Waiting for another node to connect */
+    while (isRunning) {
+      while (!workQueue.isEmpty()) {
         try {
-          Socket socketIn = serverSocket.accept();
-          socketIn.setReuseAddress(true);
-
-          ClusterPeer cn = new ClusterPeer(this, socketIn);
-          Thread t = new Thread(cn);
-          t.start();
-        } catch(SocketTimeoutException e) {
-          continue;
+          WorkPacket wp = workQueue.pop();
+          System.out.println("Packet from " +
+              reactor.getSocketAddress().getPort());
+          wp.execute();
+        } catch(IOException e) {
+          Util.errln("I/O error during work for the network peer: ", e);
         }
-      } catch(IOException e) {
-        Util.outln(D_SOCKET_WAIT_ERROR_X, serverSocket.getInetAddress().toString()
-            + serverSocket.getLocalPort());
-        stop();
       }
     }
 

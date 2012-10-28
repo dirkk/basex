@@ -1,9 +1,11 @@
 package org.basex.core.cmd;
 
+import java.io.*;
 import java.net.*;
 
 import org.basex.core.*;
 import org.basex.dist.*;
+import org.basex.util.*;
 
 /**
  * Evaluates the 'distribute' command and opens connections to communicate
@@ -16,24 +18,24 @@ public final class Distribute extends Command {
   /**
    * Open a new network.
    *
-   * @param hostIn The host name of the local socket.
-   * @param portIn The local socket port number.
+   * @param host The host name of the local socket.
+   * @param port The local socket port number.
    */
-  public Distribute(final String hostIn, final String portIn) {
-    this(hostIn, portIn, null, null);
+  public Distribute(final String host, final String port) {
+    this(host, port, null, null);
   }
 
   /**
    * Connect to a existing network as a normal peer.
    *
-   * @param hostIn The host name of the local socket.
-   * @param portIn The local socket port number.
-   * @param hostOut Connect to this host.
-   * @param portOut Connect to this port.
+   * @param host The host name of the local socket.
+   * @param port The local socket port number.
+   * @param remoteHost Connect to this host.
+   * @param remotePort Connect to this port.
    */
-  public Distribute(final String hostIn, final String portIn, final String hostOut,
-      final String portOut) {
-    super(Perm.ADMIN, hostIn, portIn, hostOut, portOut);
+  public Distribute(final String host, final String port, final String remoteHost,
+      final String remotePort) {
+    super(Perm.ADMIN, host, port, remoteHost, remotePort);
   }
 
   @Override
@@ -45,39 +47,27 @@ public final class Distribute extends Command {
     String host = args[0];
     int port = Integer.valueOf(args[1]);
 
-    // connect to network, if given
-    if (args[2] != null && args[3] != null) {
-      String hostOut = args[2];
-      int portOut = Integer.valueOf(args[3]);
-
-      try {
-        context.nNode = new NetworkPeer(host, port, context);
-      } catch (UnknownHostException e) {
-        return false;
-      }
-
-      try {
-        if (hostOut != null && portOut > 1023) {
-          if (!context.nNode.connectToCluster(InetAddress.getByName(hostOut), portOut))
-            return false;
-        } else
-          return false;
-      } catch(UnknownHostException e) {
-        return false;
-      }
-      Thread t = new Thread(context.nNode);
-      t.start();
-
-
-      return true;
-    }
-
-    // new network
+    // open local sockets
     try {
       context.nNode = new NetworkPeer(host, port, context);
-    } catch(UnknownHostException e) {
+    } catch (IOException e) {
+      Util.errln("Could not open new network. Cause: ");
+      e.printStackTrace();
       return false;
     }
+    
+    // connect to network, if given
+    if (args[2] != null && args[3] != null) {
+      String remoteHost = args[2];
+      int remotePort = Integer.valueOf(args[3]);
+
+      if (remoteHost != null && remotePort > 1023) {
+        context.nNode.connect(new InetSocketAddress(remoteHost, remotePort));
+      } else {
+        return false;
+      }
+    }
+
     new Thread(context.nNode).start();
 
     return true;

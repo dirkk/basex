@@ -3,7 +3,6 @@ package org.basex.test.dist;
 import static org.junit.Assert.*;
 
 import java.io.*;
-import java.util.*;
 
 import org.basex.core.*;
 import org.basex.core.cmd.*;
@@ -12,71 +11,41 @@ import org.basex.util.*;
 import org.junit.*;
 
 /**
- * Test the overlay P2P network infrastructure for the distributed BaseX version.
+ * Test the overlay P2P network infrastructure for the distributed BaseX
+ * version.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
  */
 public final class NetworkOverlayTest {
-  /** Number of super-peers. */
-  private static final int NUM_SUPERPEERS = 4;
-  /** Minimum number of peers per super-peer. */
-  private static final int MIN_PEERS = 3;
-  /** Maximum number of peers per super-peer. */
-  private static final int MAX_PEERS = 6;
-  /** starting port. */
-  private static int localPort = 22000;
+  /** Number of peers to create. */
+  private static final int PEERS = 2;
+  /** starting port, will be increased by 10 for every new peer. */
+  private static final int START_PORT = 22000;
+  /** port to be used for the next peer as server port. */
+  private static int localPort = START_PORT;
 
   /**
    * Start peers and build the overlay network topology.
    * @throws Exception exception
    */
-  @SuppressWarnings("unused")
   @Test
   public void createNetwork() throws Exception {
-    Random generator = new Random();
-    int clusterPort = 0;
-    Peer[] t = new Peer[(MAX_PEERS + 1) * NUM_SUPERPEERS];
-    int iT = 0;
+    Peer[] t = new Peer[PEERS];
 
-    for (int i = 0; i < NUM_SUPERPEERS; ++i) {
-      if (i == 0) {
-        // start first peer
-        t[iT] = new Peer("localhost", localPort);
-        t[iT].start();
-        t[iT].join();
-        ++iT;
-      } else {
-        // create super-peer for this cluster
-        t[iT] = new Peer("localhost", localPort, "localhost", clusterPort, true);
-        t[iT].start();
-        t[iT].join();
-        ++iT;
-      }
-
-      clusterPort = localPort;
+    // start first peer, connect to nothing
+    t[0] = new Peer("localhost", localPort);
+    //t[0].start();
+    //t[0].join();
+    
+    // start all other peers, connect to first peer
+    for (int i = 1; i < PEERS; ++i) {
       localPort += 10;
-      int max;
-      if (MAX_PEERS == MIN_PEERS) {
-        max = MIN_PEERS;
-      } else {
-        max = generator.nextInt(MAX_PEERS + 1 - MIN_PEERS) + MIN_PEERS;
-      }
-
-      for (int j = 0; j < max; ++j) {
-        try {
-          t[iT] = new Peer("localhost", localPort, "localhost", clusterPort);
-        } catch (BaseXException e) {
-          System.err.println("Exception");
-          System.err.println(e.getMessage());
-          e.printStackTrace();
-          throw new Exception();
-        }
-        t[iT].start();
-        t[iT].join();
-        ++iT;
-        localPort += 10;
-      }
+      Thread.sleep(1000);
+      
+      t[i] = new Peer("localhost", localPort, "localhost", START_PORT);
+      //t[i].start();
+      //t[i++].join();
     }
   }
 
@@ -134,35 +103,14 @@ public final class NetworkOverlayTest {
       }
       createSandbox();
       ctx.mprop.set(MainProp.DBPATH, sandbox().path());
-      new Distribute(host, String.valueOf(port), cHost, String.valueOf(cPort), false).execute(ctx);
-    }
-
-    /**
-     * Peer constructor.
-     * @param host host name.
-     * @param port port number.
-     * @param cHost host name to connect to.
-     * @param cPort port number to connect to.
-     * @param superpeer This peer should be a superpeer.
-     * @throws IOException I/O exception while establishing the session
-     */
-    public Peer(final String host, final int port, final String cHost, final int cPort,
-        @SuppressWarnings("unused") final boolean superpeer) throws IOException {
-      synchronized(this) {
-        name = Util.name(NetworkOverlayTest.class) + String.valueOf(number);
-        ++number;
-      }
-      createSandbox();
-      ctx.mprop.set(MainProp.DBPATH, sandbox().path());
-      new Distribute(host, String.valueOf(port), cHost, String.valueOf(cPort), true)
-        .execute(ctx);
+      new Distribute(host, String.valueOf(port), cHost, String.valueOf(cPort)).execute(ctx);
     }
 
     @Override
     public void run() {
       System.err.println("Thread NetworkOverlayTest.Peer runs.");
       try {
-        sleep(1000);
+        sleep(10000);
         String output = new ShowNetwork().execute(ctx);
         if (output.contains("State: DISCONNECTED") || output.contains("State: PENDING")
             ) {
