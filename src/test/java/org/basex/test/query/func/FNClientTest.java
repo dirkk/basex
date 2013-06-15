@@ -9,7 +9,6 @@ import org.basex.core.*;
 import org.basex.core.cmd.*;
 import org.basex.query.util.*;
 import org.basex.test.query.*;
-import org.basex.test.server.*;
 import org.junit.*;
 
 /**
@@ -85,11 +84,13 @@ public final class FNClientTest extends AdvancedQueryTest {
   /** Test method for the correct return of all XDM data types. */
   @Test
   public void queryTypes() {
+    /* TODO
     final Object[][] types = XdmInfoTest.TYPES;
     for(final Object[] type : types) {
       if(type == null || type.length < 3) continue;
       query(_CLIENT_QUERY.args(conn(), " " + "\"" + type[1] + "\""), type[2]);
     }
+    */
   }
 
   /** Test method. */

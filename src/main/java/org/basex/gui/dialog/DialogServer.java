@@ -262,8 +262,9 @@ public final class DialogServer extends BaseXDialog {
    */
   private boolean ping(final boolean local) {
     final GUIProp gprop = gui.gprop;
-    return BaseXServer.ping(local ? LOCALHOST : gprop.get(GUIProp.S_HOST),
-      gprop.num(local ? GUIProp.S_SERVERPORT : GUIProp.S_PORT));
+    //TODO return BaseXServer.ping(local ? LOCALHOST : gprop.get(GUIProp.S_HOST),
+    //  gprop.num(local ? GUIProp.S_SERVERPORT : GUIProp.S_PORT));
+    return false;
   }
 
   @Override
@@ -277,7 +278,7 @@ public final class DialogServer extends BaseXDialog {
 
     try {
       if(cmp == start) {
-        try {
+        // try {
           final int p = Integer.parseInt(ports.getText());
           gui.gprop.set(GUIProp.S_SERVERPORT, p);
           if(host.getText().equals(LOCALHOST)) {
@@ -285,16 +286,17 @@ public final class DialogServer extends BaseXDialog {
             gui.gprop.set(GUIProp.S_EVENTPORT, p + 1);
             portc.setText(String.valueOf(p));
           }
-          BaseXServer.start(p, "-p", Integer.toString(p), "-e", Integer.toString(p + 1));
+          // TODO BaseXServer.start(p, "-p", Integer.toString(p), "-e", Integer.toString(p + 1));
           msg = Util.info(SRV_STARTED_PORT_X, p);
           running = true;
+          /* TODO
         } catch(final BaseXException ex) {
           msg = Util.message(ex);
           icon = Msg.ERROR;
-        }
+        } */
       } else if(cmp == stop) {
         final int p = gui.gprop.num(GUIProp.S_SERVERPORT);
-        if(running) BaseXServer.stop(p, gui.gprop.num(GUIProp.S_EVENTPORT));
+        // TODO if(running) BaseXServer.stop(p, gui.gprop.num(GUIProp.S_EVENTPORT));
         running = ping(true);
         connected = connected && ping(false);
         if(!connected) msg = Util.info(SRV_STOPPED_PORT_X, p);

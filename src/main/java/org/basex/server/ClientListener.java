@@ -37,8 +37,6 @@ public final class ClientListener extends Thread {
   private final Performance perf = new Performance();
   /** Database context. */
   private final Context context;
-  /** Server reference. */
-  private final BaseXServer server;
   /** Socket reference. */
   private final Socket socket;
 
@@ -65,10 +63,9 @@ public final class ClientListener extends Thread {
    * @param c database context
    * @param srv server reference
    */
-  public ClientListener(final Socket s, final Context c, final BaseXServer srv) {
+  public ClientListener(final Socket s, final Context c) {
     context = new Context(c, this);
     socket = s;
-    server = srv;
     last = System.currentTimeMillis();
     setDaemon(true);
   }
@@ -211,7 +208,7 @@ public final class ClientListener extends Thread {
       }
     }
 
-    server.remove(this);
+    // TODO server.remove(this);
     return running;
   }
 
@@ -396,7 +393,7 @@ public final class ClientListener extends Thread {
    * @throws IOException I/O exception
    */
   private void watch() throws IOException {
-    server.initEvents();
+    // server.initEvents();
 
     // initialize server-based event handling
     if(!events) {
