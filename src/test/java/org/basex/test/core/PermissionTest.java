@@ -273,7 +273,7 @@ public final class PermissionTest extends SandboxTest {
   @Test
   public void dropUsers() {
     no(new DropUser(NAME), testSession);
-    no(new DropUser(NAME), adminSession);
+    ok(new DropUser(NAME), adminSession);
     ok(new Exit(), testSession);
     // give the server some time to close the client session
     Performance.sleep(50);

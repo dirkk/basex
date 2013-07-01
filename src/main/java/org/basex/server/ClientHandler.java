@@ -10,6 +10,7 @@ import org.basex.core.parse.*;
 import org.basex.io.in.*;
 import org.basex.query.*;
 import org.basex.server.messages.*;
+import org.basex.util.*;
 
 import scala.concurrent.duration.*;
 
@@ -53,6 +54,8 @@ public class ClientHandler extends UntypedActor {
   protected ActorRef event;
   /** Worker pool to do blocking command execution. */
   protected ActorRef cmdWorker;
+  /** Current command. */
+  private Command command;
   
   /**
    * Create Props for the client handler actor.
@@ -109,7 +112,7 @@ public class ClientHandler extends UntypedActor {
           .sendDelayed(getSender(), getSelf(), getContext().system(), Duration.create(1, TimeUnit.SECONDS));
       }
     } else if (msg instanceof ConnectionClosed) {
-      connectionClosed((ConnectionClosed) msg);
+      quit();
     } else {
       unhandled(msg);
     }
@@ -174,7 +177,7 @@ public class ClientHandler extends UntypedActor {
             }
           }
         } else if (msg instanceof ConnectionClosed) {
-          connectionClosed((ConnectionClosed) msg);
+          quit();
         } else if (msg instanceof ActorRef) {
           register((ActorRef) msg);
         } else {
@@ -197,7 +200,21 @@ public class ClientHandler extends UntypedActor {
    * Exits the session.
    */
   public synchronized void quit() {
+    // wait until running command was stopped
+    if(command != null) {
+      command.stop();
+    }
+    dbContext().sessions.remove(this);
     
+    try {
+      new Close().run(dbContext());
+      // remove this session from all events in pool
+      for(final Sessions s : dbContext().events.values()) s.remove(this);
+    } catch(final Throwable ex) {
+      log.error(ex.getMessage());
+    }
+
+    getContext().stop(getSelf());
   }
   
   /**
@@ -328,7 +345,6 @@ public class ClientHandler extends UntypedActor {
    * @param reader incoming message reader
    */
   protected void command(final Reader reader) {
-    Command command;
     String cmd = reader.getString();
     
     // parse input and create command instance
@@ -357,14 +373,6 @@ public class ClientHandler extends UntypedActor {
     log.info("Event registered");
     
     new Writer().writeTerminator().send(event, getSelf());
-  }
-  /**
-   * The TCP socket connection was closed.
-   * @param msg closing message
-   */
-  protected void connectionClosed(final ConnectionClosed msg) {
-    log.info("TCP connection was closed. Error Cause: {}", msg.getErrorCause());
-    getContext().stop(getSelf());
   }
 
   /**
