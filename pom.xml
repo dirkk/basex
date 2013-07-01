@@ -93,31 +93,26 @@
       <scope>runtime</scope>
       <optional>true</optional>
     </dependency>
-        <dependency>
-		    <groupId>com.typesafe.akka</groupId>
-		    <artifactId>akka-actor_2.10</artifactId>
-		    <version>${akkaVersion}</version>
+    	<dependency>
+		  <groupId>com.typesafe.akka</groupId>
+		  <artifactId>akka-actor_2.10</artifactId>
+		  <version>${akkaVersion}</version>
 		</dependency>
 		<dependency>
-		    <groupId>com.typesafe.akka</groupId>
-		    <artifactId>akka-remote_2.10</artifactId>
-		    <version>${akkaVersion}</version>
+		  <groupId>com.typesafe.akka</groupId>
+		  <artifactId>akka-remote_2.10</artifactId>
+		  <version>${akkaVersion}</version>
 		</dependency>
 		<dependency>
-		    <groupId>com.typesafe.akka</groupId>
-		    <artifactId>akka-contrib_2.10</artifactId>
-		    <version>${akkaVersion}</version>
+		  <groupId>com.typesafe.akka</groupId>
+		  <artifactId>akka-contrib_2.10</artifactId>
+		  <version>${akkaVersion}</version>
 		</dependency>
 		<dependency>
-		    <groupId>com.typesafe.akka</groupId>
-		    <artifactId>akka-testkit_2.10</artifactId>
-		    <version>${akkaVersion}</version>
-		    <scope>test</scope>
-		</dependency>
-    <dependency>
-		    <groupId>com.typesafe.akka</groupId>
-		    <artifactId>akka-contrib_2.10</artifactId>
-		    <version>${akkaVersion}</version>
+		  <groupId>com.typesafe.akka</groupId>
+		  <artifactId>akka-testkit_2.10</artifactId>
+		  <version>${akkaVersion}</version>
+		  <scope>test</scope>
 		</dependency>
   </dependencies>
   <build>
