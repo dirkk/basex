@@ -1,11 +1,15 @@
-======================================================= BASEX README ===
+BaseX ReadMe
+================================
 
  Welcome to the source code of BaseX.
+ 
+ Build status: ![build status](https://api.travis-ci.org/dirkk/basex.png "Build Status")
 
  To get the project running as smooth as possible, please consider the
  following notes:
 
-COMPILING BASEX --------------------------------------------------------
+COMPILING BASEX
+--------------------------------------------------------
 
  JDK 1.6 and JUnit is currently needed to compile the complete sources
  of the main project. If you are using another environment than Eclipse
@@ -26,13 +30,15 @@ COMPILING BASEX --------------------------------------------------------
  example, you can use BaseX to process XQuery expressions without
  entering the console.
 
-USING ECLIPSE ----------------------------------------------------------
+USING ECLIPSE
+----------------------------------------------------------
 
  BaseX is being developed with the Eclipse environment. Some style
  guidelines are integrated in the sources of BaseX; they are being
  embedded as soon as you open the project.
 
-RUNNING BASEX ----------------------------------------------------------
+RUNNING BASEX
+----------------------------------------------------------
 
  The following steps can be performed to start BaseX with Eclipse:
 
@@ -42,7 +48,8 @@ RUNNING BASEX ----------------------------------------------------------
  - Choose a "Main class" (e.g., org.basex.BaseXGUI)
  - Launch the project via 'Run'
 
-ADDING CHECKSTYLE ------------------------------------------------------
+ADDING CHECKSTYLE
+------------------------------------------------------
 
  Some additional Checkstyle guidelines are defined in the project:
 
@@ -52,7 +59,8 @@ ADDING CHECKSTYLE ------------------------------------------------------
  - Enter the URL: http://eclipse-cs.sourceforge.net/update
  - Follow the installation procedure and restart Eclipse
 
-USING GIT --------------------------------------------------------------
+USING GIT
+--------------------------------------------------------------
 
  The code base of BaseX can be accessed via GitHub (www.github.com):
 
@@ -61,7 +69,8 @@ USING GIT --------------------------------------------------------------
  - Examples: http://github.com/BaseXdb/basex-examples
  - Tests, Stress Tests: http://github.com/BaseXdb/basex-tests
 
-------------------------------------------------------------------------
+FEEDBACK
+--------------------------------------------------------------
 
  Any kind of feedback is welcome; please check out the documentation at
  http://docs.basex.org
@@ -74,5 +83,3 @@ USING GIT --------------------------------------------------------------
 
  All the best,
  BaseX Team, 2011
-
-========================================================================
