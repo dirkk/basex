@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 import org.basex.*;
 import org.basex.core.*;
 import org.basex.core.cmd.*;
-import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.test.query.*;
 import org.junit.*;
 

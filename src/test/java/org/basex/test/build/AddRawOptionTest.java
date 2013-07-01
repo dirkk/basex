@@ -10,6 +10,7 @@ import org.basex.core.cmd.*;
 import org.basex.core.cmd.Set;
 import org.basex.query.func.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.test.*;
 import org.junit.*;
 

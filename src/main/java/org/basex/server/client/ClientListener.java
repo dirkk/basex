@@ -1,4 +1,4 @@
-package org.basex.server;
+package org.basex.server.client;
 
 import java.io.*;
 import java.net.*;

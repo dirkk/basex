@@ -1,4 +1,4 @@
-package org.basex.server;
+package org.basex.server.client;
 
 import java.io.*;
 import java.net.*;
@@ -8,6 +8,7 @@ import org.basex.core.*;
 import org.basex.core.parse.Commands.*;
 import org.basex.io.in.*;
 import org.basex.io.out.*;
+import org.basex.server.*;
 import org.basex.util.*;
 
 /**

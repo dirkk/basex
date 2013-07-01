@@ -4,6 +4,7 @@ import java.io.*;
 
 import org.basex.io.in.*;
 import org.basex.query.value.type.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 

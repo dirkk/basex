@@ -1,9 +1,10 @@
-package org.basex.server;
+package org.basex.server.client;
 
 import java.io.*;
 
 import org.basex.core.*;
 import org.basex.io.in.*;
+import org.basex.server.*;
 
 /**
  * This class defines all methods for iteratively evaluating queries with the

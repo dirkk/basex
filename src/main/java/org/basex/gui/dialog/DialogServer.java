@@ -18,6 +18,7 @@ import org.basex.gui.editor.*;
 import org.basex.gui.layout.*;
 import org.basex.io.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 

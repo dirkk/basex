@@ -1,9 +1,10 @@
-package org.basex.server;
+package org.basex.server.client;
 
 import java.io.*;
 
 import org.basex.core.*;
 import org.basex.io.out.*;
+import org.basex.server.*;
 
 /**
  * <p>This class defines methods for evaluating commands, either locally or

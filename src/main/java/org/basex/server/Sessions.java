@@ -4,6 +4,7 @@ import static org.basex.core.Text.*;
 
 import java.util.concurrent.*;
 
+import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 

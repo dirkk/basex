@@ -1,4 +1,4 @@
-package org.basex.server;
+package org.basex.server.client;
 
 /**
  * Notification interface for handling database events.

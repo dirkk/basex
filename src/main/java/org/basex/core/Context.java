@@ -6,6 +6,7 @@ import org.basex.data.*;
 import org.basex.io.random.*;
 import org.basex.query.util.pkg.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 

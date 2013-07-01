@@ -42,6 +42,8 @@ public final class MainProp extends AProp {
   public static final Object[] PORT = { "PORT", 1984 };
   /** Server: port, used for binding the server. */
   public static final Object[] SERVERPORT = { "SERVERPORT", 1984 };
+  /** Server: port, used for listening for data changes. */
+  public static final Object[] MASTERPORT = { "MASTERPORT", 1984 };
   /** Server: port, used for sending events. */
   public static final Object[] EVENTPORT = { "EVENTPORT", 1985 };
   /** Default user. */
@@ -51,6 +53,8 @@ public final class MainProp extends AProp {
 
   /** Server: host, used for binding the server. Empty string for wildcard.*/
   public static final Object[] SERVERHOST = { "SERVERHOST", "" };
+  /** Server: master host, used for listening for data changes. Empty string for wildcard.*/
+  public static final Object[] MASTERHOST = { "MASTERHOST", "" };
   /** Server: proxy host. */
   public static final Object[] PROXYHOST = { "PROXYHOST", "" };
   /** Server: proxy port. */

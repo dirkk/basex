@@ -10,7 +10,7 @@ import org.basex.*;
 import org.basex.core.*;
 import org.basex.io.*;
 import org.basex.io.out.*;
-import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 import org.junit.*;
@@ -80,7 +80,7 @@ public abstract class SandboxTest {
   protected static BaseXServer createServer(final String... args) throws IOException {
     try {
       System.setOut(NULL);
-      final StringList sl = new StringList().add("-z").add("-p9999").add("-e9998");
+      final StringList sl = new StringList().add("-z").add("-h:9999").add("-e9998");
       for(final String a : args) sl.add(a);
       final BaseXServer server = new BaseXServer(sl.toArray());
       server.context.mprop.set(MainProp.DBPATH, sandbox().path());
@@ -93,9 +93,8 @@ public abstract class SandboxTest {
   /**
    * Stops a server instance.
    * @param server server
-   * @throws IOException I/O exception
    */
-  protected static void stopServer(final BaseXServer server) throws IOException {
+  protected static void stopServer(final BaseXServer server) {
     try {
       System.setOut(NULL);
       if(server != null) server.stop();

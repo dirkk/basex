@@ -10,6 +10,7 @@ import org.basex.io.*;
 import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 
 /**

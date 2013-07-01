@@ -10,6 +10,7 @@ import org.basex.io.*;
 import org.basex.io.out.*;
 import org.basex.io.serial.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 

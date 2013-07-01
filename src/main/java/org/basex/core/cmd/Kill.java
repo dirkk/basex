@@ -4,6 +4,7 @@ import static org.basex.core.Text.*;
 
 import org.basex.core.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 
 /**
  * Evaluates the 'kill' command and stops user sessions.

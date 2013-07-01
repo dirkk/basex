@@ -16,6 +16,7 @@ import org.basex.query.value.*;
 import org.basex.query.value.item.*;
 import org.basex.query.value.type.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 
 /**

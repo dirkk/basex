@@ -9,6 +9,7 @@ import org.basex.core.parse.*;
 import org.basex.core.parse.Commands.*;
 import org.basex.data.*;
 import org.basex.server.*;
+import org.basex.server.client.*;
 import org.basex.util.*;
 
 /**
