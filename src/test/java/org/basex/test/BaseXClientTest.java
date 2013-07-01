@@ -29,7 +29,7 @@ public final class BaseXClientTest extends BaseXTest {
    */
   @Test
   public void port() throws IOException {
-    equals("1", new String[] { "-p9898", "-q1" }, new String[] { "-p9898" });
+    equals("1", new String[] { "-p9898", "-q1" }, new String[] { "-h:9898" });
   }
 
   /**

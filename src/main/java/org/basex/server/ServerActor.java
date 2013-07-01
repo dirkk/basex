@@ -4,7 +4,6 @@ import static org.basex.core.Text.*;
 
 import java.net.*;
 import org.basex.core.*;
-import org.basex.server.client.*;
 import org.basex.server.replication.*;
 import org.basex.util.*;
 
@@ -105,7 +104,7 @@ public class ServerActor extends UntypedActor {
       Bound b = (Bound) msg;
 
       log.info("Server bound to {} ", b.localAddress());
-      Util.outln(CONSOLE + Util.info(SRV_STARTED_PORT_X, b.localAddress().getPort()), SERVERMODE);
+      log.info(CONSOLE + Util.info(SRV_STARTED_PORT_X, b.localAddress().getPort()), SERVERMODE);
       bound = true;
       if (boundListener != null)
         boundListener.tell(true, getSelf());

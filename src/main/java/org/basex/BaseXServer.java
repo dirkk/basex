@@ -98,8 +98,6 @@ public final class BaseXServer extends Main {
     }
 
     if(service) {
-      Util.start(BaseXServer.class, args);
-      Util.outln(SRV_STARTED_PORT_X, port);
       Performance.sleep(1000);
       return;
     }

@@ -97,15 +97,15 @@ public interface Text {
   String SERVERMODE = "Server";
   /** Server start information. */
   String SERVERINFO =
-    " [-cdeipSz] [stop]" + NL +
-    "  stop      Stop running server" + NL +
-    "  -c<cmds>  Execute initial database commands" + NL +
-    "  -d        Activate debugging mode" + NL +
-    "  -e<port>  Set event port" + NL +
-    "  -i        Enter interactive mode" + NL +
-    "  -p<port>  Set server port" + NL +
-    "  -S        Start as service" + NL +
-    "  -z        Suppress logging";
+    " [-cdehiSz] [stop]" + NL +
+    "  stop               Stop running server" + NL +
+    "  -c<cmds>           Execute initial database commands" + NL +
+    "  -d                 Activate debugging mode" + NL +
+    "  -e<port>           Set event port" + NL +
+    "  -h<host>[:<port>]  Set server host and port" + NL +
+    "  -i                 Enter interactive mode" + NL +
+    "  -S                 Start as service" + NL +
+    "  -z                 Suppress logging";
 
   /** GUI mode. */
   String GUIMODE = "GUI";

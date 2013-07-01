@@ -44,10 +44,9 @@ public final class PermissionTest extends SandboxTest {
 
   /**
    * Stops the server.
-   * @throws IOException I/O exception
    */
   @AfterClass
-  public static void stop() throws IOException {
+  public static void stop() {
     stopServer(server);
   }
 
@@ -81,7 +80,7 @@ public final class PermissionTest extends SandboxTest {
       adminSession.execute(new DropDB(NAME));
       adminSession.close();
       // give the server some time to clean up the sessions before next test
-      Performance.sleep(50);
+      Performance.sleep(200);
     } catch(final Exception ex) {
       fail(Util.message(ex));
     }

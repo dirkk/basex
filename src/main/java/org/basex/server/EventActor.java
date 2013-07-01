@@ -57,7 +57,7 @@ public class EventActor extends UntypedActor {
     if (msg instanceof Bound) {
       Bound b = (Bound) msg;
       log.info("Event Server bound to {} ", b.localAddress());
-      Util.outln(CONSOLE + Util.info(SRV_STARTED_PORT_X, b.localAddress().getPort()), SERVERMODE);
+      log.info(CONSOLE + Util.info(SRV_STARTED_PORT_X, b.localAddress().getPort()), SERVERMODE);
     } else if (msg instanceof CommandFailed) {
       getContext().stop(getSelf());
     } else if (msg instanceof Connected) {
