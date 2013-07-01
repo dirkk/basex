@@ -19,8 +19,6 @@ import akka.io.Tcp.Connected;
  * 
  * This is a rather bad architecture due to the old client/server API. It means
  * opening a new thread for each event to listen to on the client side.
- * 
- * TODO: At the moment, no event notification is ever thrown.
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten

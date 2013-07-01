@@ -4,7 +4,6 @@ import static org.basex.core.Text.*;
 
 import java.util.concurrent.*;
 
-import org.basex.server.client.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 
@@ -14,7 +13,7 @@ import org.basex.util.list.*;
  * @author BaseX Team 2005-12, BSD License
  * @author Christian Gruen
  */
-public final class Sessions extends CopyOnWriteArrayList<ClientListener> {
+public final class Sessions extends CopyOnWriteArrayList<ClientHandler> {
   /**
    * Returns information about the currently opened sessions.
    * @return data reference
@@ -24,8 +23,8 @@ public final class Sessions extends CopyOnWriteArrayList<ClientListener> {
     tb.addExt(SESSIONS_X, size()).add(size() != 0 ? COL : DOT);
 
     final StringList sl = new StringList();
-    for(final ClientListener sp : this) {
-      sl.add(sp.context().user.name + ' ' + sp);
+    for(final ClientHandler sp : this) {
+      sl.add(sp.dbContext().user.name + ' ' + sp);
     }
     for(final String sp : sl.sort(true, true)) tb.add(NL).add(LI).add(sp);
     return tb.toString();

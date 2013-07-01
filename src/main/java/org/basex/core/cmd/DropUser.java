@@ -9,7 +9,6 @@ import org.basex.core.parse.*;
 import org.basex.core.parse.Commands.*;
 import org.basex.data.*;
 import org.basex.server.*;
-import org.basex.server.client.*;
 import org.basex.util.*;
 
 /**
@@ -48,8 +47,8 @@ public final class DropUser extends AUser {
 
     // drop global user
     if(db == null) {
-      for(final ClientListener s : context.sessions) {
-        if(s.context().user.name.equals(user)) return !info(USER_LOGGED_IN_X, user);
+      for(final ClientHandler s : context.sessions) {
+        if(s.dbContext().user.name.equals(user)) return !info(USER_LOGGED_IN_X, user);
       }
       context.users.drop(context.users.get(user));
       return info(USER_DROPPED_X, user);

@@ -22,7 +22,7 @@ import org.basex.util.list.*;
  */
 public final class Context {
   /** Client listener. Set to {@code null} in standalone/server mode. */
-  public final ClientListener listener;
+  public final ClientHandler listener;
   /** Client-related properties. */
   public final Prop prop = new Prop();
   /** Main properties. */
@@ -81,7 +81,7 @@ public final class Context {
    * @param ctx context of the main process
    * @param cl client listener
    */
-  public Context(final Context ctx, final ClientListener cl) {
+  public Context(final Context ctx, final ClientHandler cl) {
     listener = cl;
     mprop = ctx.mprop;
     dbs = ctx.dbs;

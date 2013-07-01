@@ -4,7 +4,6 @@ import static org.basex.core.Text.*;
 
 import org.basex.core.*;
 import org.basex.server.*;
-import org.basex.server.client.*;
 
 /**
  * Evaluates the 'kill' command and stops user sessions.
@@ -33,9 +32,9 @@ public final class Kill extends AUser {
       final Sessions ss = context.sessions;
       final String arg = args[0];
       for(int s = ss.size() - 1; s >= 0; --s) {
-        final ClientListener cl = ss.get(s);
+        final ClientHandler cl = ss.get(s);
         final String cs = cl.toString().replaceAll("\\[|\\]", "");
-        if(cl.context() == context) {
+        if(cl.dbContext() == context) {
           // show error if own session is addressed
           if(cs.equals(arg)) return error(KILL_SELF_X, arg);
         } else if(cs.startsWith(arg)) {
@@ -53,9 +52,9 @@ public final class Kill extends AUser {
     // kill all sessions of the specified user
     final Sessions ss = context.sessions;
     for(int s = ss.size() - 1; s >= 0; --s) {
-      final ClientListener cl = ss.get(s);
+      final ClientHandler cl = ss.get(s);
       // don't kill own sessions
-      if(cl.context() != context && user.equals(cl.context().user.name)) {
+      if(cl.dbContext() != context && user.equals(cl.dbContext().user.name)) {
         cl.quit();
         count++;
       }

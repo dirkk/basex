@@ -1,4 +1,4 @@
-package org.basex.server.client;
+package org.basex.server;
 
 import java.io.*;
 import java.util.*;
@@ -9,9 +9,6 @@ import org.basex.core.cmd.*;
 import org.basex.core.parse.*;
 import org.basex.io.in.*;
 import org.basex.query.*;
-import org.basex.server.*;
-import org.basex.server.Reader;
-import org.basex.server.Writer;
 import org.basex.server.messages.*;
 
 import scala.concurrent.duration.*;
@@ -46,14 +43,14 @@ public class ClientHandler extends UntypedActor {
   /** Active queries. */
   protected final HashMap<Integer, ActorRef> queries =
     new HashMap<Integer, ActorRef>();
+  /** Connected client address. */
+  protected Address addr;
   /** Event Socket address already sent? */
   protected boolean addressSend = false;
   /** Waiting for a WATCH command. Stateful protocol. */
   protected boolean watchCommand = false;
   /** Event handling actor. */
   protected ActorRef event;
-  /** Interface for core. */
-  protected ClientListener lst;
   /** Worker pool to do blocking command execution. */
   protected ActorRef cmdWorker;
   
@@ -73,7 +70,6 @@ public class ClientHandler extends UntypedActor {
   public ClientHandler(final Context ctx) {
     log = Logging.getLogger(getContext().system(), this);
     dbContext = new Context(ctx, null);
-    lst = new ClientListener(dbContext, null);
     cmdWorker = getContext().actorOf(CommandActor.mkProps(dbContext)
         .withRouter(new RoundRobinRouter(10)),
         "CmdExec");
@@ -97,7 +93,8 @@ public class ClientHandler extends UntypedActor {
       dbContext.user = dbContext.users.get(user);
       if (md5(dbContext.user.password + ts).equals(hashedPw)) {
         log.info("Authentification successful for user {}", dbContext.user);
-
+        addr = getSender().path().address();
+        
         // send successful response message
         new Writer().writeTerminator().send(getSender(), getSelf());
         
@@ -188,6 +185,22 @@ public class ClientHandler extends UntypedActor {
   }
   
   /**
+   * Returns the database context of this session.
+   * @return user reference
+   */
+  public Context dbContext() {
+    return dbContext;
+  }
+  
+
+  /**
+   * Exits the session.
+   */
+  public synchronized void quit() {
+    
+  }
+  
+  /**
    * Creates a database.
    * @param name database name
    * @param input input stream
@@ -222,6 +235,16 @@ public class ClientHandler extends UntypedActor {
   protected void store(final String path, final InputStream input) {
     execute(new Store(path), input);
   }
+  
+  /**
+   * Sends a notification to the client.
+   * @param name event name
+   * @param msg event message
+   */
+  public synchronized void notify(final byte[] name, final byte[] msg) {
+    new Writer().writeBytes(name).writeBytes(msg)
+      .send(event, getSelf());
+  }
 
   /**
    * Watches an event.
@@ -240,8 +263,7 @@ public class ClientHandler extends UntypedActor {
       final boolean ok = s != null && !s.contains(this);
       final String message;
       if(ok) {
-        if (lst == null) lst = new ClientListener(dbContext, null);
-        s.add(lst);
+        s.add(this);
         message = WATCHING_EVENT_X;
       } else if(s == null) {
         message = EVENT_UNKNOWN_X;
@@ -259,10 +281,10 @@ public class ClientHandler extends UntypedActor {
    */
   protected void unwatch(final String name) {
     final Sessions s = dbContext.events.get(name);
-    final boolean ok = s != null && s.contains(lst);
+    final boolean ok = s != null && s.contains(this);
     final String message;
     if(ok) {
-      s.remove(lst);
+      s.remove(this);
       message = UNWATCHING_EVENT_X;
     } else if(s == null) {
       message = EVENT_UNKNOWN_X;
@@ -334,7 +356,7 @@ public class ClientHandler extends UntypedActor {
     event = eventActor;
     log.info("Event registered");
     
-    new Writer().writeTerminator().send(getSender(), getSelf());
+    new Writer().writeTerminator().send(event, getSelf());
   }
   /**
    * The TCP socket connection was closed.
@@ -343,5 +365,13 @@ public class ClientHandler extends UntypedActor {
   protected void connectionClosed(final ConnectionClosed msg) {
     log.info("TCP connection was closed. Error Cause: {}", msg.getErrorCause());
     getContext().stop(getSelf());
+  }
+
+  /**
+   * Returns the host and port of a client.
+   * @return string representation
+   */
+  public String address() {
+    return addr.toString();
   }
 }

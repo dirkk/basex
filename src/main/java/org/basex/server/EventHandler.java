@@ -28,7 +28,7 @@ public class EventHandler extends UntypedActor {
     if (msg instanceof Received) {
       String name = new Reader(((Received) msg).data()).getString();
       ActorSelection sel = getContext().actorSelection("../../" + name);
-      sel.tell(getSelf(), getSender());
+      sel.tell(getSender(), getSelf());
     } else {
       unhandled(msg);
     }

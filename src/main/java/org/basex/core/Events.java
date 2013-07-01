@@ -10,7 +10,6 @@ import org.basex.io.*;
 import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
 import org.basex.server.*;
-import org.basex.server.client.*;
 import org.basex.util.*;
 
 /**
@@ -108,15 +107,10 @@ public final class Events extends HashMap<String, Sessions> {
     if(sess == null) return false;
 
     // refresh timestamp for last interaction
-    for(final ClientListener srv : sess) {
+    for(final ClientHandler srv : sess) {
       // ignore active client
       if(srv == ctx.listener) continue;
-      try {
-        srv.notify(name, msg);
-      } catch(final IOException ex) {
-        // remove client if event could not be delivered
-        sess.remove(srv);
-      }
+      srv.notify(name, msg);
     }
     return true;
   }

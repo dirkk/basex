@@ -39,6 +39,18 @@ public class Writer {
     return this;
   }
   
+  
+  /**
+   * Write a byte array and append with the terminator byte.
+   * @param b array to send
+   * @return this instance for method chaining
+   */
+  public Writer writeBytes(final byte[] b) {
+    builder.putBytes(b);
+    writeTerminator();
+    return this;
+  }
+  
   /**
    * Returns an {@link OutputStream}, which can now be used to write data to
    * the message

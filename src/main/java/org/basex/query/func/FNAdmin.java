@@ -145,10 +145,10 @@ public final class FNAdmin extends StandardFunc {
   private static Iter sessions(final QueryContext ctx) {
     final ValueBuilder vb = new ValueBuilder();
     synchronized(ctx.context.sessions) {
-      for(final ClientListener sp : ctx.context.sessions) {
-        final String user = sp.context().user.name;
+      for(final ClientHandler sp : ctx.context.sessions) {
+        final String user = sp.dbContext().user.name;
         final String addr = sp.address();
-        final Data data = sp.context().data();
+        final Data data = sp.dbContext().data();
         final FElem elem = new FElem(Q_SESSION).add(Q_USER, user).add(Q_ADDRESS, addr);
         if(data != null) elem.add(Q_DATABASE, data.meta.name);
         vb.add(elem);
