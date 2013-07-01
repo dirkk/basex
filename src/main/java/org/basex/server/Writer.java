@@ -1,6 +1,7 @@
 package org.basex.server;
 
 import java.io.*;
+import java.util.concurrent.*;
 
 import scala.concurrent.duration.*;
 
@@ -104,7 +105,7 @@ public class Writer {
     sys.scheduler().scheduleOnce(
         duration,
         dest,
-        builder.result(),
+        TcpMessage.write(builder.result()),
         sys.dispatcher(),
         sender
     );
