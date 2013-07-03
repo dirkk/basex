@@ -10,7 +10,6 @@ import org.basex.core.parse.*;
 import org.basex.io.in.*;
 import org.basex.query.*;
 import org.basex.server.messages.*;
-import org.basex.util.*;
 
 import scala.concurrent.duration.*;
 
