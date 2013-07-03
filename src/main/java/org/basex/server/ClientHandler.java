@@ -161,7 +161,7 @@ public class ClientHandler extends UntypedActor {
                   .send(getSender(), getSelf());
               }
             } else if (sc == ServerCmd.BIND || sc == ServerCmd.CONTEXT ||
-                sc == ServerCmd.ITER || sc == ServerCmd.EXEC || sc == ServerCmd.FULL ||
+                sc == ServerCmd.RESULTS || sc == ServerCmd.EXEC || sc == ServerCmd.FULL ||
                 sc == ServerCmd.INFO || sc == ServerCmd.OPTIONS || sc == ServerCmd.UPDATING) {
               int queryId = Integer.decode(reader.getString());
               if (queries.containsKey(queryId)) {

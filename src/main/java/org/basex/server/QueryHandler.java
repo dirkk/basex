@@ -86,7 +86,7 @@ public class QueryHandler extends UntypedActor {
           bind(reader);
         } else if (sc == ServerCmd.CONTEXT){
           context(reader);
-        } else if (sc == ServerCmd.ITER){
+        } else if (sc == ServerCmd.RESULTS){
           results();
         } else if (sc == ServerCmd.EXEC){
           exec();
