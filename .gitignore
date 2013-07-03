@@ -1,3 +1,12 @@
+# Test files
+SandboxTest.xml
+
+# config files
+
+.basex
+.basexgui
+.basexhistory
+
 ## generic files to ignore
 *~
 *.lock
