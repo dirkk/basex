@@ -43,7 +43,7 @@ public final class MainProp extends AProp {
   /** Server: port, used for binding the server. */
   public static final Object[] SERVERPORT = { "SERVERPORT", 1984 };
   /** Server: port, used for listening for data changes. */
-  public static final Object[] MASTERPORT = { "MASTERPORT", 1984 };
+  public static final Object[] MASTERPORT = { "MASTERPORT", 0 };
   /** Server: port, used for sending events. */
   public static final Object[] EVENTPORT = { "EVENTPORT", 1985 };
   /** Default user. */

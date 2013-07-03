@@ -39,10 +39,6 @@ public final class BaseXServer extends Main {
   private StringList commands;
   /** Start as daemon. */
   private boolean service;
-  /** Master host, if any. */
-  private String masterhost;
-  /** Master port, if any. */
-  private int masterport;
 
   /**
    * Main method, launching the server process.
@@ -79,22 +75,18 @@ public final class BaseXServer extends Main {
     final MainProp mprop = context.mprop;
     
     // parse and set all config options from the BaseX settings
-    Map<String, Object> configObjects = new HashMap<String, Object>();
     int port = mprop.num(MainProp.SERVERPORT);
-    if (port != 0)
-      configObjects.put("akka.remote.netty.tcp.port", port);
     String host = mprop.get(MainProp.SERVERHOST);
-    if (!host.isEmpty())
-      configObjects.put("akka.remote.netty.tcp.hostname", host);
-    Config parseConfig = ConfigFactory.parseMap(configObjects);
     
     // parse the Akka configuration and merge both configs, letting BaseX
     // specific config win
     Config regularConfig = ConfigFactory.load().getConfig("server");
 
     InetSocketAddress master = null;
-    if (masterhost != null && masterhost.length() > 0) {
-      master = new InetSocketAddress(masterhost, masterport);
+    int mport = mprop.num(MainProp.MASTERPORT);
+    String mhost = mprop.get(MainProp.MASTERHOST);
+    if (mhost != null && mhost.length() > 0 && mport != 0) {
+      master = new InetSocketAddress(mhost, mport);
     }
 
     if(service) {
@@ -107,10 +99,11 @@ public final class BaseXServer extends Main {
       for(final String c : commands) execute(c);
 
       // set up actor system
-      system = ActorSystem.create("BaseXServer", parseConfig.withFallback(regularConfig));
+      system = ActorSystem.create("BaseXServer", regularConfig);
       ActorRef server = system.actorOf(ServerActor.mkProps(
           new InetSocketAddress(host, port), 
           new InetSocketAddress(host, mprop.num(MainProp.EVENTPORT)),
+          master,
           context), "server");
       
       // wait for socket to be bound
@@ -169,17 +162,11 @@ public final class BaseXServer extends Main {
             if (all.length >= 2)
               context.mprop.set(MainProp.SERVERPORT, Integer.valueOf(all[1]));
             break;
-          case 'l': // this is a slave server, connect to this master host
-            masterhost = arg.string();
-            break;
           case 'm': // parse host + port of the master server to subscribe to
             all = arg.string().split(":");
             context.mprop.set(MainProp.MASTERHOST, all[0]);
             if (all.length >= 2)
               context.mprop.set(MainProp.MASTERPORT, Integer.valueOf(all[1]));
-            break;
-          case 'o': // parse master port
-            masterport = arg.number();
             break;
           case 'S': // set service flag
             service = true;

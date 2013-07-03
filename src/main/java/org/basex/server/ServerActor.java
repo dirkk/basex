@@ -46,24 +46,29 @@ public class ServerActor extends UntypedActor {
    * Create Props for the server actor.
    * @param l listening address for incoming connections
    * @param e event server address
+   * @param m master server address
    * @param ctx database context
    * @return Props for creating this actor, can be further configured
    */
   public static Props mkProps(final InetSocketAddress l, final InetSocketAddress e,
-      final Context ctx) {
-    return Props.create(ServerActor.class, l, e, ctx);
+      final InetSocketAddress m, final Context ctx) {
+    if (m == null)
+      return Props.create(ServerActor.class, l, e, ctx);
+    
+    return Props.create(ServerActor.class, l, e, m, ctx);
   }
 
   /**
    * Constructor.
-   * @param s listening address
+   * @param s server address
    * @param e event server address
    * @param ctx database context
    */
-  public ServerActor(final InetSocketAddress s, final InetSocketAddress e, final Context ctx) {
+  public ServerActor(final InetSocketAddress s, final InetSocketAddress e,
+      final Context ctx) {
     this(s, e, null, ctx);
   }
-  
+
   /**
    * Constructor.
    * @param s server address
@@ -79,8 +84,10 @@ public class ServerActor extends UntypedActor {
     dbContext = ctx;
     log = Logging.getLogger(getContext().system(), this);
     
-    if (m != null)
+    if (m == null)
       initPublishing();
+    else
+      initSubscription();
   }
 
   @Override
@@ -93,6 +100,13 @@ public class ServerActor extends UntypedActor {
         );
   }
 
+
+  @Override
+  public void postStop() {
+    Tcp.get(getContext().system()).manager()
+      .tell(TcpMessage.close(), getSelf());
+  }
+  
   @Override
   public void onReceive(Object msg) throws Exception {
     if (msg instanceof String && ((String) msg).equalsIgnoreCase("bound")) {
@@ -139,5 +153,12 @@ public class ServerActor extends UntypedActor {
    */
   private void initPublishing() {
     publisher = getContext().actorOf(PublishActor.mkProps(getId()), "publisher");
+  }
+  
+  /**
+   * Initialize the subscription to a master.
+   */
+  private void initSubscription() {
+    getContext().actorOf(SubscriberActor.mkProps(getId()), "subscriber");
   }
 }

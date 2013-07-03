@@ -1,7 +1,6 @@
 package org.basex.server.replication;
 
 import org.basex.server.*;
-import org.basex.server.client.*;
 
 import akka.actor.*;
 import akka.contrib.pattern.*;
