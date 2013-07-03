@@ -1,5 +1,6 @@
 package org.basex.test.server;
 
+import static org.basex.query.func.Function.*;
 import static org.junit.Assert.*;
 
 import java.io.*;
@@ -160,7 +161,11 @@ public final class EventTest extends SandboxTest {
   /**
    * Runs event test with specified second query and without.
    * @throws IOException I/O exception
+<<<<<<< HEAD
    * @throws InterruptedException event was not fired
+=======
+   * @throws InterruptedException waiting interrupted
+>>>>>>> 5c17ec254bb5806eb22a0d5e321f78cb6a0f18de
    */
   @Test
   public void event() throws IOException, InterruptedException {
@@ -234,7 +239,6 @@ public final class EventTest extends SandboxTest {
 
     // wait for half a second that the event is fired
     assertTrue(doneSignal.await(500, TimeUnit.MILLISECONDS));
-    
     // unwatch events
     for(final ClientSession cs : sessions) {
       cs.unwatch(NAME);
@@ -272,7 +276,7 @@ public final class EventTest extends SandboxTest {
       try {
         String name = NAME;
         if(!first) name += 1;
-        cs.query("db:event('" + name + "', '" + value + "')").execute();
+        cs.query(_DB_EVENT.args(name, value)).execute();
         cs.close();
       } catch(final Exception ex) {
         Util.stack(ex);

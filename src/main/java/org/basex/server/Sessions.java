@@ -26,7 +26,7 @@ public final class Sessions extends CopyOnWriteArrayList<ClientHandler> {
     for(final ClientHandler sp : this) {
       sl.add(sp.dbContext().user.name + ' ' + sp);
     }
-    for(final String sp : sl.sort(true, true)) tb.add(NL).add(LI).add(sp);
+    for(final String sp : sl.sort(true)) tb.add(NL).add(LI).add(sp);
     return tb.toString();
   }
 }
