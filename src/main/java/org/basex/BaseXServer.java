@@ -5,7 +5,6 @@ import static org.basex.core.Text.*;
 
 import java.io.*;
 import java.net.*;
-import java.util.*;
 
 import org.basex.core.*;
 import org.basex.server.*;
@@ -39,6 +38,8 @@ public final class BaseXServer extends Main {
   private StringList commands;
   /** Start as daemon. */
   private boolean service;
+  /** Use replication (master/slave infrastructure). */
+  private boolean replication = true;
 
   /**
    * Main method, launching the server process.
@@ -85,7 +86,7 @@ public final class BaseXServer extends Main {
     InetSocketAddress master = null;
     int mport = mprop.num(MainProp.MASTERPORT);
     String mhost = mprop.get(MainProp.MASTERHOST);
-    if (mhost != null && mhost.length() > 0 && mport != 0) {
+    if (replication && mhost != null && mhost.length() > 0 && mport != 0) {
       master = new InetSocketAddress(mhost, mport);
     }
 
@@ -170,6 +171,9 @@ public final class BaseXServer extends Main {
             break;
           case 'S': // set service flag
             service = true;
+            break;
+          case 'u': // do no use replication
+            replication = false;
             break;
           case 'z': // suppress logging
             context.mprop.set(MainProp.LOG, false);

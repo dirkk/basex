@@ -105,6 +105,7 @@ public interface Text {
     "  -h<host>[:<port>]  Set server host and port" + NL +
     "  -i                 Enter interactive mode" + NL +
     "  -S                 Start as service" + NL +
+    "  -u                 Do not use replication" + NL +
     "  -z                 Suppress logging";
 
   /** GUI mode. */
