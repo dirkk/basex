@@ -6,7 +6,7 @@ import org.basex.data.*;
 import org.basex.io.random.*;
 import org.basex.query.util.pkg.*;
 import org.basex.server.*;
-import org.basex.server.client.*;
+import org.basex.server.replication.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 
@@ -40,6 +40,9 @@ public final class Context {
   /** Databases list. */
   public final Databases databases;
 
+  /** Replication reference. */
+  public Replication repl;
+  
   /** User reference. */
   public User user;
   /** Log. */
@@ -92,6 +95,7 @@ public final class Context {
     users = ctx.users;
     repo = ctx.repo;
     log = ctx.log;
+    repl = ctx.repl;
   }
 
   /**
@@ -111,6 +115,7 @@ public final class Context {
     log = new Log(this);
     user = users.get(ADMIN);
     listener = null;
+    repl = null;
   }
 
   /**
@@ -194,6 +199,14 @@ public final class Context {
    */
   public void update() {
     current = null;
+  }
+  
+  /**
+   * Sets and enables replication. Only for client/server mode.
+   * @param r replication adapter
+   */
+  public void setReplication(final Replication r) {
+    repl = r;
   }
 
   /**

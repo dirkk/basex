@@ -18,6 +18,7 @@ import org.basex.core.parse.Commands.CmdIndexInfo;
 import org.basex.core.parse.Commands.CmdInfo;
 import org.basex.core.parse.Commands.CmdOptimize;
 import org.basex.core.parse.Commands.CmdPerm;
+import org.basex.core.parse.Commands.CmdRepl;
 import org.basex.core.parse.Commands.CmdRepo;
 import org.basex.core.parse.Commands.CmdShow;
 import org.basex.query.*;
@@ -215,6 +216,15 @@ public final class StringParser extends CmdParser {
             return new RepoDelete(string(cmd), new InputInfo(parser));
           case LIST:
             return new RepoList();
+          default:
+        }
+        break;
+      case REPLICATE:
+        switch(consume(CmdRepl.class, cmd)) {
+          case START:
+            return new ReplStart();
+          case CONNECT:
+            return new ReplConnect(string(cmd));
           default:
         }
         break;

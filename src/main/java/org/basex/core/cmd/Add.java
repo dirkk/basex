@@ -1,6 +1,7 @@
 package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
+import static org.basex.data.DataText.*;
 
 import java.io.*;
 
@@ -10,6 +11,7 @@ import org.basex.core.parse.*;
 import org.basex.data.*;
 import org.basex.data.atomic.*;
 import org.basex.io.*;
+import org.basex.server.messages.*;
 import org.basex.util.*;
 
 /**
@@ -105,6 +107,10 @@ public final class Add extends ACreate {
       if(tmp.meta.size > 1) {
         if(lock && !data.startUpdate()) return error(DB_PINNED_X, data.meta.name);
         data.insert(data.meta.size, -1, new DataClip(tmp));
+        if (context.repl != null)
+          context.repl.replicate(new DatabaseMessage(
+              new File(data.meta.dbfile(DATATBL).file(), "r")
+              ));
         context.update();
         if(lock) data.finishUpdate();
       }

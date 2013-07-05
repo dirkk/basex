@@ -38,8 +38,6 @@ public final class BaseXServer extends Main {
   private StringList commands;
   /** Start as daemon. */
   private boolean service;
-  /** Use replication (master/slave infrastructure). */
-  private boolean replication = true;
 
   /**
    * Main method, launching the server process.
@@ -83,28 +81,17 @@ public final class BaseXServer extends Main {
     // specific config win
     Config regularConfig = ConfigFactory.load().getConfig("server");
 
-    InetSocketAddress master = null;
-    int mport = mprop.num(MainProp.MASTERPORT);
-    String mhost = mprop.get(MainProp.MASTERHOST);
-    if (replication && mhost != null && mhost.length() > 0 && mport != 0) {
-      master = new InetSocketAddress(mhost, mport);
-    }
-
     if(service) {
       Performance.sleep(1000);
       return;
     }
 
     try {
-      // execute command-line arguments
-      for(final String c : commands) execute(c);
-
       // set up actor system
       system = ActorSystem.create("BaseXServer", regularConfig);
       ActorRef server = system.actorOf(ServerActor.mkProps(
           new InetSocketAddress(host, port), 
           new InetSocketAddress(host, mprop.num(MainProp.EVENTPORT)),
-          master,
           context), "server");
       
       // wait for socket to be bound
@@ -115,6 +102,9 @@ public final class BaseXServer extends Main {
       } catch(final Exception ex) {
         throw new BaseXException("Could not bind to socket");
       }
+
+      // execute command-line arguments
+      for(final String c : commands) execute(c);
       
       if(console) {
         console();
@@ -163,17 +153,8 @@ public final class BaseXServer extends Main {
             if (all.length >= 2)
               context.mprop.set(MainProp.SERVERPORT, Integer.valueOf(all[1]));
             break;
-          case 'm': // parse host + port of the master server to subscribe to
-            all = arg.string().split(":");
-            context.mprop.set(MainProp.MASTERHOST, all[0]);
-            if (all.length >= 2)
-              context.mprop.set(MainProp.MASTERPORT, Integer.valueOf(all[1]));
-            break;
           case 'S': // set service flag
             service = true;
-            break;
-          case 'u': // do no use replication
-            replication = false;
             break;
           case 'z': // suppress logging
             context.mprop.set(MainProp.LOG, false);

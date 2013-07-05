@@ -72,15 +72,30 @@ public abstract class SandboxTest {
   }
 
   /**
-   * Creates a new, sandboxed server instance.
+   * Creates a new, sandboxed server instance listening on port localhost:9999.
    * @param args additional arguments
    * @return server instance
    * @throws IOException I/O exception
    */
   protected static BaseXServer createServer(final String... args) throws IOException {
+    return createServer(LOCALHOST, 9999, args);
+  }
+  /**
+   * Creates a new, sandboxed server instance.
+   * @param host server host name
+   * @param port server port
+   * @param args additional arguments
+   * @return server instance
+   * @throws IOException I/O exception
+   */
+  protected static BaseXServer createServer(final String host, final int port,
+      final String... args) throws IOException {
     try {
       System.setOut(NULL);
-      final StringList sl = new StringList().add("-z").add("-h:9999").add("-e9998");
+      final StringList sl = new StringList()
+        .add("-z")
+        .add("-h" + host + ":" + port)
+        .add("-e" + (port - 1));
       for(final String a : args) sl.add(a);
       final BaseXServer server = new BaseXServer(sl.toArray());
       server.context.mprop.set(MainProp.DBPATH, sandbox().path());
@@ -104,15 +119,28 @@ public abstract class SandboxTest {
   }
 
   /**
-   * Creates a client instance.
+   * Creates a client instance connected to a server at localhost:9999.
    * @param login optional login data
    * @return client instance
    * @throws IOException I/O exception
    */
   public static ClientSession createClient(final String... login) throws IOException {
+    return createClient(LOCALHOST, 9999, login);
+  }
+  
+  /**
+   * Creates a client instance.
+   * @param host server host name
+   * @param port server port
+   * @param login optional login data
+   * @return client instance
+   * @throws IOException I/O exception
+   */
+  public static ClientSession createClient(final String host, final int port,
+      final String... login) throws IOException {
     final String user = login.length > 0 ? login[0] : ADMIN;
     final String pass = login.length > 1 ? login[1] : ADMIN;
-    return new ClientSession(LOCALHOST, 9999, user, pass);
+    return new ClientSession(host, port, user, pass);
   }
 
   /**

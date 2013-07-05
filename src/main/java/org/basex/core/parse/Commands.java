@@ -89,6 +89,10 @@ public interface Commands {
   String RENAME = "rename";
   /** Command string: "replace". */
   String REPLACE = "replace";
+  /** Command string: "repl-start". */
+  String REPL_START = "replicate-start";
+  /** Command string: "repl-connect". */
+  String REPL_CONNECT = "replicate-connect";
   /** Command string: "repo-delete". */
   String REPO_DELETE = "repo-delete";
   /** Command string: "repo-install". */
@@ -167,6 +171,8 @@ public interface Commands {
   enum CmdAlter { DATABASE, DB, USER }
   /** Repo types. */
   enum CmdRepo { INSTALL, DELETE, LIST }
+  /** Replication types. */
+  enum CmdRepl { START, CONNECT }
 
   /** Command definitions. */
   enum Cmd {
@@ -175,7 +181,7 @@ public interface Commands {
     EXPORT(HELPEXPORT), FIND(HELPFIND), FLUSH(HELPFLUSH), GET(HELPGET), GRANT(HELPGRANT),
     HELP(HELPHELP), INFO(HELPINFO), INSPECT(HELPINSPECT), KILL(HELPKILL), LIST(HELPLIST),
     OPEN(HELPOPEN), OPTIMIZE(HELPOPTIMIZE), PASSWORD(HELPPASSWORD), RENAME(HELPRENAME),
-    REPLACE(HELPREPLACE), REPO(HELPREPO), RESTORE(HELPRESTORE), RETRIEVE(HELPRETRIEVE),
+    REPLACE(HELPREPLACE), REPLICATE(HELPREPLICATE), REPO(HELPREPO), RESTORE(HELPRESTORE), RETRIEVE(HELPRETRIEVE),
     RUN(HELPRUN), EXECUTE(HELPEXECUTE), SET(HELPSET), SHOW(HELPSHOW), STORE(HELPSTORE),
     XQUERY(HELPXQUERY);
 

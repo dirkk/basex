@@ -3,7 +3,9 @@ package org.basex.server;
 import static org.basex.core.Text.*;
 
 import java.net.*;
+
 import org.basex.core.*;
+import org.basex.server.messages.*;
 import org.basex.server.replication.*;
 import org.basex.util.*;
 
@@ -29,8 +31,6 @@ public class ServerActor extends UntypedActor {
   private final InetSocketAddress serverAddr;
   /** Event address. */
   private final InetSocketAddress eventAddr;
-  /** Replication: Master address. */
-  private final InetSocketAddress masterAddr;
   /** Logging adapter. */
   private final LoggingAdapter log;
   /** Database context. */
@@ -41,21 +41,19 @@ public class ServerActor extends UntypedActor {
   private boolean bound = false;
   /** Publishing actor. */
   private ActorRef publisher;
+  /** Replicate interface for core system. */
+  private Replication repl;
 
   /**
    * Create Props for the server actor.
    * @param l listening address for incoming connections
    * @param e event server address
-   * @param m master server address
    * @param ctx database context
    * @return Props for creating this actor, can be further configured
    */
   public static Props mkProps(final InetSocketAddress l, final InetSocketAddress e,
-      final InetSocketAddress m, final Context ctx) {
-    if (m == null)
-      return Props.create(ServerActor.class, l, e, ctx);
-    
-    return Props.create(ServerActor.class, l, e, m, ctx);
+      final Context ctx) {
+    return Props.create(ServerActor.class, l, e, ctx);
   }
 
   /**
@@ -66,28 +64,12 @@ public class ServerActor extends UntypedActor {
    */
   public ServerActor(final InetSocketAddress s, final InetSocketAddress e,
       final Context ctx) {
-    this(s, e, null, ctx);
-  }
-
-  /**
-   * Constructor.
-   * @param s server address
-   * @param e event server address
-   * @param m master address, if any
-   * @param ctx database context
-   */
-  public ServerActor(final InetSocketAddress s, final InetSocketAddress e,
-      final InetSocketAddress m, final Context ctx) {
     serverAddr = s;
     eventAddr = e;
-    masterAddr = m;
     dbContext = ctx;
     log = Logging.getLogger(getContext().system(), this);
-    
-    if (m == null)
-      initPublishing();
-    else
-      initSubscription();
+    repl = new Replication(getSelf());
+    dbContext.setReplication(repl);
   }
 
   @Override
@@ -133,6 +115,18 @@ public class ServerActor extends UntypedActor {
       handler.tell("connect", getSender());
     } else if (msg instanceof Terminated) {
       log.error("The actor {} terminated.", ((Terminated) msg).actor().path());
+    } else if (msg instanceof ServerCommandMessage) {
+      InternalServerCmd cmd = ((ServerCommandMessage) msg).getCommand();
+      if (cmd == InternalServerCmd.STARTMASTER) {
+        initPublishing();
+      } else if (cmd == InternalServerCmd.CONNECTMASTER) {
+        InetSocketAddress masterAddr = (InetSocketAddress) ((ServerCommandMessage) msg).getArgs()[0];
+        initSubscription(masterAddr);
+      } else {
+        unhandled(msg);
+      }
+    } else if (msg instanceof InetSocketAddress) {
+      initSubscription((InetSocketAddress) msg);
     } else {
       if (publisher != null) {
         publisher.tell(msg, getSelf());
@@ -152,13 +146,14 @@ public class ServerActor extends UntypedActor {
    * Initialize the publishing actor.
    */
   private void initPublishing() {
-    publisher = getContext().actorOf(PublishActor.mkProps(getId()), "publisher");
+    publisher = getContext().actorOf(PublishActor.mkProps(dbContext, getId()), "publisher");
   }
-  
+
   /**
    * Initialize the subscription to a master.
+   * @param master master address to listen to
    */
-  private void initSubscription() {
+  private void initSubscription(final InetSocketAddress master) {
     getContext().actorOf(SubscriberActor.mkProps(getId()), "subscriber");
   }
 }

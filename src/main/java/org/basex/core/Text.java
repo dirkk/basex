@@ -410,6 +410,12 @@ public interface Text {
     "([" + C_PW + "])", lang("c_password1"), lang("c_password2")
   };
   /** Command help. */
+  String[] HELPREPLICATE = {
+    "[" + CmdRepl.START + "|" + CmdRepl.CONNECT + "]",
+    lang("c_repl1"),
+    lang("c_repl2")
+  };
+  /** Command help. */
   String[] HELPREPO = {
     "[" + CmdRepo.DELETE + '|' + CmdRepo.INSTALL + '|' + CmdRepo.LIST + ']',
     lang("c_repo1"),

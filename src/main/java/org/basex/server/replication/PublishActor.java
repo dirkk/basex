@@ -1,7 +1,6 @@
 package org.basex.server.replication;
 
-import org.basex.server.*;
-import org.basex.server.client.*;
+import org.basex.core.*;
 
 import akka.actor.*;
 import akka.contrib.pattern.*;
@@ -16,6 +15,8 @@ import akka.event.*;
  * @author Dirk Kirsten
  */
 public class PublishActor extends UntypedActor {
+  /** Database context. */
+  private final Context dbContext;
   /** DistributedPubSub contrib extension to Akka. */
   private final ActorRef mediator;
   /** Publish to this id. */
@@ -25,23 +26,27 @@ public class PublishActor extends UntypedActor {
  
   /**
    * Create Props for the publishing actor.
+   * @param ctx database context
    * @param t topic to sent to.
    * @return Props for creating this actor, can be further configured
    */
-  public static Props mkProps(final String t) {
-    return Props.create(ClientHandler.class, t);
+  public static Props mkProps(final Context ctx, final String t) {
+    return Props.create(PublishActor.class, ctx, t);
   }
   
   /**
    * Constructor.
+   * @param ctx database context
    * @param t id to publish to.
    */
-  public PublishActor(final String t) {
+  public PublishActor(final Context ctx, final String t) {
+    dbContext = ctx;
     topic = t;
     mediator = DistributedPubSubExtension.get(getContext().system()).mediator();
     log = Logging.getLogger(getContext().system(), this);
   }
   
+  @Override
   public void onReceive(Object msg) {
     mediator.tell(new DistributedPubSubMediator.Publish(topic, msg), 
       getSelf());
