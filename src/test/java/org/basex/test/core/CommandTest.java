@@ -327,6 +327,12 @@ public class CommandTest extends SandboxTest {
     ok(new InfoIndex());
     no(new InfoIndex("x"));
   }
+  
+  /** Command test. */
+  @Test
+  public final void infoReplication() {
+    ok(new InfoReplication());
+  }
 
   /** Command test. */
   @Test

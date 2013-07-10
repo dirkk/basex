@@ -91,7 +91,7 @@ public abstract class SandboxTest {
   protected static BaseXServer createServer(final String host, final int port,
       final String... args) throws IOException {
     try {
-      System.setOut(NULL);
+      // System.setOut(NULL);
       final StringList sl = new StringList()
         .add("-z")
         .add("-h" + host + ":" + port)

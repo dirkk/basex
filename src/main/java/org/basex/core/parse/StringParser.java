@@ -126,6 +126,8 @@ public final class StringParser extends CmdParser {
             return new InfoDB();
           case INDEX:
             return new InfoIndex(consume(CmdIndexInfo.class, null));
+          case REPLICATION:
+            return new InfoReplication();
           case STORAGE:
             String arg1 = number(null);
             final String arg2 = arg1 != null ? number(null) : null;

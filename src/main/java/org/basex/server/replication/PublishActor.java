@@ -1,9 +1,11 @@
 package org.basex.server.replication;
 
+import java.util.*;
+
 import org.basex.core.*;
+import org.basex.server.messages.*;
 
 import akka.actor.*;
-import akka.contrib.pattern.*;
 import akka.event.*;
 
 /**
@@ -17,38 +19,52 @@ import akka.event.*;
 public class PublishActor extends UntypedActor {
   /** Database context. */
   private final Context dbContext;
-  /** DistributedPubSub contrib extension to Akka. */
-  private final ActorRef mediator;
-  /** Publish to this id. */
-  private final String topic;
+  /** List of connected slaves */
+  private final List<ActorRef> slaves;
   /** Logging adapter. */
+  @SuppressWarnings("unused")
   private final LoggingAdapter log;
  
   /**
    * Create Props for the publishing actor.
    * @param ctx database context
-   * @param t topic to sent to.
    * @return Props for creating this actor, can be further configured
    */
-  public static Props mkProps(final Context ctx, final String t) {
-    return Props.create(PublishActor.class, ctx, t);
+  public static Props mkProps(final Context ctx) {
+    return Props.create(PublishActor.class, ctx);
   }
   
   /**
    * Constructor.
    * @param ctx database context
-   * @param t id to publish to.
    */
-  public PublishActor(final Context ctx, final String t) {
+  public PublishActor(final Context ctx) {
     dbContext = ctx;
-    topic = t;
-    mediator = DistributedPubSubExtension.get(getContext().system()).mediator();
+    slaves = new LinkedList<ActorRef>();
     log = Logging.getLogger(getContext().system(), this);
   }
   
   @Override
+  public void preStart() {
+    dbContext.repl.setPublisher(getSelf());
+  }
+  
+  @Override
   public void onReceive(Object msg) {
-    mediator.tell(new DistributedPubSubMediator.Publish(topic, msg), 
-      getSelf());
+    log.info("Publishing message: {}", msg.toString());
+    if (msg instanceof ServerCommandMessage) {
+      addSlave(getSender());
+    } else {
+      publish(msg);
+    }
+  }
+  
+  private void addSlave(final ActorRef slave) {
+    slaves.add(slave);
+  }
+  
+  private void publish(Object msg) {
+    for (ActorRef act : slaves)
+      act.tell(msg, getSelf());
   }
 }

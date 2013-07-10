@@ -5,10 +5,12 @@ import static org.basex.core.Text.*;
 
 import java.io.*;
 import java.net.*;
+import java.util.*;
 
 import org.basex.core.*;
 import org.basex.server.*;
 import org.basex.server.client.*;
+import org.basex.server.messages.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 
@@ -73,12 +75,22 @@ public final class BaseXServer extends Main {
     
     final MainProp mprop = context.mprop;
     
-    // parse and set all config options from the BaseX settings
     int port = mprop.num(MainProp.SERVERPORT);
     String host = mprop.get(MainProp.SERVERHOST);
     
+    // parse and set all config options from the BaseX settings
+    int mport = mprop.num(MainProp.MASTERPORT);
+    String mhost = mprop.get(MainProp.MASTERHOST);
+    Map<String, Object> configObjects = new HashMap<String, Object>();
+    if (mport != 0)
+      configObjects.put("akka.remote.netty.tcp.port", mport);
+    if (!mhost.isEmpty())
+      configObjects.put("akka.remote.netty.tcp.hostname", mhost);
+    Config parseConfig = ConfigFactory.parseMap(configObjects);
+    
     // parse the Akka configuration and merge both configs, letting BaseX
     // specific config win
+    ConfigFactory.invalidateCaches();
     Config regularConfig = ConfigFactory.load().getConfig("server");
 
     if(service) {
@@ -88,7 +100,8 @@ public final class BaseXServer extends Main {
 
     try {
       // set up actor system
-      system = ActorSystem.create("BaseXServer", regularConfig);
+      system = ActorSystem.create("BaseXServer",
+          parseConfig.withFallback(regularConfig));
       ActorRef server = system.actorOf(ServerActor.mkProps(
           new InetSocketAddress(host, port), 
           new InetSocketAddress(host, mprop.num(MainProp.EVENTPORT)),
@@ -97,7 +110,9 @@ public final class BaseXServer extends Main {
       // wait for socket to be bound
       try {
         Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-        Future<Object> future = Patterns.ask(server, "bound", timeout);
+        Future<Object> future = Patterns.ask(server,
+            new ServerCommandMessage(InternalServerCmd.BOUND),
+            timeout);
         Await.result(future, timeout.duration());
       } catch(final Exception ex) {
         throw new BaseXException("Could not bind to socket");
@@ -153,6 +168,12 @@ public final class BaseXServer extends Main {
             if (all.length >= 2)
               context.mprop.set(MainProp.SERVERPORT, Integer.valueOf(all[1]));
             break;
+          case 'r': // parse host + port the remote system is bound to
+            all = arg.string().split(":");
+            context.mprop.set(MainProp.MASTERHOST, all[0]);
+            if (all.length >= 2)
+              context.mprop.set(MainProp.MASTERPORT, Integer.valueOf(all[1]));
+            break;
           case 'S': // set service flag
             service = true;
             break;
@@ -167,7 +188,7 @@ public final class BaseXServer extends Main {
       }
     }
   }
-  
+
   /**
    * Stops the server of this instance.
    */

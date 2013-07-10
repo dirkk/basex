@@ -276,12 +276,13 @@ public interface Text {
   /** Command help. */
   String[] HELPINFO = {
     "([" + CmdInfo.DATABASE + '|' + CmdInfo.INDEX + '|' +
-    CmdInfo.STORAGE + "])",
+    CmdInfo.REPLICATION + '|' + CmdInfo.STORAGE + "])",
     lang("c_info1"),
     lang("c_info21") + NL +
     LI + lang("c_info22") + NL +
     LI + CmdInfo.DATABASE + ": " + lang("c_info23") + NL +
     LI + CmdInfo.INDEX + ": " + lang("c_info24") + NL +
+    LI + CmdInfo.REPLICATION + ": " + lang("c_info26") + NL +
     LI + CmdInfo.STORAGE + " [start end] | [" + C_QUERY + "]: " +
       lang("c_info25")
   };
@@ -1483,7 +1484,13 @@ public interface Text {
   String S_SERVER_ADMIN = lang("s_server_admin");
   /** Command info. */
   String S_H_SERVER_ADMIN = lang("s_h_server_admin");
-
+  
+  // REPLICATION TEXTS  =======================================================
+  /** Master. */
+  String MASTER = lang("master");
+  /** Slave. */
+  String SLAVE = lang("slave");
+  
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);
 }

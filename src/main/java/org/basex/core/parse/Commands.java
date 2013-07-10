@@ -71,6 +71,8 @@ public interface Commands {
   String INFO_DB = "info-db";
   /** Command string: "info-index". */
   String INFO_INDEX = "info-index";
+  /** Command string: "info-replication". */
+  String INFO_REPL = "info-replication";
   /** Command string: "info-storage". */
   String INFO_STORAGE = "info-storage";
   /** Command string: "kill". */
@@ -154,7 +156,7 @@ public interface Commands {
   /** Create commands. */
   enum CmdCreate { DATABASE, DB, INDEX, USER, BACKUP, EVENT }
   /** Info commands. */
-  enum CmdInfo { NULL, DATABASE, DB, INDEX, STORAGE }
+  enum CmdInfo { NULL, DATABASE, DB, INDEX, STORAGE, REPLICATION }
   /** Drop commands. */
   enum CmdDrop { DATABASE, DB, INDEX, USER, BACKUP, EVENT }
   /** Optimize commands. */

@@ -41,6 +41,8 @@ public class ServerActor extends UntypedActor {
   private boolean bound = false;
   /** Publishing actor. */
   private ActorRef publisher;
+  /** Subscribing actor. */
+  private ActorRef subscriber;
   /** Replicate interface for core system. */
   private Replication repl;
 
@@ -91,12 +93,7 @@ public class ServerActor extends UntypedActor {
   
   @Override
   public void onReceive(Object msg) throws Exception {
-    if (msg instanceof String && ((String) msg).equalsIgnoreCase("bound")) {
-      if (bound)
-        getSender().tell(true, getSelf());
-      else
-        boundListener = getSender();
-    } else if (msg instanceof Bound) {
+    if (msg instanceof Bound) {
       Bound b = (Bound) msg;
 
       log.info("Server bound to {} ", b.localAddress());
@@ -117,7 +114,12 @@ public class ServerActor extends UntypedActor {
       log.error("The actor {} terminated.", ((Terminated) msg).actor().path());
     } else if (msg instanceof ServerCommandMessage) {
       InternalServerCmd cmd = ((ServerCommandMessage) msg).getCommand();
-      if (cmd == InternalServerCmd.STARTMASTER) {
+      if (cmd == InternalServerCmd.BOUND) {
+        if (bound)
+          getSender().tell(true, getSelf());
+        else
+          boundListener = getSender();
+      } else if (cmd == InternalServerCmd.STARTMASTER) {
         initPublishing();
       } else if (cmd == InternalServerCmd.CONNECTMASTER) {
         InetSocketAddress masterAddr = (InetSocketAddress) ((ServerCommandMessage) msg).getArgs()[0];
@@ -128,9 +130,7 @@ public class ServerActor extends UntypedActor {
     } else if (msg instanceof InetSocketAddress) {
       initSubscription((InetSocketAddress) msg);
     } else {
-      if (publisher != null) {
-        publisher.tell(msg, getSelf());
-      }
+      unhandled(msg);
     }
   }
 
@@ -146,7 +146,7 @@ public class ServerActor extends UntypedActor {
    * Initialize the publishing actor.
    */
   private void initPublishing() {
-    publisher = getContext().actorOf(PublishActor.mkProps(dbContext, getId()), "publisher");
+    publisher = getContext().actorOf(PublishActor.mkProps(dbContext), "publisher");
   }
 
   /**
@@ -154,6 +154,7 @@ public class ServerActor extends UntypedActor {
    * @param master master address to listen to
    */
   private void initSubscription(final InetSocketAddress master) {
-    getContext().actorOf(SubscriberActor.mkProps(getId()), "subscriber");
+    subscriber = getContext().actorOf(SubscriberActor.mkProps(dbContext, master),
+        "subscriber");
   }
 }

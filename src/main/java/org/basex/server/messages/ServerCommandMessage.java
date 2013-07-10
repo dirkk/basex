@@ -9,7 +9,7 @@ import java.io.*;
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
  */
-public class ServerCommandMessage {
+public class ServerCommandMessage implements Serializable {
   /** Command to execute. */
   private final InternalServerCmd cmd;
   /** Arguments. */

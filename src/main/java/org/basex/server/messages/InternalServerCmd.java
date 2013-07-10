@@ -11,6 +11,10 @@ public enum InternalServerCmd {
   STARTMASTER(0),
   /** Connect as slave to a master. */
   CONNECTMASTER(1),
+  /** New slave. */
+  SLAVE(2),
+  /** Socket bound. */
+  BOUND(3),
   /** Unknown command. Should lead to a failure when used. */
   UNKNOWN(-1);
 
