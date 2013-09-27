@@ -11,6 +11,9 @@
     <version>7.7.2-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
+  <properties>
+    <akkaVersion>2.2.1</akkaVersion>
+  </properties>
 
   <name>BaseX Core</name>
 
@@ -44,6 +47,38 @@
       <artifactId>jline</artifactId>
       <optional>true</optional>
     </dependency>
+      <dependency>
+          <groupId>com.typesafe.akka</groupId>
+          <artifactId>akka-actor_2.10</artifactId>
+          <version>${akkaVersion}</version>
+      </dependency>
+      <dependency>
+          <groupId>com.typesafe.akka</groupId>
+          <artifactId>akka-remote_2.10</artifactId>
+          <version>${akkaVersion}</version>
+      </dependency>
+      <dependency>
+          <groupId>com.typesafe.akka</groupId>
+          <artifactId>akka-cluster_2.10</artifactId>
+          <version>${akkaVersion}</version>
+      </dependency>
+      <dependency>
+          <groupId>com.typesafe.akka</groupId>
+          <artifactId>akka-testkit_2.10</artifactId>
+          <version>${akkaVersion}</version>
+          <scope>test</scope>
+      </dependency>
+      <dependency>
+          <groupId>com.typesafe.akka</groupId>
+          <artifactId>akka-multi-node-testkit_2.10</artifactId>
+          <version>${akkaVersion}</version>
+          <scope>test</scope>
+      </dependency>
+      <dependency>
+          <groupId>com.typesafe.akka</groupId>
+          <artifactId>akka-contrib_2.10</artifactId>
+          <version>${akkaVersion}</version>
+      </dependency>
   </dependencies>
 
   <build>

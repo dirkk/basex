@@ -1,36 +1,60 @@
 package org.basex.query;
 
+import org.basex.core.Context;
+import org.basex.core.LockResult;
+import org.basex.core.Proc;
+import org.basex.core.Prop;
+import org.basex.data.Data;
+import org.basex.data.FTPosData;
+import org.basex.data.Nodes;
+import org.basex.data.Result;
+import org.basex.io.IO;
+import org.basex.io.serial.SerializerProp;
+import org.basex.query.expr.Expr;
+import org.basex.query.expr.Expr.Flag;
+import org.basex.query.func.JavaMapping;
+import org.basex.query.func.StaticFuncs;
+import org.basex.query.iter.Iter;
+import org.basex.query.iter.ValueBuilder;
+import org.basex.query.up.Updates;
+import org.basex.query.util.ClientSessions;
+import org.basex.query.util.Collation;
+import org.basex.query.util.JDBCConnections;
+import org.basex.query.util.json.JsonMapConverter;
+import org.basex.query.util.json.JsonParser.Spec;
+import org.basex.query.util.pkg.ModuleLoader;
+import org.basex.query.value.Value;
+import org.basex.query.value.item.*;
+import org.basex.query.value.node.DBNode;
+import org.basex.query.value.node.FDoc;
+import org.basex.query.value.node.FElem;
+import org.basex.query.value.type.AtomType;
+import org.basex.query.value.type.ListType;
+import org.basex.query.value.type.NodeType;
+import org.basex.query.value.type.Type;
+import org.basex.query.var.Var;
+import org.basex.query.var.VarScope;
+import org.basex.query.var.Variables;
+import org.basex.util.*;
+import org.basex.util.ft.FTLexer;
+import org.basex.util.ft.FTOpt;
+import org.basex.util.hash.TokenMap;
+import org.basex.util.hash.TokenObjMap;
+import org.basex.util.list.IntList;
+import org.basex.util.list.StringList;
+import org.basex.util.list.TokenList;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import static org.basex.core.Text.*;
 import static org.basex.query.util.Err.*;
 import static org.basex.util.Token.*;
-
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.regex.*;
-
-import org.basex.core.*;
-import org.basex.core.Context;
-import org.basex.data.*;
-import org.basex.io.*;
-import org.basex.io.serial.*;
-import org.basex.query.expr.*;
-import org.basex.query.expr.Expr.Flag;
-import org.basex.query.func.*;
-import org.basex.query.iter.*;
-import org.basex.query.up.*;
-import org.basex.query.util.*;
-import org.basex.query.util.json.*;
-import org.basex.query.util.json.JsonParser.Spec;
-import org.basex.query.util.pkg.*;
-import org.basex.query.value.*;
-import org.basex.query.value.item.*;
-import org.basex.query.value.node.*;
-import org.basex.query.value.type.*;
-import org.basex.query.var.*;
-import org.basex.util.*;
-import org.basex.util.ft.*;
-import org.basex.util.hash.*;
-import org.basex.util.list.*;
 
 /**
  * This class organizes both static and dynamic properties that are specific to a
@@ -310,7 +334,7 @@ public final class QueryContext extends Proc {
   public Value update() throws QueryException {
     if(updating) {
       //context.downgrade(this, updates.databases());
-      updates.apply();
+      updates.apply(context.triggers);
       if(updates.size() != 0 && context.data() != null) context.update();
       if(output.size() != 0) return output.value();
     }

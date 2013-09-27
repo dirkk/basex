@@ -1,19 +1,25 @@
 package org.basex.test;
 
-import static org.basex.core.Text.*;
-import static org.junit.Assert.*;
+import org.basex.BaseXServer;
+import org.basex.core.Command;
+import org.basex.core.Context;
+import org.basex.core.MainProp;
+import org.basex.core.Prop;
+import org.basex.io.IOFile;
+import org.basex.io.out.NullOutput;
+import org.basex.server.ClientSession;
+import org.basex.util.Util;
+import org.basex.util.list.StringList;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
-import java.io.*;
-import java.util.concurrent.*;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.util.concurrent.CountDownLatch;
 
-import org.basex.*;
-import org.basex.core.*;
-import org.basex.io.*;
-import org.basex.io.out.*;
-import org.basex.server.*;
-import org.basex.util.*;
-import org.basex.util.list.*;
-import org.junit.*;
+import static org.basex.core.Text.ADMIN;
+import static org.basex.core.Text.LOCALHOST;
+import static org.junit.Assert.assertTrue;
 
 /**
  * If this class is extended, tests will be run in a sandbox.
@@ -111,9 +117,23 @@ public abstract class SandboxTest {
    * @throws IOException I/O exception
    */
   public static ClientSession createClient(final String... login) throws IOException {
+    return createClient(LOCALHOST, 9999, login);
+  }
+  
+  /**
+   * Creates a client instance to a specific server.
+   *
+   * @param host host name
+   * @param port port number
+   * @param login optional login data
+   * @return client instance
+   * @throws IOException I/O exception
+   */
+  public static ClientSession createClient(final String host, final int port, 
+      final String... login) throws IOException {
     final String user = login.length > 0 ? login[0] : ADMIN;
     final String pass = login.length > 1 ? login[1] : ADMIN;
-    return new ClientSession(LOCALHOST, 9999, user, pass);
+    return new ClientSession(host, port, user, pass);
   }
 
   /**

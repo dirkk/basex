@@ -6,6 +6,7 @@ import org.basex.data.*;
 import org.basex.io.random.*;
 import org.basex.query.util.pkg.*;
 import org.basex.server.*;
+import org.basex.trigger.TriggerManager;
 import org.basex.util.*;
 import org.basex.util.list.*;
 
@@ -40,6 +41,8 @@ public final class Context {
   public final Repo repo;
   /** Databases list. */
   public final Databases databases;
+  /** Trigger manager. */
+  public final TriggerManager triggers;
 
   /** User reference. */
   public User user;
@@ -94,6 +97,8 @@ public final class Context {
     users = ctx.users;
     repo = ctx.repo;
     log = ctx.log;
+    user = ctx.user;
+    triggers = ctx.triggers;
   }
 
   /**
@@ -113,6 +118,7 @@ public final class Context {
     repo = new Repo(this);
     log = new Log(this);
     user = users.get(ADMIN);
+    triggers = new TriggerManager();
     listener = null;
   }
 

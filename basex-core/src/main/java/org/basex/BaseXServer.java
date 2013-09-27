@@ -29,8 +29,6 @@ public final class BaseXServer extends Main implements Runnable {
   /** Stop file. */
   private IOFile stop;
 
-  /** New sessions. */
-  private final HashSet<ClientListener> auth = new HashSet<ClientListener>();
   /** Stopped flag. */
   private volatile boolean stopped;
   /** EventsListener. */
@@ -149,25 +147,15 @@ public final class BaseXServer extends Main implements Runnable {
         } else {
           // drop inactive connections
           final long ka = context.mprop.num(MainProp.KEEPALIVE) * 1000L;
-          if(ka > 0) {
-            final long ms = System.currentTimeMillis();
-            for(final ClientListener cs : context.sessions) {
-              if(ms - cs.last > ka) cs.quit();
-            }
+          if (ka > 0) {
+            for(final ClientListener cs : context.sessions)
+              cs.isInactive(ka);
           }
-          final ClientListener cl = new ClientListener(s, context, this);
-          // start authentication timeout
-          final long to = context.mprop.num(MainProp.KEEPALIVE) * 1000L;
-          if(to > 0) {
-            cl.auth.schedule(new TimerTask() {
-              @Override
-              public void run() {
-                cl.quitAuth();
-              }
-            }, to);
-            auth.add(cl);
-          }
-          cl.start();
+
+          // start authentification listener, which in turn will start
+          // the client listener
+          final AuthenticationListener listener = new AuthenticationListener(s, context, this);
+          listener.start();
         }
       } catch(final SocketException ex) {
         break;
@@ -194,10 +182,6 @@ public final class BaseXServer extends Main implements Runnable {
     if(!running) return;
     running = false;
 
-    for(final ClientListener cs : auth) {
-      remove(cs);
-      cs.quitAuth();
-    }
     for(final ClientListener cs : context.sessions) {
       cs.quit();
     }
@@ -337,17 +321,6 @@ public final class BaseXServer extends Main implements Runnable {
     } catch(final IOException ex) {
       stop.delete();
       throw ex;
-    }
-  }
-
-  /**
-   * Removes an authenticated session.
-   * @param client client to be removed
-   */
-  public void remove(final ClientListener client) {
-    synchronized(auth) {
-      auth.remove(client);
-      client.auth.cancel();
     }
   }
 

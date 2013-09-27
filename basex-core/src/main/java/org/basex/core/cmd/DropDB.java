@@ -1,13 +1,15 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
-
-import org.basex.core.*;
-import org.basex.core.parse.*;
+import org.basex.core.Context;
+import org.basex.core.Databases;
+import org.basex.core.LockResult;
+import org.basex.core.parse.CmdBuilder;
 import org.basex.core.parse.Commands.Cmd;
 import org.basex.core.parse.Commands.CmdDrop;
-import org.basex.io.*;
-import org.basex.util.list.*;
+import org.basex.io.IOFile;
+import org.basex.util.list.StringList;
+
+import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'drop database' command and deletes a database.
@@ -60,7 +62,11 @@ public final class DropDB extends ACreate {
    */
   public static synchronized boolean drop(final String db, final Context ctx) {
     final IOFile dbpath = ctx.mprop.dbpath(db);
-    return dbpath.exists() && drop(dbpath);
+    boolean ok = dbpath.exists() && drop(dbpath);
+    if (ok) {
+      ctx.triggers.afterDrop(db);
+    }
+    return ok;
   }
 
   /**

@@ -1,13 +1,20 @@
 package org.basex.query.up;
 
-import org.basex.data.*;
-import org.basex.data.atomic.*;
-import org.basex.query.*;
-import org.basex.query.iter.*;
-import org.basex.query.up.primitives.*;
-import org.basex.query.value.node.*;
-import org.basex.util.hash.*;
-import org.basex.util.list.*;
+import org.basex.data.Data;
+import org.basex.data.MemData;
+import org.basex.data.atomic.AtomicUpdateList;
+import org.basex.data.atomic.BasicUpdate;
+import org.basex.query.QueryContext;
+import org.basex.query.QueryException;
+import org.basex.query.iter.AxisIter;
+import org.basex.query.up.primitives.Operation;
+import org.basex.query.up.primitives.UpdatePrimitive;
+import org.basex.query.value.node.ANode;
+import org.basex.query.value.node.DBNode;
+import org.basex.trigger.TriggerManager;
+import org.basex.util.hash.IntObjMap;
+import org.basex.util.hash.TokenSet;
+import org.basex.util.list.StringList;
 
 /**
  * <p>Implementation of the W3C XQUERY UPDATE FACILITY 1.0.</p>
@@ -116,8 +123,8 @@ public final class Updates {
    * Executes all updates.
    * @throws QueryException query exception
    */
-  public void apply() throws QueryException {
-    if(mod != null) mod.apply();
+  public void apply(final TriggerManager tr) throws QueryException {
+    if(mod != null) mod.apply(tr);
   }
 
   /**

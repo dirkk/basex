@@ -18,6 +18,7 @@ import org.basex.core.parse.Commands.CmdIndexInfo;
 import org.basex.core.parse.Commands.CmdInfo;
 import org.basex.core.parse.Commands.CmdOptimize;
 import org.basex.core.parse.Commands.CmdPerm;
+import org.basex.core.parse.Commands.CmdReplication;
 import org.basex.core.parse.Commands.CmdRepo;
 import org.basex.core.parse.Commands.CmdShow;
 import org.basex.query.*;
@@ -129,6 +130,8 @@ public final class StringParser extends CmdParser {
             final String arg2 = arg1 != null ? number(null) : null;
             if(arg1 == null) arg1 = xquery(null);
             return new InfoStorage(arg1, arg2);
+          case REPLICATION:
+            return new InfoReplication();
         }
         break;
       case INSPECT:
@@ -149,6 +152,16 @@ public final class StringParser extends CmdParser {
             return new DropBackup(glob(cmd));
           case EVENT:
             return new DropEvent(name(cmd));
+        }
+        break;
+      case REPLICATION:
+        switch(consume(CmdReplication.class, cmd)) {
+          case START:
+            return new ReplicationStart(string(cmd), string(cmd));
+          case CONNECT:
+            return new ReplicationConnect(string(cmd), string(cmd));
+          case STOP:
+            return new ReplicationStop();
         }
         break;
       case OPTIMIZE:

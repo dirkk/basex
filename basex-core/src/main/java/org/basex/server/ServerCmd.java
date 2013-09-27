@@ -41,6 +41,10 @@ public enum ServerCmd {
   UPDATING(30),
   /** Code for executing a query and returning all information relevant for XQJ: {id}0. */
   FULL(31),
+  /** Replica set: Request message broker address. */
+  MQ_ADDR(40),
+  /** Replica set: Send an information fo all database with the timestamp of last update operation. */
+  DATABASES_TIMESTAMP(41),
   /** Code for running a database command: {path}0{input}0. */
   COMMAND(-1);
 

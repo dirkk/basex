@@ -1,20 +1,27 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
-
-import java.io.*;
-
-import org.basex.build.*;
+import org.basex.build.DirParser;
+import org.basex.build.DiskBuilder;
+import org.basex.build.MemBuilder;
+import org.basex.build.Parser;
 import org.basex.core.*;
-import org.basex.core.parse.*;
-import org.basex.core.parse.Commands.*;
-import org.basex.data.*;
-import org.basex.index.*;
-import org.basex.index.ft.*;
-import org.basex.index.value.*;
-import org.basex.io.*;
-import org.basex.io.in.*;
-import org.basex.util.*;
+import org.basex.core.parse.CmdBuilder;
+import org.basex.core.parse.Commands.Cmd;
+import org.basex.core.parse.Commands.CmdCreate;
+import org.basex.data.Data;
+import org.basex.data.MemData;
+import org.basex.index.IndexType;
+import org.basex.index.ft.FTBuilder;
+import org.basex.index.value.ValueIndexBuilder;
+import org.basex.io.IO;
+import org.basex.io.IOStream;
+import org.basex.io.in.LookupInput;
+import org.basex.util.Util;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'create db' command and creates a new database.
@@ -101,6 +108,8 @@ public final class CreateDB extends ACreate {
           if(data.meta.createattr) create(IndexType.ATTRIBUTE, data, this);
           if(data.meta.createftxt) create(IndexType.FULLTEXT,  data, this);
         } finally {
+
+          context.triggers.afterCreateDb(name);
           data.finishUpdate();
         }
       }

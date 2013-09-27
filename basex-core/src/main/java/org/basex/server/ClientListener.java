@@ -24,40 +24,23 @@ import org.basex.util.list.*;
  * @author Andreas Weiler
  * @author Christian Gruen
  */
-public final class ClientListener extends Thread {
-  /** Timer for authentication time out. */
-  public final Timer auth = new Timer();
-  /** Timestamp of last interaction. */
-  public long last;
-
+public final class ClientListener extends AListener {
   /** Active queries. */
   private final HashMap<String, QueryListener> queries =
     new HashMap<String, QueryListener>();
-  /** Performance measurement. */
-  private final Performance perf = new Performance();
-  /** Database context. */
-  private final Context context;
-  /** Server reference. */
-  private final BaseXServer server;
-  /** Socket reference. */
-  private final Socket socket;
 
+  /** Performance measurement. */
+  protected final Performance perf = new Performance();
   /** Socket for events. */
   private Socket esocket;
   /** Output for events. */
   private PrintOutput eout;
   /** Flag for active events. */
   private boolean events;
-  /** Input stream. */
-  private BufferInput in;
-  /** Output stream. */
-  private PrintOutput out;
   /** Current command. */
   private Command command;
   /** Query id counter. */
   private int id;
-  /** Indicates if the server thread is running. */
-  private boolean running;
 
   /**
    * Constructor.
@@ -66,20 +49,19 @@ public final class ClientListener extends Thread {
    * @param srv server reference
    */
   public ClientListener(final Socket s, final Context c, final BaseXServer srv) {
+    super(s, c, srv);
+
     context = new Context(c, this);
-    socket = s;
-    server = srv;
-    last = System.currentTimeMillis();
-    setDaemon(true);
   }
 
   @Override
   public void run() {
-    if(!authenticate()) return;
-
     ServerCmd sc;
     String cmd;
+
     try {
+      running = true;
+      setStreams();
       while(running) {
         command = null;
         try {
@@ -170,66 +152,24 @@ public final class ClientListener extends Thread {
   }
 
   /**
-   * Initializes a session via cram-md5.
-   * @return success flag
+   * Checks, whether this connection is timed out. If it is inactive, the connection
+   * will be dropped.
+   *
+   * @param timeout allowed timeout
+   * @return is inactive
    */
-  private boolean authenticate() {
-    try {
-      final String ts = Long.toString(System.nanoTime());
-      final byte[] address = socket.getInetAddress().getAddress();
+  public boolean isInactive(final long timeout) {
+    final long ms = System.currentTimeMillis();
+    final boolean inactive = ms - last > timeout;
+    if(inactive) quit();
 
-      // send {TIMESTAMP}0
-      out = PrintOutput.get(socket.getOutputStream());
-      out.print(ts);
-      send(true);
-
-      // evaluate login data
-      in = new BufferInput(socket.getInputStream());
-      // receive {USER}0{PASSWORD}0
-      final String us = in.readString();
-      final String pw = in.readString();
-      context.user = context.users.get(us);
-      running = context.user != null && md5(context.user.password + ts).equals(pw);
-
-      // write log information
-      if(running) {
-        // send {OK}
-        send(true);
-        context.blocker.remove(address);
-        context.sessions.add(this);
-      } else {
-        if(!us.isEmpty()) log(ACCESS_DENIED, false);
-        // delay users with wrong passwords
-        for(int d = context.blocker.delay(address); d > 0; d--) Performance.sleep(1000);
-        send(false);
-      }
-    } catch(final IOException ex) {
-      if(running) {
-        Util.stack(ex);
-        log(ex, false);
-        running = false;
-      }
-    }
-
-    server.remove(this);
-    return running;
-  }
-
-  /**
-   * Quits the authentication.
-   */
-  public synchronized void quitAuth() {
-    try {
-      socket.close();
-      log(TIMEOUT_EXCEEDED, false);
-    } catch(final Throwable ex) {
-      log(ex, false);
-    }
+    return inactive;
   }
 
   /**
    * Exits the session.
    */
+  @Override
   public synchronized void quit() {
     if(!running) return;
     running = false;
@@ -292,54 +232,9 @@ public final class ClientListener extends Thread {
     eout.flush();
   }
 
-  /**
-   * Returns the host and port of a client.
-   * @return string representation
-   */
-  public String address() {
-    return socket.getInetAddress().getHostAddress() + ':' + socket.getPort();
-  }
 
-  @Override
-  public String toString() {
-    final StringBuilder sb = new StringBuilder("[").append(address()).append(']');
-    if(context.data() != null) sb.append(COLS).append(context.data().meta.name);
-    return sb.toString();
-  }
 
   // PRIVATE METHODS ==========================================================
-
-  /**
-   * Returns error feedback.
-   * @param info error string
-   * @throws IOException I/O exception
-   */
-  private void error(final String info) throws IOException {
-    info(info, false);
-  }
-
-  /**
-   * Returns user feedback.
-   * @param info information string
-   * @throws IOException I/O exception
-   */
-  private void success(final String info) throws IOException {
-    info(info, true);
-  }
-
-  /**
-   * Returns user feedback.
-   * @param info information string
-   * @param ok success/error flag
-   * @throws IOException I/O exception
-   */
-  private void info(final String info, final boolean ok) throws IOException {
-    // write feedback to log file
-    log(info, ok);
-    // send {MSG}0 and (0|1) as (success|error) flag
-    out.writeString(info);
-    send(ok);
-  }
 
   /**
    * Creates a database.
@@ -526,26 +421,17 @@ public final class ClientListener extends Thread {
   }
 
   /**
-   * Sends a success flag to the client (0: true, 1: false).
-   * @param ok success flag
-   * @throws IOException I/O exception
-   */
-  void send(final boolean ok) throws IOException {
-    out.write(ok ? 0 : 1);
-    out.flush();
-  }
-
-  /**
    * Writes a log message.
    * @param info message info
    * @param type message type (true/false/null: OK, ERROR, REQUEST)
    */
-  private void log(final Object info, final Object type) {
+  @Override
+  protected void log(final Object info, final Object type) {
     // add evaluation time if any type is specified
     final String user = context.user != null ? context.user.name : "";
     final Log log = context.log;
     if(log != null) log.write(type != null ?
-      new Object[] { address(), user, type, info, perf } :
-      new Object[] { address(), user, null, info });
+            new Object[] { address(), user, type, info, perf } :
+            new Object[] { address(), user, null, info });
   }
 }

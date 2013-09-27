@@ -1,22 +1,27 @@
 package org.basex.query.up;
 
-import static org.basex.query.util.Err.*;
+import org.basex.core.Prop;
+import org.basex.core.cmd.Export;
+import org.basex.data.Data;
+import org.basex.data.MemData;
+import org.basex.data.atomic.AtomicUpdateList;
+import org.basex.io.serial.SerializerProp;
+import org.basex.query.QueryException;
+import org.basex.query.up.primitives.*;
+import org.basex.query.value.item.QNm;
+import org.basex.query.value.node.DBNode;
+import org.basex.query.value.type.NodeType;
+import org.basex.util.hash.IntObjMap;
+import org.basex.util.hash.IntSet;
+import org.basex.util.list.IntList;
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 
-import org.basex.core.*;
-import org.basex.core.cmd.*;
-import org.basex.data.*;
-import org.basex.data.atomic.*;
-import org.basex.io.serial.*;
-import org.basex.query.*;
-import org.basex.query.up.primitives.*;
-import org.basex.query.value.item.*;
-import org.basex.query.value.type.*;
-import org.basex.util.hash.*;
-import org.basex.util.list.*;
+import static org.basex.query.util.Err.*;
 
 /**
  * This class 'caches' all updates, fn:put operations and other database related
@@ -41,6 +46,9 @@ final class DatabaseUpdates {
   private final IntObjMap<Put> puts = new IntObjMap<Put>();
   /** Number of updates. */
   private int size;
+  /** List of all document pre values which are possibly affected by updating
+   * operations. */
+  private List<DBNode> documents = new LinkedList<DBNode>();
 
   /**
    * Constructor.
@@ -48,6 +56,35 @@ final class DatabaseUpdates {
    */
   DatabaseUpdates(final Data d) {
     data = d;
+  }
+  
+  /**
+   * Returns the pre value of the document the specified entry (specified by
+   * the pre value) is part of.
+   *
+   * @param p pre value
+   * @return document pre value
+   */
+  private int getParentDocument(final int p) {
+    int currentPre = p;
+    int k = data.kind(currentPre);
+    
+    while(k != Data.DOC) {
+      currentPre = data.parent(currentPre, k);
+      k = data.kind(currentPre);
+    };
+    
+    return currentPre;
+  }
+  
+  /**
+   * Returns all document pre values of documents which can be affected by the
+   * given updating operations.
+   *
+   * @return list of pre values of documents
+   */
+  public List<DBNode> getDocuments() {
+    return documents;
   }
 
   /**
@@ -64,6 +101,11 @@ final class DatabaseUpdates {
         if(pc == null) {
           pc = new NodeUpdates();
           updatePrimitives.put(pre, pc);
+          final int parent = getParentDocument(pre);
+          if (!documents.contains(parent)) {
+            DBNode n = new DBNode(data, parent);
+            documents.add(n);
+          }
         }
         pc.add(subp);
       }

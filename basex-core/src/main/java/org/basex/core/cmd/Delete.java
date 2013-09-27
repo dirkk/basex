@@ -1,12 +1,14 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
+import org.basex.core.Perm;
+import org.basex.data.Data;
+import org.basex.data.atomic.AtomicUpdateList;
+import org.basex.io.IOFile;
+import org.basex.util.list.IntList;
+import org.basex.util.list.TokenList;
 
-import org.basex.core.*;
-import org.basex.data.*;
-import org.basex.data.atomic.*;
-import org.basex.io.*;
-import org.basex.util.list.*;
+import static org.basex.core.Text.DB_PINNED_X;
+import static org.basex.core.Text.RES_DELETED_X_X;
 
 /**
  * Evaluates the 'delete' command and deletes resources from a database.
@@ -43,12 +45,15 @@ public final class Delete extends ACreate {
     final TokenList bins = data.resources.binaries(target);
     delete(data, target);
 
+    context.triggers.afterDelete(target);
+
     // finish update
     data.finishUpdate();
 
     // return info message
     return info(RES_DELETED_X_X, docs.size() + bins.size(), perf);
   }
+
 
   /**
    * Deletes the specified resources.

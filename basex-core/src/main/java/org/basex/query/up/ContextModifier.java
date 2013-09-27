@@ -1,11 +1,16 @@
 package org.basex.query.up;
 
-import java.util.*;
+import org.basex.data.Data;
+import org.basex.data.MemData;
+import org.basex.query.QueryContext;
+import org.basex.query.QueryException;
+import org.basex.query.up.primitives.DBCreate;
+import org.basex.query.up.primitives.Operation;
+import org.basex.query.value.node.DBNode;
+import org.basex.trigger.TriggerManager;
+import org.basex.util.list.StringList;
 
-import org.basex.data.*;
-import org.basex.query.*;
-import org.basex.query.up.primitives.*;
-import org.basex.util.list.*;
+import java.util.*;
 
 /**
  * Base class for the different context modifiers. A context modifier aggregates
@@ -72,11 +77,29 @@ public abstract class ContextModifier {
   }
 
   /**
+   * Adds all documents belonging to all databases to be updated to the
+   * specified list.
+   * @return documents
+   */
+  private List<DBNode> documents() {
+    final List<DBNode> docs = new LinkedList<DBNode>();
+    for(final DatabaseUpdates du : pendingUpdates.values()) {
+      final Data d = du.data();
+
+      if(!d.inMemory()) {
+        docs.addAll(du.getDocuments());
+      }
+    }
+    
+    return docs;
+  }
+
+  /**
    * Checks constraints and applies all update primitives to the databases if
    * no constraints are hurt.
    * @throws QueryException query exception
    */
-  final void apply() throws QueryException {
+  final void apply(final TriggerManager tr) throws QueryException {
     // checked constraints
     final Collection<DatabaseUpdates> updates = pendingUpdates.values();
     final Collection<DBCreate> creates = dbCreates.values();
@@ -105,6 +128,9 @@ public abstract class ContextModifier {
       // remove write locks and updating files
       for(final DatabaseUpdates c : updates) {
         if(i-- == 0) break;
+        for (DBNode n : c.getDocuments()) {
+          tr.afterUpdate(n);
+        }
         c.finishUpdate();
       }
     }

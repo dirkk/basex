@@ -18,6 +18,8 @@ public interface DataText {
    * by older versions. */
   String ISTORAGE = "7.1";
 
+  /** Database name. */
+  String DBNAME = "DBNAME";
   /** Database version. */
   String DBSTR = "STORAGE";
   /** Database version. */

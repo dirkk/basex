@@ -1,11 +1,13 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
-
-import org.basex.core.*;
-import org.basex.core.parse.*;
+import org.basex.core.Context;
+import org.basex.core.Databases;
+import org.basex.core.LockResult;
+import org.basex.core.parse.CmdBuilder;
 import org.basex.core.parse.Commands.Cmd;
 import org.basex.core.parse.Commands.CmdAlter;
+
+import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'alter database' command and renames a database.
@@ -63,7 +65,11 @@ public final class AlterDB extends ACreate {
    */
   public static synchronized boolean alter(final String source, final String target,
       final Context ctx) {
-    return ctx.mprop.dbpath(source).rename(ctx.mprop.dbpath(target));
+    boolean ok = ctx.mprop.dbpath(source).rename(ctx.mprop.dbpath(target));
+    if (ok) {
+      ctx.triggers.afterAlter(source, target);
+    }
+    return ok;
   }
 
   @Override

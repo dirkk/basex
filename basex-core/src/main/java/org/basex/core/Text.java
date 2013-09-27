@@ -281,7 +281,8 @@ public interface Text {
     LI + CmdInfo.DATABASE + ": " + lang("c_info23") + NL +
     LI + CmdInfo.INDEX + ": " + lang("c_info24") + NL +
     LI + CmdInfo.STORAGE + " [start end] | [" + C_QUERY + "]: " +
-      lang("c_info25")
+      lang("c_info25") + NL +
+    LI + CmdInfo.REPLICATION + ": " + lang("c_info26")
   };
   /** Command help. */
   String[] HELPCLOSE = {
@@ -355,6 +356,13 @@ public interface Text {
   String[] HELPREPLACE = {
     '[' + C_PATH  + "] [" + C_INPUT + ']',
     lang("c_replace1"), lang("c_replace2")
+  };
+  /** Command help. */
+  String[] HELPREPLICATION = {
+    "([" + CmdReplication.START + '|' + CmdReplication.CONNECT + '|' +
+      CmdReplication.STOP + "])",
+    lang("c_replication1"),
+    lang("c_replication1")
   };
   /** Command help. */
   String[] HELPRESTORE = {
@@ -1470,6 +1478,21 @@ public interface Text {
   String S_SERVER_ADMIN = lang("s_server_admin");
   /** Command info. */
   String S_H_SERVER_ADMIN = lang("s_h_server_admin");
+  
+  // REPLICATION TEXTS ========================================================
+  
+  /** Replication is already running. */
+  String R_ALREADY_RUNNING = lang("r_already_running");
+  /** Replication is currently not running. */
+  String R_NOT_RUNNING = lang("r_not_running");
+  /** Message broker address is invalid. */
+  String R_INVALID_AMQP_ADDRESS = lang("r_invalid_amqp_address");
+  /** Invalid master server address. */
+  String R_INVALID_SOCKET_ADDRESS = lang("r_invalid_socket_address");
+  /** Connection to the message broker was refused. */
+  String R_CONNECTION_REFUSED_X = lang("r_connection_refused_%");
+  /** Replication instance is not a running master. */
+  String R_NOT_MASTER = lang("r_not_master");
 
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);

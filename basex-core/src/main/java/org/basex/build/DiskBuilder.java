@@ -14,6 +14,7 @@ import org.basex.io.in.DataInput;
 import org.basex.io.out.*;
 import org.basex.io.out.DataOutput;
 import org.basex.io.random.*;
+import org.basex.query.value.node.DBNode;
 import org.basex.util.*;
 
 /**
