@@ -4,6 +4,7 @@ import static org.basex.util.Token.*;
 import static org.junit.Assert.*;
 
 import java.io.*;
+import java.net.*;
 
 import org.basex.core.*;
 import org.basex.core.cmd.*;
@@ -30,6 +31,8 @@ public class CommandTest extends SandboxTest {
   private static final String FILE = FLDR + '/' + FN;
   /** Test name. */
   static final String NAME2 = NAME + '2';
+  /** Test host:port address for replication message broker. */
+  private static final String REPLICATION_ADDR = "localhost:8492";
   /** Socket reference. */
   static Session session;
 
@@ -498,6 +501,27 @@ public class CommandTest extends SandboxTest {
     // reject invalid or missing names
     no(new Store("", "</a>"));
     no(new Store("../x", FILE));
+  }
+  
+  /** Start replication as master. */
+  @Test
+  public final void replicationMaster() {
+    ok(new ReplicationStartMaster(REPLICATION_ADDR));
+    // already running as master, so second call should fail
+    no(new ReplicationStartMaster(REPLICATION_ADDR));
+    
+    ok(new ReplicationStop());
+  }
+  
+  /** Start replication as slave. */
+  @Test
+  public final void replicationSlave() {
+    final InetSocketAddress mbAddr = new InetSocketAddress(0);
+    ok(new ReplicationStartSlave(REPLICATION_ADDR));
+    // already running as master, so second call should fail
+    no(new ReplicationStartSlave(REPLICATION_ADDR));
+    
+    ok(new ReplicationStop());
   }
 
   /**

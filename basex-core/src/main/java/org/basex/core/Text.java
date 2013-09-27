@@ -281,7 +281,8 @@ public interface Text {
     LI + CmdInfo.DATABASE + ": " + lang("c_info23") + NL +
     LI + CmdInfo.INDEX + ": " + lang("c_info24") + NL +
     LI + CmdInfo.STORAGE + " [start end] | [" + C_QUERY + "]: " +
-      lang("c_info25")
+      lang("c_info25") + NL +
+    LI + CmdInfo.REPLICATION + ": " + lang("c_info26")
   };
   /** Command help. */
   String[] HELPCLOSE = {
@@ -355,6 +356,12 @@ public interface Text {
   String[] HELPREPLACE = {
     '[' + C_PATH  + "] [" + C_INPUT + ']',
     lang("c_replace1"), lang("c_replace2")
+  };
+  /** Command help. */
+  String[] HELPREPLICATION = {
+    "([" + CmdReplication.START + '|' + CmdReplication.STOP + "])",
+    lang("c_replication1"),
+    lang("c_replication1")
   };
   /** Command help. */
   String[] HELPRESTORE = {

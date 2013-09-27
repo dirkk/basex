@@ -122,6 +122,8 @@ final class XMLParser extends CmdParser {
       return new InfoIndex(value(root, TYPE));
     if(e.equals(INFO_STORAGE) && check(root, '#' + QUERY + '?'))
       return new InfoStorage(value(root));
+    if(e.equals(INFO_REPLICATION) && check(root))
+      return new InfoReplication();
     if(e.equals(KILL) && check(root, TARGET + '?'))
       return new Kill(value(root, TARGET));
     if(e.equals(LIST) && check(root, NAME + '?', PATH + '?'))
@@ -144,6 +146,12 @@ final class XMLParser extends CmdParser {
       return new RepoInstall(value(root, PATH), null);
     if(e.equals(REPO_LIST) && check(root))
       return new RepoList();
+    if(e.equals(REPLICATION_START_MASTER) && check(root))
+      return new ReplicationStartMaster(value(root));
+    if(e.equals(REPLICATION_START_SLAVE) && check(root))
+      return new ReplicationStartSlave(value(root));
+    if(e.equals(REPLICATION_STOP) && check(root))
+      return new ReplicationStop();
     if(e.equals(RESTORE) && check(root, NAME))
       return new Restore(value(root, NAME));
     if(e.equals(RETRIEVE) && check(root, PATH))

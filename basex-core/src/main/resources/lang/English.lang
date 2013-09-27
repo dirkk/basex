@@ -517,6 +517,7 @@ c_rename1            = Rename resources in database.
 c_rename2            = Renames resources in the current database.
 c_replace1           = Replace resources in database.
 c_replace2           = Replaces resources in the current database.
+c_replication1			 = Starts master/slave replication
 c_repo1              = Install, delete or list packages.
 c_repo2              = Installs, deletes or lists packages from the repository.
 c_repo3              = deletes the package with name [%] or directory [%]
