@@ -149,11 +149,7 @@ public class DocumentMessage {
    * @throws BaseXException exception
    */
   public void saveDocument(final Context context) throws BaseXException {
-    try {
-      new Open(getDatabase()).execute(context);
-    } catch (Exception e) {
-      new CreateDB(getDatabase()).execute(context);
-    }
+    new Check(getDatabase()).execute(context);
     new Replace(getPath(), getContent()).execute(context);
     new Close().equals(context);
   }

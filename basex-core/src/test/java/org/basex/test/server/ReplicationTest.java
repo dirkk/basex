@@ -88,6 +88,28 @@ public class ReplicationTest extends SandboxTest {
   }
   
   /**
+   * Execute an ADD document command on the master and checks if the slaves got the
+   * update.
+   * 
+   * @throws IOException I/O exception
+   * @throws InterruptedException interrupt
+   */
+  @Test
+  public final void add() throws IOException, InterruptedException {
+    // Create a database and add a simple document
+    master.execute(new CreateDB(DB));
+    master.execute(new Add("testAdd.xml", "<test><ADD/></test>"));
+    
+    Thread.sleep(200);
+    String res = slaves.get(0).execute(new XQuery(RAW + "doc('" + DB + "/testAdd.xml')"));
+    assertEqual("<test><ADD/></test>",
+        res);
+    
+    // drop the temporary database
+    master.execute(new DropDB(DB));
+  }
+  
+  /**
    * Execute an INSERT INTO on the master and checks if the slaves got the
    * update.
    * 

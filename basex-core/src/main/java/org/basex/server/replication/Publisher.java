@@ -51,7 +51,7 @@ public class Publisher extends Distributor {
       factory.setUri(addr);
       connection = factory.newConnection();
       channel = connection.createChannel();
-      channel.exchangeDeclare(EXCHANGE_NAME, "fanout", false);
+      channel.exchangeDeclare(EXCHANGE_NAME, "topic", false);
     } catch (Exception e) {
       context.log.writeError(e.getCause());
       throw new BaseXException(e);
@@ -66,7 +66,7 @@ public class Publisher extends Distributor {
   public void publish(DocumentMessage dm) {
     try {
       byte[] send = dm.serialize();
-      channel.basicPublish(EXCHANGE_NAME, "", null, send);
+      channel.basicPublish(EXCHANGE_NAME, topic, null, send);
     } catch(IOException e) {
       context.log.writeError(e);
       System.err.println(e.getMessage());

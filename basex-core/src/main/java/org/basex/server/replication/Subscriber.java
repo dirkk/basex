@@ -59,7 +59,7 @@ public class Subscriber extends Distributor implements Runnable {
         true, true, true, null).getQueue();
     channel.queuePurge(queueName);
     channel.basicQos(10);
-    channel.queueBind(queueName, EXCHANGE_NAME, "");
+    channel.queueBind(queueName, EXCHANGE_NAME, topic);
 
     consumer = new QueueingConsumer(channel);
     channel.basicConsume(queueName, false, consumer);
