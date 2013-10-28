@@ -10,6 +10,7 @@ import org.basex.core.parse.*;
 import org.basex.data.*;
 import org.basex.data.atomic.*;
 import org.basex.io.*;
+import org.basex.server.replication.*;
 import org.basex.util.*;
 
 /**
@@ -104,8 +105,10 @@ public final class Add extends ACreate {
       // skip update if fragment is empty
       if(tmp.meta.size > 1) {
         if(lock && !data.startUpdate()) return error(DB_PINNED_X, data.meta.name);
-        data.insert(data.meta.size, -1, new DataClip(tmp));
+        int pre = data.meta.size;
+        data.insert(pre, -1, new DataClip(tmp));
         context.update();
+        context.replication.replicate(new DocumentMessage(data, pre));
         if(lock) data.finishUpdate();
       }
       // return info message

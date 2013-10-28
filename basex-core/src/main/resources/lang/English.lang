@@ -501,6 +501,7 @@ c_info22             = no argument: shows global information
 c_info23             = shows database information
 c_info24             = shows index information
 c_info25             = shows internal database table
+c_info26						 = shows replication status
 c_inspect1           = Perform integrity checks.
 c_inspect2           = Checks the database for errors.
 c_kill1              = Kill user sessions.
@@ -564,3 +565,10 @@ s_sessions           = Sessions
 s_alter              = Alter
 s_server_admin       = Server Administration
 s_h_server_admin     = Display the server administration for user management and log tracing.
+
+# Replication texts
+
+r_already_running      = Replication is already running.
+r_not_running          = Replication is currently not running.
+r_invalid_address		   = The given address is invalid. It must be a valid AMQP URI address.
+r_connection_refused_% = Connection to the message broker at % was not successful.

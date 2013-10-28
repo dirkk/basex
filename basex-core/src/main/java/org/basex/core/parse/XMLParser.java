@@ -147,9 +147,9 @@ final class XMLParser extends CmdParser {
     if(e.equals(REPO_LIST) && check(root))
       return new RepoList();
     if(e.equals(REPLICATION_START_MASTER) && check(root))
-      return new ReplicationStartMaster(value(root));
+      return new ReplicationStartMaster(value(root), value(root));
     if(e.equals(REPLICATION_START_SLAVE) && check(root))
-      return new ReplicationStartSlave(value(root));
+      return new ReplicationStartSlave(value(root), value(root));
     if(e.equals(REPLICATION_STOP) && check(root))
       return new ReplicationStop();
     if(e.equals(RESTORE) && check(root, NAME))

@@ -1,82 +1,75 @@
 package org.basex.server.replication;
 
 import java.io.*;
-import java.net.*;
+
+import org.basex.core.*;
 
 import com.rabbitmq.client.*;
 
-public class Publisher implements Runnable {
-  /** RabbitMQ address. */
-  private final InetSocketAddress addr;
-  /** Connection to the message broker. */
-  private Connection connection;
-  /** Channel to the message broker. */
-  private Channel channel;
-  /** Test. */
-  private static final String EXCHANGE_NAME = "test";
-  
+/**
+ * Publisher of changes and master of a replica set. This takes care of all
+ * updating queries within a replica set.
+ *
+ * A publisher is connected to a RabbitMQ message broker.
+ * 
+ * @author BaseX Team 2005-12, BSD License
+ * @author Dirk Kirsten
+ */
+public class Publisher extends Distributor {  
   /**
    * Constructor
+   * @param c database context
    * @param a message queue address
+   * @param t replica set name
+   * @throws BaseXException connection exception
    */
-  public Publisher(final InetSocketAddress a) {
-    addr = a;
-  }
-  
-  /**
-   * Connect to the RabbitMQ message broker.
-   * 
-   * @throws IOException I/O exception
-   */
-  private void connect() throws IOException {
-    ConnectionFactory factory = new ConnectionFactory();
-    factory.setHost(addr.getHostString());
-    factory.setPort(addr.getPort());
-
-    connection = factory.newConnection();
-    channel = connection.createChannel();
-    channel.exchangeDeclare(EXCHANGE_NAME, "fanout");
+  public Publisher(final Context c, final String a, final String t) throws BaseXException {
+    super(c, a, t);
+    start();
   }
   
   /**
    * Close the channel and connection.
    */
-  private void close() {
+  public void close() {
     try {
-      channel.close();
+      // deletes the exchanges and automatically closes the channel
+      channel.exchangeDelete(EXCHANGE_NAME);
       connection.close();
     } catch(IOException e) {
       e.printStackTrace();
     }
   }
   
-  @Override
-  public void run() {
+  /**
+   * Connect to the RabbitMQ message broker.
+   * @throws BaseXException connection exception
+   */
+  public void start() throws BaseXException {
     try {
-      connect();
-
-      // TODO just testing
-      try {
-        Thread.sleep(5000);
-      } catch(InterruptedException e) {
-        e.printStackTrace();
-      }
-      for (int i = 0; i < 10; ++i) {
-        String message = "mymessage: " + i;
-  
-        channel.basicPublish(EXCHANGE_NAME, "", null, message.getBytes());
-        System.out.println(" [x] Sent '" + message + "'");
-        try {
-          Thread.sleep(500);
-        } catch(InterruptedException e) {
-          e.printStackTrace();
-        }
-      }
-    } catch (IOException e) {
-      System.err.println(e.getMessage());
-    } finally {
-      close();
+      ConnectionFactory factory = new ConnectionFactory();
+      factory.setUri(addr);
+      connection = factory.newConnection();
+      channel = connection.createChannel();
+      channel.exchangeDeclare(EXCHANGE_NAME, "fanout", false);
+    } catch (Exception e) {
+      context.log.writeError(e.getCause());
+      throw new BaseXException(e);
     }
   }
-
+  
+  /**
+   * Publishes a message to the message exchange.
+   *
+   * @param dm object to publish
+   */
+  public void publish(DocumentMessage dm) {
+    try {
+      byte[] send = dm.serialize();
+      channel.basicPublish(EXCHANGE_NAME, "", null, send);
+    } catch(IOException e) {
+      context.log.writeError(e);
+      System.err.println(e.getMessage());
+    }
+  }
 }

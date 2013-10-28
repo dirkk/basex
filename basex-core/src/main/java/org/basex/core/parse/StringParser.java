@@ -19,7 +19,6 @@ import org.basex.core.parse.Commands.CmdInfo;
 import org.basex.core.parse.Commands.CmdOptimize;
 import org.basex.core.parse.Commands.CmdPerm;
 import org.basex.core.parse.Commands.CmdReplication;
-import org.basex.core.parse.Commands.CmdReplicationStart;
 import org.basex.core.parse.Commands.CmdRepo;
 import org.basex.core.parse.Commands.CmdShow;
 import org.basex.query.*;
@@ -157,14 +156,10 @@ public final class StringParser extends CmdParser {
         break;
       case REPLICATION:
         switch(consume(CmdReplication.class, cmd)) {
-          case START:
-            switch(consume(CmdReplicationStart.class, cmd)) {
-              case MASTER:
-                return new ReplicationStartMaster(string(cmd));
-              case SLAVE:
-                return new ReplicationStartSlave(string(cmd));
-            }
-            break;
+          case START_MASTER:
+            return new ReplicationStartMaster(string(cmd), string(cmd));
+          case START_SLAVE:
+            return new ReplicationStartSlave(string(cmd), string(cmd));
           case STOP:
             return new ReplicationStop();
         }

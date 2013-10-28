@@ -111,9 +111,23 @@ public abstract class SandboxTest {
    * @throws IOException I/O exception
    */
   public static ClientSession createClient(final String... login) throws IOException {
+    return createClient(LOCALHOST, 9999, login);
+  }
+  
+  /**
+   * Creates a client instance to a specific server.
+   *
+   * @param host host name
+   * @param port port number
+   * @param login optional login data
+   * @return client instance
+   * @throws IOException I/O exception
+   */
+  public static ClientSession createClient(final String host, final int port, 
+      final String... login) throws IOException {
     final String user = login.length > 0 ? login[0] : ADMIN;
     final String pass = login.length > 1 ? login[1] : ADMIN;
-    return new ClientSession(LOCALHOST, 9999, user, pass);
+    return new ClientSession(host, port, user, pass);
   }
 
   /**

@@ -1,6 +1,7 @@
 package org.basex.core.cmd;
 
-import org.basex.core.*;
+import org.basex.core.parse.*;
+import org.basex.core.parse.Commands.*;
 
 /**
  * Evaluates the 'replication stop' command and stops the
@@ -9,17 +10,27 @@ import org.basex.core.*;
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
  */
-public final class ReplicationStop extends Command {
+public final class ReplicationStop extends AReplication {
 
   /**
    * Constructor.
    */
   public ReplicationStop() {
-    super(Perm.ADMIN, false);
+    super();
   }
 
   @Override
   protected boolean run() {
-    return true;
+    if (context.replication.isRunning()) {
+      context.replication.stop();
+      return true;
+    }
+    
+    return false;
+  }
+  
+  @Override
+  public void build(final CmdBuilder cb) {
+    cb.init(Cmd.REPLICATION + " " + CmdReplication.STOP).args();
   }
 }

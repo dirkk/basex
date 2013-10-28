@@ -359,7 +359,8 @@ public interface Text {
   };
   /** Command help. */
   String[] HELPREPLICATION = {
-    "([" + CmdReplication.START + '|' + CmdReplication.STOP + "])",
+    "([" + CmdReplication.START_MASTER + '|' + CmdReplication.START_SLAVE + '|' +
+      CmdReplication.STOP + "])",
     lang("c_replication1"),
     lang("c_replication1")
   };
@@ -1477,6 +1478,17 @@ public interface Text {
   String S_SERVER_ADMIN = lang("s_server_admin");
   /** Command info. */
   String S_H_SERVER_ADMIN = lang("s_h_server_admin");
+  
+  // REPLICATION TEXTS ========================================================
+  
+  /** Replication is already running. */
+  String R_ALREADY_RUNNING = lang("r_already_running");
+  /** Replication is currently not running. */
+  String R_NOT_RUNNING = lang("r_not_running");
+  /** Message broker address is invalid. */
+  String R_INVALID_ADDRESS = lang("r_invalid_address");
+  /** Connection to the message broker was refused. */
+  String R_CONNECTION_REFUSED_X = lang("r_connection_refused_%");
 
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);

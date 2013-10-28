@@ -310,7 +310,7 @@ public final class QueryContext extends Proc {
   public Value update() throws QueryException {
     if(updating) {
       //context.downgrade(this, updates.databases());
-      updates.apply();
+      updates.apply(context.replication);
       if(updates.size() != 0 && context.data() != null) context.update();
       if(output.size() != 0) return output.value();
     }

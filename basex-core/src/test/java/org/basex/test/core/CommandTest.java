@@ -1,10 +1,10 @@
 package org.basex.test.core;
 
 import static org.basex.util.Token.*;
+import static org.basex.core.Text.*;
 import static org.junit.Assert.*;
 
 import java.io.*;
-import java.net.*;
 
 import org.basex.core.*;
 import org.basex.core.cmd.*;
@@ -32,7 +32,9 @@ public class CommandTest extends SandboxTest {
   /** Test name. */
   static final String NAME2 = NAME + '2';
   /** Test host:port address for replication message broker. */
-  private static final String REPLICATION_ADDR = "localhost:8492";
+  private static final String REPLICATION_ADDR = "localhost:5672";
+  /** Test replication set name. */
+  private static final String REPL_SET = "SET-A";
   /** Socket reference. */
   static Session session;
 
@@ -341,6 +343,20 @@ public class CommandTest extends SandboxTest {
     ok(new InfoStorage("1", null));
     ok(new InfoStorage("// li", null));
   }
+  
+  /** Command test. */
+  @Test
+  public final void infoReplication() {
+    ok(new InfoReplication());
+
+    ok(new ReplicationStartMaster(REPLICATION_ADDR, REPL_SET));
+    ok(new InfoReplication());
+    ok(new ReplicationStop());
+
+    ok(new ReplicationStartSlave(REPLICATION_ADDR, REPL_SET));
+    ok(new InfoReplication());
+    ok(new ReplicationStop());
+  }
 
   /** Command test. */
   @Test
@@ -506,21 +522,61 @@ public class CommandTest extends SandboxTest {
   /** Start replication as master. */
   @Test
   public final void replicationMaster() {
-    ok(new ReplicationStartMaster(REPLICATION_ADDR));
+    ok(new ReplicationStartMaster(REPLICATION_ADDR, REPL_SET));
     // already running as master, so second call should fail
-    no(new ReplicationStartMaster(REPLICATION_ADDR));
-    
+    no(new ReplicationStartMaster(REPLICATION_ADDR, REPL_SET));
     ok(new ReplicationStop());
   }
   
   /** Start replication as slave. */
   @Test
   public final void replicationSlave() {
-    final InetSocketAddress mbAddr = new InetSocketAddress(0);
-    ok(new ReplicationStartSlave(REPLICATION_ADDR));
+    ok(new ReplicationStartSlave(REPLICATION_ADDR, REPL_SET));
     // already running as master, so second call should fail
-    no(new ReplicationStartSlave(REPLICATION_ADDR));
+    no(new ReplicationStartSlave(REPLICATION_ADDR, REPL_SET));
     
+    ok(new ReplicationStop());
+  }
+  
+  /** Tests if the correctness test of an AMQP URI is valid. */
+  @Test
+  public final void replicationAMQP() {
+    // valid addresses
+    no(new ReplicationStartMaster("amqp://localhost", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost"));
+    no(new ReplicationStartMaster("localhost", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost"));
+    no(new ReplicationStartMaster("amqp://localhost:1234", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost:1234"));
+    no(new ReplicationStartMaster("amqp://localhost/vhost", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost/vhost"));
+    no(new ReplicationStartMaster("amqp://localhost:1234/vhost", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost:1234/vhost"));
+    no(new ReplicationStartMaster("amqp://user@localhost", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://user@localhost"));
+    no(new ReplicationStartMaster("amqp://user:pass@localhost:1234/vhost", REPL_SET),
+        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://user:pass@localhost:1234/vhost"));
+    
+    // invalid addresses
+    no(new ReplicationStartMaster("amqp://", REPL_SET), R_INVALID_ADDRESS);
+    no(new ReplicationStartMaster("", REPL_SET), R_INVALID_ADDRESS);
+    no(new ReplicationStartMaster("amqp://localhost:", REPL_SET), R_INVALID_ADDRESS);
+    no(new ReplicationStartMaster("amqp://:1234", REPL_SET), R_INVALID_ADDRESS);
+    no(new ReplicationStartMaster("amqp://user:@localhost", REPL_SET), R_INVALID_ADDRESS);
+    no(new ReplicationStartMaster("amqp://localhost/", REPL_SET), R_INVALID_ADDRESS);
+  }
+  
+  /** Stop replication instance. */
+  @Test
+  public final void replicationStop() {
+    no(new ReplicationStop());
+
+    // start as master and stop
+    ok(new ReplicationStartMaster(REPLICATION_ADDR, REPL_SET));
+    ok(new ReplicationStop());
+
+    // start as slave and stop
+    ok(new ReplicationStartSlave(REPLICATION_ADDR, REPL_SET));
     ok(new ReplicationStop());
   }
 
@@ -631,6 +687,23 @@ public class CommandTest extends SandboxTest {
       fail("\"" + cmd + "\" was supposed to fail.");
     } catch(final IOException ex) {
       /* expected */
+    }
+  }
+  
+  /**
+   * Assumes that this command fails with a specific error message.
+   * @param cmd command reference
+   * @param e expected error message
+   */
+  static final void no(final Command cmd, final String e) {
+    try {
+      session.execute(cmd);
+      fail("\"" + cmd + "\" was supposed to fail with error message '" + e +
+          "', but succed.");
+    } catch(final IOException ex) {
+      if (ex.getMessage().compareTo(e) != 0)
+        fail("\"" + cmd + "\" was supposed to fail with error message '" + e +
+            "', but failed with '" + ex.getMessage() + "'.");
     }
   }
 }

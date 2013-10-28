@@ -1,5 +1,6 @@
 package org.basex.query.up;
 
+import org.basex.core.*;
 import org.basex.data.*;
 import org.basex.data.atomic.*;
 import org.basex.query.*;
@@ -114,10 +115,11 @@ public final class Updates {
 
   /**
    * Executes all updates.
+   * @param r replication
    * @throws QueryException query exception
    */
-  public void apply() throws QueryException {
-    if(mod != null) mod.apply();
+  public void apply(final Replication r) throws QueryException {
+    if(mod != null) mod.apply(r);
   }
 
   /**

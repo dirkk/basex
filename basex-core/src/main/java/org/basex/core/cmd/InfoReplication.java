@@ -1,8 +1,6 @@
 package org.basex.core.cmd;
 
 import java.io.*;
-
-import org.basex.core.*;
 import org.basex.core.parse.*;
 import org.basex.core.parse.Commands.*;
 import org.basex.util.*;
@@ -14,12 +12,12 @@ import org.basex.util.*;
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
  */
-public final class InfoReplication extends AQuery {
+public final class InfoReplication extends AInfo {
   /**
    * Default constructor.
    */
   public InfoReplication() {
-    super(Perm.ADMIN, false);
+    super(false);
   }
 
   @Override
@@ -32,10 +30,14 @@ public final class InfoReplication extends AQuery {
    * Creates a replication information string.
    * @return info string
    */
-  public static String replication() {
-
+  private String replication() {
     final TokenBuilder tb = new TokenBuilder();
-    //info(tb, NAME, meta.name);
+    if (context.replication.isRunning()) {
+      info(tb, "Running", true);
+      info(tb, "Address", context.replication.getBrokerAddress());
+    } else {
+      info(tb, "Running", false);
+    }
     return tb.toString();
   }
 

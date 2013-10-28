@@ -2,9 +2,11 @@ package org.basex.query.up;
 
 import java.util.*;
 
+import org.basex.core.*;
 import org.basex.data.*;
 import org.basex.query.*;
 import org.basex.query.up.primitives.*;
+import org.basex.server.replication.*;
 import org.basex.util.list.*;
 
 /**
@@ -72,11 +74,30 @@ public abstract class ContextModifier {
   }
 
   /**
+   * Adds all documents belonging to all databases to be updated to the
+   * specified list.
+   * @return documents
+   */
+  private List<DocumentMessage> documents() {
+    final List<DocumentMessage> docs = new LinkedList<DocumentMessage>();
+    for(final DatabaseUpdates du : pendingUpdates.values()) {
+      final Data d = du.data();
+
+      if(!d.inMemory()) {
+        docs.addAll(du.getDocuments());
+      }
+    }
+    
+    return docs;
+  }
+
+  /**
    * Checks constraints and applies all update primitives to the databases if
    * no constraints are hurt.
+   * @param repl replication facade
    * @throws QueryException query exception
    */
-  final void apply() throws QueryException {
+  final void apply(final Replication repl) throws QueryException {
     // checked constraints
     final Collection<DatabaseUpdates> updates = pendingUpdates.values();
     final Collection<DBCreate> creates = dbCreates.values();
@@ -102,6 +123,10 @@ public abstract class ContextModifier {
       // apply updates
       for(final DatabaseUpdates c : updates) c.apply();
     } finally {
+      // replicate all documents which have been updated
+      for (final DocumentMessage dm : documents())
+        repl.replicate(dm);
+      
       // remove write locks and updating files
       for(final DatabaseUpdates c : updates) {
         if(i-- == 0) break;

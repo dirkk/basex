@@ -15,6 +15,7 @@ import org.basex.query.*;
 import org.basex.query.up.primitives.*;
 import org.basex.query.value.item.*;
 import org.basex.query.value.type.*;
+import org.basex.server.replication.*;
 import org.basex.util.hash.*;
 import org.basex.util.list.*;
 
@@ -41,6 +42,9 @@ final class DatabaseUpdates {
   private final IntObjMap<Put> puts = new IntObjMap<Put>();
   /** Number of updates. */
   private int size;
+  /** List of all document pre values which are possibly affected by updating
+   * operations. */
+  private List<DocumentMessage> documents = new LinkedList<DocumentMessage>();
 
   /**
    * Constructor.
@@ -48,6 +52,35 @@ final class DatabaseUpdates {
    */
   DatabaseUpdates(final Data d) {
     data = d;
+  }
+  
+  /**
+   * Returns the pre value of the document the specified entry (specified by
+   * the pre value) is part of.
+   *
+   * @param p pre value
+   * @return document pre value
+   */
+  private int getParentDocument(final int p) {
+    int currentPre = p;
+    int k = data.kind(currentPre);
+    
+    while(k != Data.DOC) {
+      currentPre = data.parent(currentPre, k);
+      k = data.kind(currentPre);
+    };
+    
+    return currentPre;
+  }
+  
+  /**
+   * Returns all document pre values of documents which can be affected by the
+   * given updating operations.
+   *
+   * @return list of pre values of documents
+   */
+  public List<DocumentMessage> getDocuments() {
+    return documents;
   }
 
   /**
@@ -64,6 +97,11 @@ final class DatabaseUpdates {
         if(pc == null) {
           pc = new NodeUpdates();
           updatePrimitives.put(pre, pc);
+          final int parent = getParentDocument(pre);
+          if (!documents.contains(parent)) {
+            DocumentMessage dm = new DocumentMessage(data, parent);
+            documents.add(dm);
+          }
         }
         pc.add(subp);
       }

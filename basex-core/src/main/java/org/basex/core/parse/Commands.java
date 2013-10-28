@@ -176,9 +176,7 @@ public interface Commands {
   /** Repo types. */
   enum CmdRepo { INSTALL, DELETE, LIST }
   /** Replication commands. */
-  enum CmdReplication { START, STOP }
-  /*+ Replication start types. */
-  enum CmdReplicationStart { MASTER, SLAVE }
+  enum CmdReplication { START_MASTER, START_SLAVE, STOP }
 
   /** Command definitions. */
   enum Cmd {
