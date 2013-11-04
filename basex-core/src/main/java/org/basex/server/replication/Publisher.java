@@ -61,11 +61,11 @@ public class Publisher extends Distributor {
   /**
    * Publishes a message to the message exchange.
    *
-   * @param dm object to publish
+   * @param m object to publish
    */
-  public void publish(DocumentMessage dm) {
+  public void publish(Message m) {
     try {
-      byte[] send = dm.serialize();
+      byte[] send = m.serialize();
       channel.basicPublish(EXCHANGE_NAME, topic, null, send);
     } catch(IOException e) {
       context.log.writeError(e);

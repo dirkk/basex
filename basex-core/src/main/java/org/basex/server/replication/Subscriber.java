@@ -83,9 +83,9 @@ public class Subscriber extends Distributor implements Runnable {
       while (true) {
         QueueingConsumer.Delivery delivery = consumer.nextDelivery();
         byte[] body = delivery.getBody();
-        DocumentMessage dm = DocumentMessage.construct(body);
+        Message m = Message.parse(body);
+        m.save(context);
         
-        dm.saveDocument(context);
         channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
       }
     } catch (Exception e) {

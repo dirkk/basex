@@ -335,7 +335,7 @@ public final class MetaData {
    * @param out output stream
    * @throws IOException I/O Exception
    */
-  void write(final DataOutput out) throws IOException {
+  public void write(final DataOutput out) throws IOException {
     writeInfo(out, DBSTR,      STORAGE);
     writeInfo(out, DBFNAME,    original);
     writeInfo(out, DBTIME,     time);

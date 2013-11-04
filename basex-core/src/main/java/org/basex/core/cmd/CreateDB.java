@@ -14,6 +14,7 @@ import org.basex.index.ft.*;
 import org.basex.index.value.*;
 import org.basex.io.*;
 import org.basex.io.in.*;
+import org.basex.server.replication.*;
 import org.basex.util.*;
 
 /**
@@ -101,6 +102,7 @@ public final class CreateDB extends ACreate {
           if(data.meta.createattr) create(IndexType.ATTRIBUTE, data, this);
           if(data.meta.createftxt) create(IndexType.FULLTEXT,  data, this);
         } finally {
+          context.replication.replicate(new DatabaseMessage(data));
           data.finishUpdate();
         }
       }

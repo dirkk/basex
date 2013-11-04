@@ -140,11 +140,11 @@ public class Replication {
   /**
    * Send the given document to the message broker, if this instance is a
    * master.
-   * @param o document to send
+   * @param m document to send
    */
-  public void replicate(DocumentMessage o) {
+  public void replicate(Message m) {
     if (master != null) {
-      master.publish(o);
+      master.publish(m);
     }
   }
 }

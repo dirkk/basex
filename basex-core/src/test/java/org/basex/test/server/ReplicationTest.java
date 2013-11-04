@@ -110,6 +110,26 @@ public class ReplicationTest extends SandboxTest {
   }
   
   /**
+   * Execute a CREATE DB command on the master and checks if the slaves got the
+   * update.
+   * 
+   * @throws IOException I/O exception
+   * @throws InterruptedException interrupt
+   */
+  @Test
+  public final void createDb() throws IOException, InterruptedException {
+    // Create a database and add a simple document
+    master.execute(new CreateDB(DB, "<test/>"));
+
+    Thread.sleep(200);
+    assertEqual("<test/>",
+        slaves.get(0).execute(new Open(DB)));
+    
+    // drop the temporary database
+    master.execute(new DropDB(DB));
+  }
+  
+  /**
    * Execute an INSERT INTO on the master and checks if the slaves got the
    * update.
    * 
