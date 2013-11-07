@@ -10,6 +10,7 @@ import org.basex.core.parse.*;
 import org.basex.data.*;
 import org.basex.data.atomic.*;
 import org.basex.io.*;
+import org.basex.query.value.node.DBNode;
 import org.basex.server.replication.*;
 import org.basex.util.*;
 
@@ -108,7 +109,8 @@ public final class Add extends ACreate {
         int pre = data.meta.size;
         data.insert(pre, -1, new DataClip(tmp));
         context.update();
-        context.replication.replicate(new DocumentMessage(data, pre));
+        if (context.replication.isMaster())
+          context.replication.replicateDocument(new DBNode(data, pre));
         if(lock) data.finishUpdate();
       }
       // return info message

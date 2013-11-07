@@ -6,6 +6,7 @@ import org.basex.core.*;
 import org.basex.data.*;
 import org.basex.query.*;
 import org.basex.query.up.primitives.*;
+import org.basex.query.value.node.DBNode;
 import org.basex.server.replication.*;
 import org.basex.util.list.*;
 
@@ -78,8 +79,8 @@ public abstract class ContextModifier {
    * specified list.
    * @return documents
    */
-  private List<DocumentMessage> documents() {
-    final List<DocumentMessage> docs = new LinkedList<DocumentMessage>();
+  private List<DBNode> documents() {
+    final List<DBNode> docs = new LinkedList<DBNode>();
     for(final DatabaseUpdates du : pendingUpdates.values()) {
       final Data d = du.data();
 
@@ -124,9 +125,16 @@ public abstract class ContextModifier {
       for(final DatabaseUpdates c : updates) c.apply();
     } finally {
       // replicate all documents which have been updated
-      for (final DocumentMessage dm : documents())
-        repl.replicate(dm);
-      
+      if (repl.isMaster()) {
+        for (final DBNode node : documents()) {
+          try {
+            repl.replicateDocument(node);
+          } catch (BaseXException e) {
+            throw new QueryException(e);
+          }
+        }
+      }
+
       // remove write locks and updating files
       for(final DatabaseUpdates c : updates) {
         if(i-- == 0) break;

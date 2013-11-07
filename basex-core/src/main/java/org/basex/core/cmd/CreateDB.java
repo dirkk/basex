@@ -102,7 +102,8 @@ public final class CreateDB extends ACreate {
           if(data.meta.createattr) create(IndexType.ATTRIBUTE, data, this);
           if(data.meta.createftxt) create(IndexType.FULLTEXT,  data, this);
         } finally {
-          context.replication.replicate(new DatabaseMessage(data));
+          if (context.replication.isMaster())
+            context.replication.replicateDatabase(data);
           data.finishUpdate();
         }
       }

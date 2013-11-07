@@ -1489,6 +1489,8 @@ public interface Text {
   String R_INVALID_ADDRESS = lang("r_invalid_address");
   /** Connection to the message broker was refused. */
   String R_CONNECTION_REFUSED_X = lang("r_connection_refused_%");
+  /** Replication instance is not a running master. */
+  String R_NOT_MASTER = lang("r_not_master");
 
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);

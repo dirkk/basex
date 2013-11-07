@@ -14,6 +14,7 @@ import org.basex.io.serial.*;
 import org.basex.query.*;
 import org.basex.query.up.primitives.*;
 import org.basex.query.value.item.*;
+import org.basex.query.value.node.DBNode;
 import org.basex.query.value.type.*;
 import org.basex.server.replication.*;
 import org.basex.util.hash.*;
@@ -44,7 +45,7 @@ final class DatabaseUpdates {
   private int size;
   /** List of all document pre values which are possibly affected by updating
    * operations. */
-  private List<DocumentMessage> documents = new LinkedList<DocumentMessage>();
+  private List<DBNode> documents = new LinkedList<DBNode>();
 
   /**
    * Constructor.
@@ -79,7 +80,7 @@ final class DatabaseUpdates {
    *
    * @return list of pre values of documents
    */
-  public List<DocumentMessage> getDocuments() {
+  public List<DBNode> getDocuments() {
     return documents;
   }
 
@@ -99,8 +100,8 @@ final class DatabaseUpdates {
           updatePrimitives.put(pre, pc);
           final int parent = getParentDocument(pre);
           if (!documents.contains(parent)) {
-            DocumentMessage dm = new DocumentMessage(data, parent);
-            documents.add(dm);
+            DBNode n = new DBNode(data, parent);
+            documents.add(n);
           }
         }
         pc.add(subp);

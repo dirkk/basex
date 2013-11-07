@@ -23,6 +23,15 @@ public abstract class Distributor {
   protected static final String EXCHANGE_NAME = "BaseXRepl";
   /** Replica set name. Topic of the exchange. */
   protected final String topic;
+  /** Message types. */
+  protected static enum TYPE {
+    Document((byte) 0x00), Database((byte) 0x01),
+    DocumentDelete((byte) 0x02), DatabaseDelete((byte) 0x03);
+
+    private final byte id;
+    TYPE(byte id) { this.id = id; }
+    public byte getValue() { return id;}
+  }
   
   /**
    * Constructor

@@ -11,7 +11,9 @@ import static org.basex.util.Token.*;
  */
 public class BlockInput {
   /** Backing Buffer. */
-  private ByteBuffer buf;
+  private byte[] buffer;
+  /** Current reading position. */
+  private int pos;
   
   /**
    * Default constructor.
@@ -19,7 +21,8 @@ public class BlockInput {
    * @param b input data
    */
   public BlockInput(final byte[] b) {
-    buf = ByteBuffer.wrap(b);
+    buffer = b;
+    pos = 0;
   }
   
   /**
@@ -28,7 +31,24 @@ public class BlockInput {
    * @return byte
    */
   public byte readByte() {
-    return buf.get();
+    synchronized (buffer) {
+      return buffer[pos++];
+    }
+  }
+
+
+  /**
+   * Read a single int value.
+   *
+   * @return int read value
+   */
+  public int readInt() {
+    synchronized (buffer) {
+      return (buffer[pos++] << 24) +
+             ((buffer[pos++] & 0xFF) << 16) +
+             ((buffer[pos++] & 0xFF) << 8) +
+             (buffer[pos++] & 0xFF);
+    }
   }
   
   /**
@@ -36,10 +56,13 @@ public class BlockInput {
    * @return payload
    */
   public byte[] readBlock() {
-    int length = buf.getInt();
+    int length = readInt();
     byte[] bl = new byte[length];
-    buf.get(bl);
-    return bl;
+    synchronized (buffer) {
+      System.arraycopy(buffer, pos, bl, 0, length);
+      pos += length;
+      return bl;
+    }
   }
 
   /**

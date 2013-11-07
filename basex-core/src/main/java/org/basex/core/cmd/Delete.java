@@ -41,13 +41,35 @@ public final class Delete extends ACreate {
 
     // delete binaries
     final TokenList bins = data.resources.binaries(target);
-    delete(data, target);
+    try {
+      deleteReplicate(data, target);
+    } catch (BaseXException e) {
+      error(e.getMessage());
+    }
+
 
     // finish update
     data.finishUpdate();
 
     // return info message
     return info(RES_DELETED_X_X, docs.size() + bins.size(), perf);
+  }
+
+
+  /**
+   * Deletes the specified resources and replicate this change.
+   * @param data data reference
+   * @param res resource to be deleted
+   */
+  public void deleteReplicate(final Data data, final String res) throws BaseXException {
+    if(data.inMemory()) return;
+    final IOFile file = data.meta.binary(res);
+    if(file != null) {
+      file.delete();
+
+      if (context.replication.isMaster())
+        context.replication.replicateDatabaseDelete(file.dirPath());
+    }
   }
 
   /**

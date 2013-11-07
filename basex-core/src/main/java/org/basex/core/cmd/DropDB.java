@@ -41,7 +41,7 @@ public final class DropDB extends ACreate {
       if(context.pinned(db)) {
         info(DB_PINNED_X, db);
         ok = false;
-      } else if(!drop(db, context)) {
+      } else if(!dropReplicate(db, context)) {
         // dropping was not successful
         info(DB_NOT_DROPPED_X, db);
         ok = false;
@@ -50,6 +50,26 @@ public final class DropDB extends ACreate {
       }
     }
     return ok;
+  }
+
+  /**
+   * Deletes the specified database and replicate this change.
+   * @param db name of the database
+   * @param ctx database context
+   * @return success flag
+   */
+  public synchronized boolean dropReplicate(final String db, final Context ctx) {
+    final IOFile dbpath = ctx.mprop.dbpath(db);
+    boolean success = dbpath.exists() && drop(dbpath);
+
+    if (success && context.replication.isMaster())
+      try {
+        context.replication.replicateDatabaseDelete(db);
+      } catch (BaseXException e) {
+        return false;
+      }
+
+    return success;
   }
 
   /**

@@ -1,6 +1,7 @@
 package org.basex.test.server;
 
 import static org.junit.Assert.*;
+import static org.basex.core.Text.*;
 
 import java.io.*;
 import java.util.*;
@@ -16,6 +17,7 @@ import org.basex.test.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
 import org.junit.*;
+import org.junit.rules.ExpectedException;
 
 /**
  * This class tests the basic replication infrastructure.
@@ -119,11 +121,10 @@ public class ReplicationTest extends SandboxTest {
   @Test
   public final void createDb() throws IOException, InterruptedException {
     // Create a database and add a simple document
-    master.execute(new CreateDB(DB, "<test/>"));
+    master.execute(new CreateDB(DB));
 
     Thread.sleep(200);
-    assertEqual("<test/>",
-        slaves.get(0).execute(new Open(DB)));
+    slaves.get(0).execute(new Open(DB));
     
     // drop the temporary database
     master.execute(new DropDB(DB));
@@ -134,14 +135,18 @@ public class ReplicationTest extends SandboxTest {
    * update.
    * 
    * @throws IOException I/O exception
+   * @throws InterruptedException interrupt
    */
   @Test
-  public final void insertInto() throws IOException {
+  public final void insertInto() throws IOException, InterruptedException {
     // Create a database and add a simple document
     master.execute(new CreateDB(DB));
     master.execute(new Add("test.xml", "<test></test>"));
     
     master.execute(new XQuery("insert node <test2/> into //test"));
+
+    // it is eventually consistent, so wait a moment
+    Thread.sleep(200);
     assertEqual("<test><test2/></test>",
         slaves.get(0).execute(new XQuery(RAW + "doc('" + DB + "/test.xml')")));
     
@@ -187,17 +192,45 @@ public class ReplicationTest extends SandboxTest {
    * @throws IOException I/O exception
    */
   @Test
-  public final void insertIntoFirst() throws IOException {
+  public final void insertIntoFirst() throws IOException, InterruptedException {
     // Create a database and add a simple document
     master.execute(new CreateDB(DB));
     master.execute(new Add("test.xml", "<test><test3/></test>"));
     
     master.execute(new XQuery("insert node <test2/> as first into //test"));
+
+    Thread.sleep(200);
     assertEqual("<test><test2/><test3/></test>",
         slaves.get(0).execute(new XQuery(RAW + "doc('" + DB + "/test.xml')")));
     
     // drop the temporary database
     master.execute(new DropDB(DB));
+  }
+
+  /**
+   * Drop a database.
+   *
+   * @throws IOException I/O exception
+   */
+  @Test
+  public final void dropDatabase() throws IOException, InterruptedException {
+    // Create a database and add a simple document
+    master.execute(new CreateDB(DB));
+    master.execute(new Add("test.xml", "<test><test3/></test>"));
+
+    Thread.sleep(200);
+    assertEqual("<test><test3/></test>",
+            slaves.get(0).execute(new XQuery(RAW + "doc('" + DB + "/test.xml')")));
+
+    // drop the database
+    master.execute(new DropDB(DB));
+    Thread.sleep(200);
+    try  {
+      slaves.get(0).execute(new Open(DB));
+      fail(new BaseXException(DB_NOT_FOUND_X, DB).getMessage());
+    } catch (BaseXException e) {
+      assertEquals(e.getMessage(), new BaseXException(DB_NOT_FOUND_X, DB).getMessage());
+    }
   }
   
   /**
@@ -239,7 +272,7 @@ public class ReplicationTest extends SandboxTest {
         final StringList sl = new StringList().add("-z").add("-p" + port).add("-e" + (port -1));
         final BaseXServer srv = new BaseXServer(sl.toArray());
         srv.context.mprop.set(MainProp.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
-        return server;
+        return srv;
       } finally {
         System.setOut(OUT);
       }
@@ -304,7 +337,7 @@ public class ReplicationTest extends SandboxTest {
         final StringList sl = new StringList().add("-z").add("-p" + port).add("-e" + (port -1));
         final BaseXServer srv = new BaseXServer(sl.toArray());
         srv.context.mprop.set(MainProp.DBPATH, new IOFile(Prop.TMP, "sandbox-slave" + port).path());
-        return server;
+        return srv;
       } finally {
         System.setOut(OUT);
       }
@@ -374,7 +407,6 @@ public class ReplicationTest extends SandboxTest {
 
       stopServer(server);
     }
-    
     
     /**
      * Starts the client session.

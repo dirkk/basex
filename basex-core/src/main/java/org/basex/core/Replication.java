@@ -1,6 +1,22 @@
 package org.basex.core;
 
+import org.basex.data.Data;
+import org.basex.data.MetaData;
+import org.basex.io.out.ArrayOutput;
+import org.basex.io.out.BlockOutput;
+import org.basex.io.serial.Serializer;
+import org.basex.query.value.node.DBNode;
 import org.basex.server.replication.*;
+import org.basex.util.Token;
+import org.basex.util.list.IntList;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+
+import static org.basex.core.Text.*;
+import static org.basex.data.DataText.DBNAME;
 
 /**
  * Replication infrastructure for master/slave of a replica set. A replica
@@ -138,13 +154,41 @@ public class Replication {
   }
 
   /**
-   * Send the given document to the message broker, if this instance is a
-   * master.
-   * @param m document to send
+   * Replicate the complete database
+   *
+   * @param data data instance to replicate
+   * @throws BaseXException exception
    */
-  public void replicate(Message m) {
-    if (master != null) {
-      master.publish(m);
-    }
+  public void replicateDatabase(final Data data) throws BaseXException {
+    if (master == null)
+      throw new BaseXException(R_NOT_MASTER);
+
+    master.replicateDatabase(data);
+  }
+
+  /**
+   * Serializes a document stored in the database. It will encode the message
+   * using prepending length fields. It send the whole base URI (include
+   * database and file name) and the UTF-8 serialized document.
+   */
+  public void replicateDocument(final DBNode node) throws BaseXException {
+    if (master == null)
+      throw new BaseXException(R_NOT_MASTER);
+
+    master.replicateDocument(node);
+  }
+
+  public void replicateDocumentDelete(final String path) throws BaseXException {
+    if (master == null)
+      throw new BaseXException(R_NOT_MASTER);
+
+    master.replicateDocumentDelete(path);
+  }
+
+  public void replicateDatabaseDelete(final String name) throws BaseXException {
+    if (master == null)
+      throw new BaseXException(R_NOT_MASTER);
+
+    master.replicateDatabaseDelete(name);
   }
 }

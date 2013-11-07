@@ -570,5 +570,6 @@ s_h_server_admin     = Display the server administration for user management and
 
 r_already_running      = Replication is already running.
 r_not_running          = Replication is currently not running.
-r_invalid_address		   = The given address is invalid. It must be a valid AMQP URI address.
+r_invalid_address      = The given address is invalid. It must be a valid AMQP URI address.
 r_connection_refused_% = Connection to the message broker at % was not successful.
+r_not_master           = This instance has no running master instance.

@@ -1,6 +1,13 @@
 package org.basex.io.out;
 
+import org.basex.util.Array;
+
 import java.nio.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+
 import static org.basex.util.Token.*;
 
 /**
@@ -11,21 +18,38 @@ import static org.basex.util.Token.*;
  */
 public class BlockOutput {
   /** Backing Buffer. */
-  private ByteBuffer buf;
+  private byte[] buffer;
   
   /**
    * Default constructor.
    */
   public BlockOutput() {
-    buf = ByteBuffer.allocate(1024);
+    buffer = new byte[0];
   }
   
   /**
-   * Write a single byte
+   * Write a single byte.
    * @param b byte to write
    */
   public void writeByte(final byte b) {
-    buf.put(b);
+    byte[] a = new byte[1];
+    a[0] = b;
+    add(a);
+  }
+
+  /**
+   * Write an integer. In Java an integer has 32bit, so 4 bytes.
+   * @param i int to write
+   */
+  public void writeInt(final int i) {
+    byte[] a = new byte[] {
+            (byte) (i >>> 24),
+            (byte) (i >>> 16),
+            (byte) (i >>> 8),
+            (byte) i
+    };
+
+    add(a);
   }
   
   /**
@@ -33,8 +57,8 @@ public class BlockOutput {
    * @param bl byte array to write
    */
   public void writeBlock(final byte[] bl) {
-    buf.putInt(bl.length);
-    buf.put(bl);
+    writeInt(bl.length);
+    add(bl);
   }
   
   /**
@@ -54,6 +78,21 @@ public class BlockOutput {
     writeString(s1);
     writeString(s2);
   }
+
+  /**
+   * Add the given byte array to the end of the byte buffer. Creates a new
+   * array and stores this as byte bufer.
+   *
+   * @param a append to buffer
+   */
+  private void add(final byte[] a) {
+    synchronized(buffer) {
+      final byte[] tmp1 = buffer;
+
+      buffer = Arrays.copyOf(tmp1, tmp1.length + a.length);
+      System.arraycopy(a, 0, buffer, tmp1.length, a.length);
+    }
+  }
   
   /**
    * Converts the buffer to a byte array.
@@ -61,9 +100,6 @@ public class BlockOutput {
    * @return byte array.
    */
   public byte[] toArray() {
-    byte[] t = new byte[buf.position()];
-    buf.rewind();
-    buf.get(t);
-    return t;
+    return buffer;
   }
 }
