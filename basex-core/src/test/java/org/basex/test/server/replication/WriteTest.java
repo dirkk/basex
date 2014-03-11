@@ -6,7 +6,6 @@ import org.basex.core.GlobalOptions;
 import org.basex.core.Replication;
 import org.basex.core.cmd.*;
 import org.basex.io.IOFile;
-import org.basex.server.replication.ReplicationActor;
 import org.basex.util.Performance;
 import org.basex.util.Prop;
 import org.basex.util.Util;
@@ -266,7 +265,7 @@ public class WriteTest {
     }
   }
 
-  public static Performance perf = ReplicationActor.perf;
+  // public static Performance perf = ReplicationActor.perf;
 
 
   @Test
@@ -275,18 +274,16 @@ public class WriteTest {
 
     for (int j = 0; j < 20; ++j) {
       // normal version
-//      final Context ctx3 = createSandbox(3);
-//      for (int i = 0; i < TRIES; ++i) {
-//        new CreateDB("test").execute(ctx3);
-//        new Add("test.xml", "<A />").execute(ctx3);
-//
-//        long t1 = System.nanoTime();
-//        new XQuery("insert node <B/> into //A").execute(ctx3);
-//        tNormal += System.nanoTime() - t1;
-//
-//        new DropDB("test").execute(ctx3);
-//      }
-//      System.out.println("Normal    : " + p);
+      final Context ctx3 = createSandbox(3);
+      for (int i = 0; i < TRIES; ++i) {
+        new CreateDB("test").execute(ctx3);
+        new Add("test.xml", "<A />").execute(ctx3);
+
+        new XQuery("insert node <B/> into //A").execute(ctx3);
+
+        new DropDB("test").execute(ctx3);
+      }
+      //System.out.println("Normal    : " + perf);
 
       // replicated version
       for (int i = 0; i < TRIES; ++i) {
@@ -297,7 +294,7 @@ public class WriteTest {
 
         new DropDB(("test")).execute(ctx1);
       }
-      System.out.println("Replicated: " + perf);
+      //System.out.println("Replicated: " + perf);
 
     }
 

@@ -21,7 +21,6 @@ import org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import org.basex.server.replication.InternalMessages.RequestStatus;
 import org.basex.server.replication.InternalMessages.StartSet;
 import org.basex.server.replication.InternalMessages.StatusMessage;
-import org.basex.util.Performance;
 import org.basex.util.Prop;
 import org.basex.util.Token;
 import scala.concurrent.duration.Duration;
@@ -237,10 +236,6 @@ public class ReplicationActor extends UntypedActor {
 
           new Open(um.getDatabaseName()).execute(dbCtx);
           new Replace(um.getPath(), content).execute(dbCtx);
-
-          if(++dirtyCounter == 20000)
-            System.out.println(perf);
-
         } else if (dm instanceof DataMessages.RenameMessage) {
           log.info("RenameMessage received");
           DataMessages.RenameMessage rm = (DataMessages.RenameMessage) dm;
@@ -268,9 +263,6 @@ public class ReplicationActor extends UntypedActor {
       }
     }
   };
-
-  static int dirtyCounter;
-  public static Performance perf = new Performance();
 
   @Override
   public void onReceive(Object msg) throws Exception {
