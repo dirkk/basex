@@ -59,12 +59,8 @@ public class ReplicationActor extends UntypedActor {
   private Member primary;
   /** Map of all secondaries, key is member ID. */
   private Map<String, Member> secondaries = new HashMap<String, Member>();
-  /** Announce actor. */
-  private ActorRef electionActor;
   /** ID. */
   private String id;
-  /** Cluster listener. */
-  private ActorRef clusterListener;
   /** Cluster. */
   private Cluster cluster = Cluster.get(getContext().system());
   /** Timeout. */
@@ -87,10 +83,10 @@ public class ReplicationActor extends UntypedActor {
 
   @Override
   public void preStart() {
-    log.info("Replication actor at path {} started.", cluster.selfAddress());
+    log.debug("Replication actor at path {} started.", cluster.selfAddress());
     id = cluster.selfAddress().toString();
 
-    electionActor = getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), timeout), "election");
+    getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), timeout), "election");
 
     // TODO get voting value
     self = new Member(getSelf(), id, true);
@@ -117,20 +113,11 @@ public class ReplicationActor extends UntypedActor {
   }
 
   /**
-   * The actor got a request message to send some information parameters.
-   * @param msg
+   * The actor was asked to send the status, so respond with the status to the
+   * sender.
    */
-  private void handleStatusRequest(final RequestStatus msg) {
-    StringBuilder b = new StringBuilder();
-    b.append("State: " + getState() + Prop.NL);
-    b.append("Primary" + Prop.NL + getPrimary() + Prop.NL);
-    b.append("Number of secondaries: " + getSecondaries().size() + Prop.NL);
-    for (Iterator<Member> it = getSecondaries().iterator(); it.hasNext(); ) {
-      Member m = it.next();
-      b.append("Secondary " + Prop.NL + m + Prop.NL);
-    }
-
-    getSender().tell(b.toString(), getSelf());
+  private void handleStatusRequest() {
+    getSender().tell(toString(), getSelf());
   }
 
   private Set<ElectionMember> getVotingMembers() {
@@ -149,6 +136,13 @@ public class ReplicationActor extends UntypedActor {
     return set;
   }
 
+  /**
+   * State machine for a Primary within a replica set. Only one Primary
+   * is allowed within a replica set at any time. Primary is chosen by
+   * election using {@link org.basex.server.election.ElectionActor}.
+   *
+   * The Primary is the only member within a replica set which is writable.
+   */
   private Procedure<Object> primaryProcedure = new Procedure<Object>() {
     @Override
     public void apply(Object msg) throws Exception {
@@ -194,8 +188,6 @@ public class ReplicationActor extends UntypedActor {
         } else {
           secondaries.put(newMember.getId(), newMember);
         }
-      } else if (msg instanceof RequestStatus) {
-        handleStatusRequest((RequestStatus) msg);
       } else if (msg instanceof DataMessage) {
         log.info("Got datamessage, {} secondaries", secondaries.values().size());
         // publish to all secondaries
@@ -204,16 +196,20 @@ public class ReplicationActor extends UntypedActor {
           m.getActor().tell(msg, getSelf());
         }
       } else {
-        unhandled(msg);
+        handleAll(msg);
       }
     }
   };
 
+  /**
+   * State machine for a Secondary within a replica set. A secondary is read-only
+   * and will replicate all write updates from the Primary.
+   */
   private Procedure<Object> secondaryProcedure = new Procedure<Object>() {
     @Override
     public void apply(Object msg) throws Exception {
       if (msg instanceof RequestStatus) {
-        handleStatusRequest((RequestStatus) msg);
+        handleStatusRequest();
       } else if (msg instanceof DataMessage) {
         // got an update from the primary
         DataMessage dm = (DataMessage) msg;
@@ -264,6 +260,13 @@ public class ReplicationActor extends UntypedActor {
     }
   };
 
+  /**
+   * State machine for an unconnected replication actor. Can either be voted to be Primary
+   * or be a Secondary. Is non-operational and read-only.
+   *
+   * @param msg incoming message
+   * @throws Exception exception
+   */
   @Override
   public void onReceive(Object msg) throws Exception {
     if (msg instanceof Start) {
@@ -303,15 +306,42 @@ public class ReplicationActor extends UntypedActor {
       clusterState = sm.getState();
     } else if (msg instanceof SyncFinished) {
       setState(State.SECONDARY);
-    } else if (msg instanceof RequestStatus) {
-      handleStatusRequest((RequestStatus) msg);
     } else {
       unhandled(msg);
     }
   }
 
-  public State getState() { return state; };
+  /**
+   * Incoming message operations which are equal for all states of the replication actor.
+   * @param msg incoming message
+   */
+  private void handleAll(Object msg) {
+    if (msg instanceof RequestStatus) {
+      handleStatusRequest();
+    } else {
+      unhandled(msg);
+    }
+  }
 
+  /**
+   * Return the state of the replication.
+   * @return state
+   */
+  private State getState() {
+    return state;
+  };
+
+  /**
+   * State machine transition from one state to another. The following changes are possible:
+   *
+   * <ul>
+   *   <li><i>UNCONNECTED -> PRIMARY</i> A new member is voted Primary</li>
+   *   <li><i>UNCONNECTED -> SECONDARY</i> A new member becomes a Secondary</li>
+   *   <li><i>SECONDARY -> PRIMARY</i> The old Primary failed, so this one was elected as replacement.</li>
+   *   <li><i>PRIMARY -> SECONDARY</i> The current Primary voluntarily stepped down and become a Secondary.</li>
+   * </ul>
+   * @param s new state
+   */
   protected  synchronized void setState(State s) {
     if (state != s) {
       log.info("System {} goes from state {} to {}", cluster.selfAddress(), state, s);
@@ -334,5 +364,19 @@ public class ReplicationActor extends UntypedActor {
           break;
       }
     }
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder b = new StringBuilder();
+    b.append("State: " + getState() + Prop.NL);
+    b.append("Primary" + Prop.NL + getPrimary() + Prop.NL);
+    b.append("Number of secondaries: " + getSecondaries().size() + Prop.NL);
+    for (Iterator<Member> it = getSecondaries().iterator(); it.hasNext(); ) {
+      Member m = it.next();
+      b.append("Secondary " + Prop.NL + m + Prop.NL);
+    }
+
+    return b.toString();
   }
 }
