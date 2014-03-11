@@ -13,7 +13,7 @@ import org.basex.util.*;
  * This is an efficient and memory-saving hash set for storing tokens.
  * The first entry of the token set (offset 0) is always empty.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class TokenSet extends ASet implements Iterable<byte[]> {
@@ -73,7 +73,7 @@ public class TokenSet extends ASet implements Iterable<byte[]> {
   /**
    * Stores the specified key if it has not been stored before.
    * @param key key to be added
-   * @return {@Code true} if the key did not exist yet and was stored
+   * @return {@code true} if the key did not exist yet and was stored
    */
   public final boolean add(final byte[] key) {
     return index(key) > 0;
@@ -82,7 +82,7 @@ public class TokenSet extends ASet implements Iterable<byte[]> {
   /**
    * Stores the specified string as key if it has not been stored before.
    * @param key string to be added
-   * @return {@Code true} if the key did not exist yet and was stored
+   * @return {@code true} if the key did not exist yet and was stored
    */
   public boolean add(final String key) {
     return add(token(key));
@@ -191,7 +191,7 @@ public class TokenSet extends ASet implements Iterable<byte[]> {
       if(!tb.isEmpty()) tb.add(", ");
       if(key != null) tb.add(key);
     }
-    return new TokenBuilder(Util.name(getClass())).add('[').add(tb.finish()).
+    return new TokenBuilder(Util.className(getClass())).add('[').add(tb.finish()).
         add(']').toString();
   }
 }

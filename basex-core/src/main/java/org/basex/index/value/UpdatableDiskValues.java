@@ -1,6 +1,7 @@
 package org.basex.index.value;
 
 import static org.basex.data.DataText.*;
+import static org.basex.util.Token.*;
 
 import java.io.*;
 
@@ -13,7 +14,7 @@ import org.basex.util.list.*;
  * This class provides access to attribute values and text contents stored on
  * disk. The data structure is described in the {@link ValueIndexBuilder} class.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class UpdatableDiskValues extends DiskValues {
@@ -62,12 +63,12 @@ public final class UpdatableDiskValues extends DiskValues {
     final TokenList nkeys = new TokenList(m.size());
     int p = 0;
     for(final byte[] key : allkeys) {
-      p = get(key, p, last);
+      p = get(key, p, s);
       if(p < 0) {
         p = -(p + 1);
         nkeys.add(key);
       } else {
-        appendIds(p, key, diffs(m.get(key)));
+        appendIds(p++, key, diffs(m.get(key)));
       }
     }
 
@@ -75,11 +76,11 @@ public final class UpdatableDiskValues extends DiskValues {
     for(int j = nkeys.size() - 1, i = last, pos = s + j; j >= 0; --j) {
       final byte[] key = nkeys.get(j);
 
-      final int ins = -(1 + get(key, 0, i));
-      if(ins < 0) throw new IllegalStateException("Key should not exist");
+      final int in = -(1 + get(key, 0, i + 1));
+      if(in < 0) throw Util.notExpected("Key should not exist: '" + string(key) + '\'');
 
       // shift all bigger keys to the right
-      while(i >= ins) {
+      while(i >= in) {
         idxr.write5(pos * 5L, idxr.read5(i * 5L));
         ctext.put(pos--, ctext.get(i--));
       }
@@ -129,11 +130,12 @@ public final class UpdatableDiskValues extends DiskValues {
 
     // delete ids and create a list of the key positions which should be deleted
     final IntList empty = new IntList(m.size());
-    int p = 0;
-    final int s = size.get() - 1;
+    int p = -1;
+    final int s = size.get();
     for(final byte[] key : allkeys) {
-      p = get(key, p, s);
-      if(p < 0) p = -(p + 1); // should not occur, but anyway
+      p = get(key, ++p, s);
+      if(p < 0) throw Util.notExpected("Tried to delete ids " + m.get(key) +
+          " of non-existing index key: '" + string(key) + '\'');
       else if(deleteIds(p, key, m.get(key).sort().toArray()) == 0) empty.add(p);
     }
 
@@ -153,7 +155,7 @@ public final class UpdatableDiskValues extends DiskValues {
     final int numold = idxl.readNum(pos);
 
     if(numold == ids.length) {
-      // all ids should be detected: the key itself will be deleted, too
+      // all ids should be deleted: the key itself will be deleted, too
       cache.delete(key);
       return 0;
     }
@@ -202,7 +204,7 @@ public final class UpdatableDiskValues extends DiskValues {
     // delete the id from the old key
     final int p = get(o);
     if(p >= 0) {
-      final int[] tmp = new int[] { id};
+      final int[] tmp = { id};
       if(deleteIds(p, o, tmp) == 0) {
         // the old key remains empty: delete it
         cache.delete(o);

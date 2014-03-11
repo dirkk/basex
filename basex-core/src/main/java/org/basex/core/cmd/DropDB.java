@@ -1,20 +1,18 @@
 package org.basex.core.cmd;
 
-import org.basex.core.Context;
-import org.basex.core.Databases;
-import org.basex.core.LockResult;
-import org.basex.core.parse.CmdBuilder;
+import static org.basex.core.Text.*;
+
+import org.basex.core.*;
+import org.basex.core.parse.*;
 import org.basex.core.parse.Commands.Cmd;
 import org.basex.core.parse.Commands.CmdDrop;
-import org.basex.io.IOFile;
-import org.basex.util.list.StringList;
-
-import static org.basex.core.Text.*;
+import org.basex.io.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'drop database' command and deletes a database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class DropDB extends ACreate {
@@ -61,7 +59,7 @@ public final class DropDB extends ACreate {
    * @return success flag
    */
   public static synchronized boolean drop(final String db, final Context ctx) {
-    final IOFile dbpath = ctx.mprop.dbpath(db);
+    final IOFile dbpath = ctx.globalopts.dbpath(db);
     boolean ok = dbpath.exists() && drop(dbpath);
     if (ok) {
       ctx.triggers.afterDrop(db);
@@ -74,7 +72,7 @@ public final class DropDB extends ACreate {
    * @param path database path
    * @return success of operation
    */
-  public static synchronized boolean drop(final IOFile path) {
+  private static synchronized boolean drop(final IOFile path) {
     return path.exists() && path.delete();
   }
 
@@ -97,8 +95,7 @@ public final class DropDB extends ACreate {
 
   @Override
   public void databases(final LockResult lr) {
-    if (!databases(lr.write, 0))
-      lr.writeAll = true;
+    if(!databases(lr.write, 0)) lr.writeAll = true;
   }
 
   @Override

@@ -1,7 +1,7 @@
 (:~
  : This module contains helper functions for locking documents in WebDAV.
  :
- : @author BaseX Team 2005-13, BSD License
+ : @author BaseX Team 2005-14, BSD License
  :)
 module namespace w = 'http://basex.org/modules/webdav';
 
@@ -89,7 +89,7 @@ declare function w:lock-db-exists() as xs:boolean {
  : Creates the database for the WebDAV locks, if it does not exist.
  :)
 declare %updating function w:init-lock-db() {
-  if (w:lock-db-exists()) then
+  if(w:lock-db-exists()) then
     ()
   else
     db:create($w:locks-db, <w:locks/>, $w:locks-db)

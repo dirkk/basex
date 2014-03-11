@@ -1,13 +1,13 @@
 package org.basex.query.up.primitives;
 
 import static org.basex.query.util.Err.*;
-import static org.basex.core.Text.*;
 
 import java.io.*;
 
 import org.basex.data.*;
 import org.basex.io.out.*;
 import org.basex.io.serial.*;
+import org.basex.io.serial.SerializerOptions.YesNo;
 import org.basex.query.*;
 import org.basex.query.value.node.*;
 import org.basex.util.*;
@@ -16,10 +16,10 @@ import org.basex.util.list.*;
 /**
  * Fn:put operation primitive.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Lukas Kircher
  */
-public final class Put extends BasicOperation {
+public final class Put extends DBUpdate {
   /** Target paths. The same node can be stored in multiple locations. */
   private final StringList paths = new StringList(1);
   /** Node id of the target node. Target nodes are identified via their ID, as structural
@@ -30,15 +30,15 @@ public final class Put extends BasicOperation {
 
   /**
    * Constructor.
-   * @param i input info
    * @param id target node id
-   * @param d target data reference
-   * @param u location path URI
+   * @param data target data reference
+   * @param path target path
+   * @param info input info
    */
-  public Put(final InputInfo i, final int id, final Data d, final String u) {
-    super(BasicOperation.TYPE.FNPUT, d, i);
+  public Put(final int id, final Data data, final String path, final InputInfo info) {
+    super(UpdateType.FNPUT, data, info);
     nodeid = id;
-    paths.add(u);
+    paths.add(path);
   }
 
   @Override
@@ -50,9 +50,9 @@ public final class Put extends BasicOperation {
       try {
         final PrintOutput po = new PrintOutput(u);
         try {
-          final SerializerProp pr = new SerializerProp();
           // try to reproduce non-chopped documents correctly
-          pr.set(SerializerProp.S_INDENT, node.data.meta.chop ? YES : NO);
+          final SerializerOptions pr = new SerializerOptions();
+          pr.set(SerializerOptions.INDENT, node.data.meta.chop ? YesNo.YES : YesNo.NO);
           final Serializer ser = Serializer.get(po, pr);
           ser.serialize(node);
           ser.close();
@@ -60,14 +60,14 @@ public final class Put extends BasicOperation {
           po.close();
         }
       } catch(final IOException ex) {
-        UPPUTERR.thrw(info, u);
+        throw UPPUTERR.get(info, u);
       }
     }
   }
 
   @Override
-  public void merge(final BasicOperation o) throws QueryException {
-    for(final String u : ((Put) o).paths) paths.add(u);
+  public void merge(final Update up) {
+    for(final String path : ((Put) up).paths) paths.add(path);
   }
 
   @Override
@@ -77,14 +77,9 @@ public final class Put extends BasicOperation {
 
   @Override
   public String toString() {
-    return Util.name(this) + '[' + getTargetNode() + ", " + paths.get(0) + ']';
+    return Util.className(this) + '[' + nodeid + ", " + paths.get(0) + ']';
   }
 
   @Override
-  public void prepare(final MemData tmp) throws QueryException { }
-
-  @Override
-  public DBNode getTargetNode() {
-    return new DBNode(data, data.pre(nodeid));
-  }
+  public void prepare(final MemData tmp) { }
 }

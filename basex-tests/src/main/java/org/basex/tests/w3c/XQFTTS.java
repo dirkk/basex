@@ -12,7 +12,7 @@ import org.basex.util.ft.*;
 /**
  * XQuery Full Text Test Suite wrapper.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class XQFTTS extends W3CTS {
@@ -40,7 +40,7 @@ public final class XQFTTS extends W3CTS {
    * Constructor.
    */
   public XQFTTS() {
-    super(Util.name(XQFTTS.class));
+    super(Util.className(XQFTTS.class));
     //context.prop.set(Prop.FTINDEX, true);
     //context.prop.set(Prop.FORCECREATE, true);
   }

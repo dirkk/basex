@@ -18,7 +18,7 @@ import org.xml.sax.*;
  * be a local file ({@link IOFile}), a URL ({@link IOUrl}), a byte array
  * ({@link IOContent}), or a stream ({@link IOStream}).
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public abstract class IO {
@@ -40,32 +40,38 @@ public abstract class IO {
   public static final String JSONSUFFIX = ".json";
   /** JAR file suffix. */
   public static final String JARSUFFIX = ".jar";
+  /** TGZIP file suffix. */
+  public static final String TGZSUFFIX = ".tgz";
   /** GZIP file suffix. */
   public static final String GZSUFFIX = ".gz";
+  /** TAR file suffix. */
+  public static final String TARSUFFIX = ".tar";
   /** XAR file suffix. */
   public static final String XARSUFFIX = ".xar";
   /** XQuery log suffix. */
   public static final String LOGSUFFIX = ".log";
+  /** Directory for raw files. */
+  public static final String RAW = "raw";
   /** File prefix. */
   public static final String FILEPREF = "file:";
 
   /** XQuery suffixes. */
   public static final String[] XQSUFFIXES =
     { XQSUFFIX, XQMSUFFIX, ".xqy", ".xql", ".xqu", ".xquery" };
-  /** ZIP suffixes. */
-  public static final String[] ZIPSUFFIXES =
-    { ZIPSUFFIX, GZSUFFIX, XARSUFFIX, ".docx", ".pptx", ".xslx", ".odt", ".odp", ".ods" };
+  /** Archive suffixes. */
+  public static final String[] ZIPSUFFIXES = {
+    ZIPSUFFIX, GZSUFFIX, TGZSUFFIX, TARSUFFIX, XARSUFFIX,
+    ".docx", ".pptx", ".xslx", ".odt", ".odp", ".ods"
+  };
   /** XML suffixes. */
   public static final String[] XMLSUFFIXES =
-    { XMLSUFFIX, ".xsd", ".svg", ".rdf", ".rss", ".rng", ".sch" };
-  /** XML suffixes. */
-  public static final String[] XSLSUFFIXES =
-    { ".xsl", ".xslt", ".fo", ".fob" };
+    { XMLSUFFIX, ".xsd", ".svg", ".rdf", ".rss", ".rng", ".sch", ".xhtml" };
+  /** XSL suffixes. */
+  public static final String[] XSLSUFFIXES = { ".xsl", ".xslt", ".fo", ".fob" };
   /** HTML suffixes. */
-  public static final String[] HTMLSUFFIXES = { ".xhtml", ".html", ".htm" };
+  public static final String[] HTMLSUFFIXES = { ".html", ".htm" };
   /** Text suffixes. */
-  public static final String[] TXTSUFFIXES = {
-    ".txt", ".text", ".ini", ".conf", ".md", ".log" };
+  public static final String[] TXTSUFFIXES = { ".txt", ".text", ".ini", ".conf", ".md", ".log" };
 
   /** Disk block/page size (4096). */
   public static final int BLOCKSIZE = 1 << 12;
@@ -86,7 +92,7 @@ public abstract class IO {
   /** File path. The path uses forward slashes, no matter which OS is used. */
   String path;
   /** File name. */
-  String name;
+  private String name;
   /** File length. */
   long len = -1;
 
@@ -106,8 +112,8 @@ public abstract class IO {
     path = p;
     final String n = p.substring(p.lastIndexOf('/') + 1);
     // use current time if no name is given
-    name = n.isEmpty() ? Long.toString(System.currentTimeMillis()) + IO.BASEXSUFFIX +
-                       IO.XMLSUFFIX : n;
+    name = n.isEmpty() ? Long.toString(System.currentTimeMillis()) + BASEXSUFFIX +
+                       XMLSUFFIX : n;
   }
 
   /**
@@ -236,7 +242,7 @@ public abstract class IO {
    * @return resulting reference
    */
   public IO merge(final String in) {
-    return IO.get(in);
+    return get(in);
   }
 
   /**
@@ -319,17 +325,5 @@ public abstract class IO {
   @Override
   public String toString() {
     return path;
-  }
-
-  /**
-   * Returns the suffix of the specified path in lower case.
-   * An empty string is returned if the last path segment has no suffix.
-   * @param path path to be checked
-   * @return mime-type
-   */
-  public static String suffix(final String path) {
-    final int s = path.lastIndexOf('/');
-    final int d = path.lastIndexOf('.');
-    return d <= s ? "" : path.substring(d + 1).toLowerCase(Locale.ENGLISH);
   }
 }

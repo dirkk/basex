@@ -6,7 +6,7 @@ import org.basex.util.*;
 /**
  * XQuery Test Suite wrapper.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class XQTS extends W3CTS {
@@ -23,7 +23,7 @@ public final class XQTS extends W3CTS {
    * Constructor.
    */
   public XQTS() {
-    super(Util.name(XQTS.class));
-    context.prop.set(Prop.XQUERY3, false);
+    super(Util.className(XQTS.class));
+    context.options.set(MainOptions.XQUERY3, false);
   }
 }

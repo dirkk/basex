@@ -7,7 +7,7 @@ import org.basex.util.*;
  * and objects. It extends the {@link IntSet} class.
  * @param <E> generic value type
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class IntObjMap<E> extends IntSet {
@@ -59,7 +59,7 @@ public final class IntObjMap<E> extends IntSet {
 
   @Override
   public String toString() {
-    final TokenBuilder tb = new TokenBuilder(Util.name(this)).add('[');
+    final TokenBuilder tb = new TokenBuilder(Util.className(this)).add('[');
     for(int i = 1; i < size; i++) {
       tb.add(Integer.toString(keys[i])).add(": ").add(get(keys[i]).toString());
       if(i < size - 1) tb.add(",\n\t");

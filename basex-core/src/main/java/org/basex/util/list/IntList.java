@@ -7,7 +7,7 @@ import org.basex.util.*;
 /**
  * This is a simple container for native integers.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class IntList extends ElementList {
@@ -116,9 +116,12 @@ public class IntList extends ElementList {
   /**
    * Deletes the element at the specified position.
    * @param index index of the element to delete
+   * @return deleted element
    */
-  public final void deleteAt(final int index) {
+  public final int deleteAt(final int index) {
+    final int l = list[index];
     Array.move(list, index + 1, -1, --size - index);
+    return l;
   }
 
   /**
@@ -173,22 +176,6 @@ public class IntList extends ElementList {
   }
 
   /**
-   * Removes duplicates from a sorted list.
-   * @return self reference
-   */
-  public IntList unique() {
-    if(size != 0) {
-      int s = 0;
-      for(int l = 1; l < size; l++) {
-        if(list[l] != list[s]) list[++s] = list[l];
-      }
-      size = s + 1;
-    }
-    return this;
-  }
-
-
-  /**
    * Sorts the data.
    * @return self reference
    */
@@ -239,9 +226,7 @@ public class IntList extends ElementList {
    * @param f ascending/descending sort
    * @param t sort tokens
    */
-  private void sort(final int s, final int e, final boolean g, final boolean f,
-      final byte[][] t) {
-
+  private void sort(final int s, final int e, final boolean g, final boolean f, final byte[][] t) {
     if(e < 7) {
       for(int i = s; i < e + s; ++i) {
         for(int j = i; j > s; j--) {
@@ -285,9 +270,8 @@ public class IntList extends ElementList {
       s(b++, c--, t);
     }
 
-    int k;
     final int n = s + e;
-    k = Math.min(a - s, b - a);
+    int k = Math.min(a - s, b - a);
     s(s, b - k, k, t);
     k = Math.min(d - c, n - d - 1);
     s(b, n - k, k, t);
@@ -347,9 +331,8 @@ public class IntList extends ElementList {
       s(b++, c--, t);
     }
 
-    int k;
     final int n = s + e;
-    k = Math.min(a - s, b - a);
+    int k = Math.min(a - s, b - a);
     s(s, b - k, k, t);
     k = Math.min(d - c, n - d - 1);
     s(b, n - k, k, t);
@@ -409,9 +392,8 @@ public class IntList extends ElementList {
       s(b++, c--, t);
     }
 
-    int k;
     final int n = s + e;
-    k = Math.min(a - s, b - a);
+    int k = Math.min(a - s, b - a);
     s(s, b - k, k, t);
     k = Math.min(d - c, n - d - 1);
     s(b, n - k, k, t);

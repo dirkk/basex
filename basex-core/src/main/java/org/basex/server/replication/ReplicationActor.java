@@ -11,7 +11,6 @@ import akka.japi.Procedure;
 import akka.util.Timeout;
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
-import org.basex.core.Prop;
 import org.basex.core.Replication;
 import org.basex.core.cmd.*;
 import org.basex.server.election.ElectionActor;
@@ -23,6 +22,7 @@ import org.basex.server.replication.InternalMessages.RequestStatus;
 import org.basex.server.replication.InternalMessages.StartSet;
 import org.basex.server.replication.InternalMessages.StatusMessage;
 import org.basex.util.Performance;
+import org.basex.util.Prop;
 import org.basex.util.Token;
 import scala.concurrent.duration.Duration;
 

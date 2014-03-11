@@ -15,7 +15,7 @@ import org.basex.util.list.*;
  * the currently opened database. Indexes and statistics are refreshed,
  * which is especially helpful after updates.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class Optimize extends ACreate {
@@ -39,7 +39,7 @@ public final class Optimize extends ACreate {
 
     if(!data.startUpdate()) return error(DB_PINNED_X, data.meta.name);
     try {
-      optimize(data, false, this);
+      optimize(data, this);
       return info(DB_OPTIMIZED_X, m.name, perf);
     } catch(final IOException ex) {
       return error(Util.message(ex));
@@ -66,12 +66,23 @@ public final class Optimize extends ACreate {
   /**
    * Optimizes the structures of a database.
    * @param data data
-   * @param rebuild rebuild all index structures
    * @param cmd calling command instance (can be {@code null})
    * @throws IOException I/O Exception during index rebuild
    */
-  public static void optimize(final Data data, final boolean rebuild, final Optimize cmd)
-      throws IOException {
+  public static void optimize(final Data data, final Optimize cmd) throws IOException {
+    optimize(data, false, false, cmd);
+  }
+
+  /**
+   * Optimizes the structures of a database.
+   * @param data data
+   * @param rebuild rebuild all index structures
+   * @param rebuildFT rebuild full-text index
+   * @param cmd calling command instance (can be {@code null})
+   * @throws IOException I/O Exception during index rebuild
+   */
+  public static void optimize(final Data data, final boolean rebuild, final boolean rebuildFT,
+      final Optimize cmd) throws IOException {
 
     // initialize structural indexes
     final MetaData md = data.meta;
@@ -95,21 +106,21 @@ public final class Optimize extends ACreate {
         }
         final int level = pars.size();
         if(kind == Data.DOC) {
-          data.paths.put(0, kind, level);
+          data.paths.put(0, Data.DOC, level);
           pars.push(pre);
           tags.push(0);
           ++n;
         } else if(kind == Data.ELEM) {
           final int id = data.name(pre);
           data.tagindex.index(data.tagindex.key(id), null, true);
-          data.paths.put(id, kind, level);
+          data.paths.put(id, Data.ELEM, level);
           pars.push(pre);
           tags.push(id);
         } else if(kind == Data.ATTR) {
           final int id = data.name(pre);
           final byte[] val = data.text(pre, false);
           data.atnindex.index(data.atnindex.key(id), val, true);
-          data.paths.put(id, kind, level, val, md);
+          data.paths.put(id, Data.ATTR, level, val, md);
         } else {
           final byte[] val = data.text(pre, true);
           if(kind == Data.TEXT && level > 1) data.tagindex.index(tags.peek(), val);
@@ -124,7 +135,7 @@ public final class Optimize extends ACreate {
     // rebuild value indexes
     optimize(IndexType.ATTRIBUTE, data, md.createattr, md.attrindex, rebuild, cmd);
     optimize(IndexType.TEXT,      data, md.createtext, md.textindex, rebuild, cmd);
-    optimize(IndexType.FULLTEXT,  data, md.createftxt, md.ftxtindex, rebuild, cmd);
+    optimize(IndexType.FULLTEXT,  data, md.createftxt, md.ftxtindex, rebuild || rebuildFT, cmd);
   }
 
   /**

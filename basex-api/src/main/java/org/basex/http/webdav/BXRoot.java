@@ -14,7 +14,7 @@ import com.bradmcevoy.http.exceptions.*;
 /**
  * WebDAV resource representing the list of all databases.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Rositsa Shadura
  * @author Dimitar Popov
  */
@@ -53,8 +53,7 @@ public final class BXRoot extends BXFolder {
       @Override
       public BXAbstractResource get() throws IOException {
         return service.dbExists(name) ?
-          new BXDatabase(new ResourceMetaData(name, service.timestamp(name)), service) :
-          null;
+          new BXDatabase(new ResourceMetaData(name, service.timestamp(name)), service) : null;
       }
     }.evalNoEx();
   }

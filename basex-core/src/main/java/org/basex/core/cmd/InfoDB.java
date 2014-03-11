@@ -14,7 +14,7 @@ import org.basex.util.*;
  * Evaluates the 'info database' command and returns information on the
  * currently opened database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class InfoDB extends AInfo {
@@ -45,8 +45,8 @@ public final class InfoDB extends AInfo {
    * @param create create permissions
    * @return info string
    */
-  public static String db(final MetaData meta, final boolean bold,
-      final boolean index, final boolean create) {
+  public static String db(final MetaData meta, final boolean bold, final boolean index,
+      final boolean create) {
 
     final TokenBuilder tb = new TokenBuilder();
     final String header = (bold ?
@@ -58,8 +58,7 @@ public final class InfoDB extends AInfo {
 
     // count number of raw files
     info(tb, DOCUMENTS, meta.ndocs);
-    final int b = meta.path != null ? meta.binaries().descendants().size() : 0;
-    info(tb, BINARIES, b);
+    info(tb, BINARIES, meta.path != null ? meta.binaries().descendants().size() : 0);
     info(tb, TIMESTAMP, DateTime.format(new Date(meta.dbtime()), DateTime.DATETIME));
     if(meta.corrupt) tb.add(' ' + DB_CORRUPT + NL);
 
@@ -68,7 +67,7 @@ public final class InfoDB extends AInfo {
     if(meta.filesize != 0) info(tb, INPUT_SIZE, Performance.format(meta.filesize));
     info(tb, TIMESTAMP, DateTime.format(new Date(meta.time), DateTime.DATETIME));
     info(tb, ENCODING, meta.encoding);
-    info(tb, WS_CHOPPING, Util.flag(meta.chop));
+    info(tb, MainOptions.CHOP.name(), meta.chop);
 
     if(index) {
       tb.add(NL).addExt(header, INDEXES);
@@ -76,12 +75,17 @@ public final class InfoDB extends AInfo {
         tb.add(' ' + H_INDEX_FORMAT + NL);
       } else {
         info(tb, UP_TO_DATE, meta.uptodate);
-        info(tb, TEXT_INDEX, Util.flag(meta.textindex));
-        info(tb, ATTRIBUTE_INDEX, Util.flag(meta.attrindex));
-        info(tb, FULLTEXT_INDEX, Util.flag(meta.ftxtindex));
-        info(tb, Prop.UPDINDEX[0], Util.flag(meta.updindex));
-        info(tb, Prop.MAXCATS[0], meta.maxcats);
-        info(tb, Prop.MAXLEN[0], meta.maxlen);
+        info(tb, MainOptions.TEXTINDEX.name(), meta.textindex);
+        info(tb, MainOptions.ATTRINDEX.name(), meta.attrindex);
+        info(tb, MainOptions.FTINDEX.name(), meta.ftxtindex);
+        info(tb, MainOptions.LANGUAGE.name(), meta.language);
+        info(tb, MainOptions.STEMMING.name(), meta.stemming);
+        info(tb, MainOptions.CASESENS.name(), meta.casesens);
+        info(tb, MainOptions.DIACRITICS.name(), meta.diacritics);
+        info(tb, MainOptions.STOPWORDS.name(), meta.stopwords);
+        info(tb, MainOptions.UPDINDEX.name(), meta.updindex);
+        info(tb, MainOptions.MAXCATS.name(), meta.maxcats);
+        info(tb, MainOptions.MAXLEN.name(), meta.maxlen);
       }
     }
     return tb.toString();

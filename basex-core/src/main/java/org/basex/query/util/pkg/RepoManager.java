@@ -20,7 +20,7 @@ import org.basex.util.list.*;
 /**
  * Repository manager.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Rositsa Shadura
  */
 public final class RepoManager {
@@ -63,7 +63,7 @@ public final class RepoManager {
       cont = io.read();
     } catch(final IOException ex) {
       Util.debug(ex);
-      BXRE_WHICH.thrw(info, path);
+      throw BXRE_WHICH.get(info, path);
     }
 
     try {
@@ -71,7 +71,7 @@ public final class RepoManager {
       if(io.hasSuffix(IO.JARSUFFIX)) return installJAR(cont);
       return installXAR(cont);
     } catch(final IOException ex) {
-      throw BXRE_PARSE.thrw(info, io.name(), ex);
+      throw BXRE_PARSE.get(info, io.name(), ex);
     }
   }
 
@@ -118,8 +118,8 @@ public final class RepoManager {
    * @param path package path
    * @return new entry
    */
-  private static TokenList entry(final String name, final String version,
-      final String type, final String path) {
+  private static TokenList entry(final String name, final String version, final String type,
+      final String path) {
 
     final TokenList tl = new TokenList();
     tl.add(name);
@@ -169,13 +169,13 @@ public final class RepoManager {
       if(eq(nextPkg, pp) || eq(Package.name(nextPkg), pp)) {
         // check if package to be deleted participates in a dependency
         final byte[] primPkg = primary(nextPkg);
-        if(primPkg != null) BXRE_DEP.thrw(info, string(primPkg), pkg);
+        if(primPkg != null) throw BXRE_DEP.get(info, string(primPkg), pkg);
 
         // clean package repository
         final IOFile f = repo.path(string(dict.get(nextPkg)));
         repo.delete(new PkgParser(repo, info).parse(new IOFile(f, DESCRIPTOR)));
         // package does not participate in a dependency => delete it
-        if(!f.delete()) BXRE_DELETE.thrw(info, f);
+        if(!f.delete()) throw BXRE_DELETE.get(info, f);
         found = true;
       }
     }
@@ -183,11 +183,11 @@ public final class RepoManager {
     // traverse all files
     final IOFile file = file(pkg, repo);
     if(file != null) {
-      if(!file.delete()) BXRE_DELETE.thrw(info, file);
+      if(!file.delete()) throw BXRE_DELETE.get(info, file);
       return;
     }
 
-    if(!found) BXRE_WHICH.thrw(info, pkg);
+    if(!found) throw BXRE_WHICH.get(info, pkg);
   }
 
   /**
@@ -215,77 +215,68 @@ public final class RepoManager {
 
   /**
    * Installs an XQuery module.
-   * @param cont package content
+   * @param content package content
    * @param path package path
    * @return {@code true} if existing package was replaced
    * @throws QueryException query exception
    * @throws IOException I/O exception
    */
-  private boolean installXQ(final byte[] cont, final String path)
+  private boolean installXQ(final byte[] content, final String path)
       throws QueryException, IOException {
 
     // parse module to find namespace uri
     final Context ctx = repo.context;
-    final byte[] uri = new QueryContext(ctx).parseLibrary(string(cont), path).name.uri();
+    final byte[] uri = new QueryContext(ctx).parseLibrary(string(content), path, null).name.uri();
 
     // copy file to rewritten URI file path
     final String uriPath = ModuleLoader.uri2path(string(uri));
-    if(uriPath == null) BXRE_URI.thrw(info, uri);
-
-    final IOFile rp = new IOFile(ctx.mprop.get(MainProp.REPOPATH));
-    final boolean exists = md(rp, uriPath);
-    new IOFile(rp, uriPath + IO.XQMSUFFIX).write(cont);
-    return exists;
+    if(uriPath == null) throw BXRE_URI.get(info, uri);
+    return write(uriPath + IO.XQMSUFFIX, content);
   }
 
   /**
    * Installs a JAR package.
-   * @param cont package content
+   * @param content package content
    * @return {@code true} if existing package was replaced
    * @throws IOException I/O exception
    */
-  private boolean installJAR(final byte[] cont) throws IOException {
-    final Zip zip = new Zip(new IOContent(cont));
+  private boolean installJAR(final byte[] content) throws IOException {
+    final Zip zip = new Zip(new IOContent(content));
     final IOContent mf = new IOContent(zip.read(MANIFEST_MF));
     final NewlineInput nli = new NewlineInput(mf);
     for(String s; (s = nli.readLine()) != null;) {
+      // write file to rewritten file path
       final Matcher m = MAIN_CLASS.matcher(s);
-      if(!m.find()) continue;
-
-      // copy file to rewritten file path
-      final IOFile rp = new IOFile(repo.context.mprop.get(MainProp.REPOPATH));
-      final String path = m.group(1).replace('.', '/');
-      final boolean exists = md(rp, path);
-      new IOFile(rp, path + IO.JARSUFFIX).write(cont);
-      return exists;
+      if(m.find()) return write(m.group(1).replace('.', '/') + IO.JARSUFFIX, content);
     }
     return false;
   }
 
   /**
-   * Creates the package directory and deletes existing packages.
-   * @param rp path to the repository
+   * Writes a package to disk.
    * @param path file path
-   * @return {@code true} if a package already existed
+   * @param content package content
+   * @return {@code true} if existing package was replaced
+   * @throws IOException I/O exception
    */
-  private static boolean md(final IOFile rp, final String path) {
+  private boolean write(final String path, final byte[] content) throws IOException {
+    final IOFile rp = new IOFile(repo.context.globalopts.get(GlobalOptions.REPOPATH));
     final IOFile target = new IOFile(rp, path);
-    final IOFile dir = target.dir();
-    dir.md();
-    final IOFile[] ch = dir.children(target.name() + ".*");
-    for(final IOFile c : ch) c.delete();
-    return ch.length != 0;
+    final boolean exists = target.exists();
+    target.dir().md();
+    target.write(content);
+    return exists;
   }
 
   /**
    * Installs a XAR package.
-   * @param cont package content
+   * @param content package content
    * @return {@code true} if existing package was replaced
    * @throws QueryException query exception
    * @throws IOException I/O exception
    */
-  private boolean installXAR(final byte[] cont) throws QueryException, IOException {
-    final Zip zip = new Zip(new IOContent(cont));
+  private boolean installXAR(final byte[] content) throws QueryException, IOException {
+    final Zip zip = new Zip(new IOContent(content));
     // parse and validate descriptor file
     final IOContent dsc = new IOContent(zip.read(DESCRIPTOR));
     final Package pkg = new PkgParser(repo, info).parse(dsc);
@@ -305,16 +296,16 @@ public final class RepoManager {
 
   /**
    * Returns a unique directory for the specified package.
-   * @param n name
+   * @param name name
    * @return unique directory
    */
-  private IOFile uniqueDir(final String n) {
-    String nm = n;
+  private IOFile uniqueDir(final String name) {
+    String nm = name;
     int c = 0;
     do {
       final IOFile io = repo.path(nm);
       if(!io.exists()) return io;
-      nm = n + '-' + ++c;
+      nm = name + '-' + ++c;
     } while(true);
   }
 

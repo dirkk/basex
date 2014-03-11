@@ -1,18 +1,16 @@
 package org.basex.core.cmd;
 
-import org.basex.core.Context;
-import org.basex.core.Databases;
-import org.basex.core.LockResult;
-import org.basex.core.parse.CmdBuilder;
+import static org.basex.core.Text.*;
+
+import org.basex.core.*;
+import org.basex.core.parse.*;
 import org.basex.core.parse.Commands.Cmd;
 import org.basex.core.parse.Commands.CmdAlter;
-
-import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'alter database' command and renames a database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class AlterDB extends ACreate {
@@ -37,9 +35,9 @@ public final class AlterDB extends ACreate {
     if(!Databases.validName(trg)) return error(NAME_INVALID_X, trg);
 
     // database does not exist
-    if(!mprop.dbexists(src)) return error(DB_NOT_FOUND_X, src);
+    if(!goptions.dbexists(src)) return error(DB_NOT_FOUND_X, src);
     // target database already exists
-    if(mprop.dbexists(trg)) return error(DB_EXISTS_X, trg);
+    if(goptions.dbexists(trg)) return error(DB_EXISTS_X, trg);
 
     // close database if it's currently opened and not opened by others
     if(!closed) closed = close(context, src);
@@ -60,14 +58,18 @@ public final class AlterDB extends ACreate {
    * Renames the specified database.
    * @param source name of the existing database
    * @param target new database name
-   * @param ctx database context
+   * @param context database context
    * @return success flag
    */
   public static synchronized boolean alter(final String source, final String target,
-      final Context ctx) {
-    boolean ok = ctx.mprop.dbpath(source).rename(ctx.mprop.dbpath(target));
+      final Context context) {
+
+    // drop target database
+    DropDB.drop(target, context);
+    boolean ok =  context.globalopts.dbpath(source).rename(context.globalopts.dbpath(target));
+
     if (ok) {
-      ctx.triggers.afterAlter(source, target);
+      context.triggers.afterAlter(source, target);
     }
     return ok;
   }

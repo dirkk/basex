@@ -2,13 +2,11 @@ package org.basex.query.up;
 
 import org.basex.data.Data;
 import org.basex.data.MemData;
-import org.basex.data.atomic.AtomicUpdateList;
 import org.basex.data.atomic.BasicUpdate;
 import org.basex.query.QueryContext;
 import org.basex.query.QueryException;
 import org.basex.query.iter.AxisIter;
-import org.basex.query.up.primitives.Operation;
-import org.basex.query.up.primitives.UpdatePrimitive;
+import org.basex.query.up.primitives.Update;
 import org.basex.query.value.node.ANode;
 import org.basex.query.value.node.DBNode;
 import org.basex.trigger.TriggerManager;
@@ -35,12 +33,12 @@ import org.basex.util.list.StringList;
  * <p>Updates work like the following:</p>
  *
  * <ol>
- * <li> Each call of an updating expression creates an {@link UpdatePrimitive}.</li>
+ * <li> Each call of an updating expression creates an {@link org.basex.query.up.primitives.NodeUpdate}.</li>
  * <li> All update primitives for a snapshot/query are collected here.</li>
  * <li> Primitives are kept separately for each database that is addressed. This
  *      way we can operate on PRE values instead of node IDs, skip mapping
  *      overhead and further optimize the process.
- *      {@link DatabaseUpdates}</li>
+ *      {@link DataUpdates}</li>
  * <li> Primitives are further kept separately for each database node - each
  *      individual target PRE value. There's a specific container for this:
  *      {@link NodeUpdates}</li>
@@ -50,14 +48,14 @@ import org.basex.util.list.StringList;
  * <li> After the query has been parsed and all update primitives have been added
  *      to the list, constraints, which cannot be taken care of on the fly, are
  *      checked. If no problems occur, updates are TO BE carried out.</li>
- * <li> Before applying the updates the {@link UpdatePrimitiveComparator} helps to order
- *      {@link UpdatePrimitive} for execution. Each primitive then creates a sequence of
+ * <li> Before applying the updates the {@link NodeUpdateComparator} helps to order
+ *      {@link org.basex.query.up.primitives.NodeUpdate} for execution. Each primitive then creates a sequence of
  *      {@link BasicUpdate} which are passed to the {@link Data} layer via an
- *      {@link AtomicUpdateList}. This list takes care of optimization and also text node
+ *      {@link org.basex.data.atomic.AtomicUpdateCache}. This list takes care of optimization and also text node
  *      merging.</li>
  * </ol>
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Lukas Kircher
  */
 public final class Updates {
@@ -76,7 +74,7 @@ public final class Updates {
    * @param ctx query context
    * @throws QueryException query exception
    */
-  public void add(final Operation up, final QueryContext ctx) throws QueryException {
+  public void add(final Update up, final QueryContext ctx) throws QueryException {
     if(mod == null) mod = new DatabaseModifier();
     mod.add(up, ctx);
   }
@@ -107,15 +105,13 @@ public final class Updates {
     MemData data = fragmentIDs.get(ancID);
     // if data doesn't exist, create a new one
     if(data == null) {
-      data =  (MemData) anc.dbCopy(ctx.context.prop).data;
+      data =  (MemData) anc.dbCopy(ctx.context.options).data;
       // create a mapping between the fragment id and the data reference
       fragmentIDs.put(ancID, data);
     }
 
     // determine the pre value of the target node within its database
-    final int trgID = target.id;
-    final int pre = preSteps(anc, trgID);
-
+    final int pre = preSteps(anc, target.id);
     return new DBNode(data, pre);
   }
 
@@ -153,8 +149,7 @@ public final class Updates {
    * @return pre value
    */
   private static int preSteps(final ANode node, final int trgID) {
-    if(node.id == trgID)
-      return 0;
+    if(node.id == trgID) return 0;
 
     int s = 1;
     AxisIter it = node.attributes();
@@ -165,7 +160,8 @@ public final class Updates {
     }
 
     it = node.children();
-    for(ANode n; (n = it.next()) != null && n.id <= trgID;) {
+    // n.id <= trgID: rewritten to catch ID overflow
+    for(ANode n; (n = it.next()) != null && trgID - n.id >= 0;) {
       s += preSteps(n, trgID);
     }
     return s;

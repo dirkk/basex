@@ -2,7 +2,6 @@ package org.basex.io.out;
 
 import java.io.*;
 
-import org.basex.core.*;
 import org.basex.util.*;
 
 /**
@@ -10,7 +9,7 @@ import org.basex.util.*;
  * byte representation (usually UTF8) will be directly output without
  * further character conversion.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class PrintOutput extends OutputStream {
@@ -49,11 +48,20 @@ public class PrintOutput extends OutputStream {
    * @return print output
    */
   public static PrintOutput get(final OutputStream out) {
-    return out instanceof PrintOutput ? (PrintOutput) out :
-      new PrintOutput(
-          out instanceof ByteArrayOutputStream ||
-          out instanceof BufferedOutputStream ||
-          out instanceof BufferOutput ? out : new BufferOutput(out));
+    return out instanceof PrintOutput ? (PrintOutput) out : new PrintOutput(
+           out instanceof ByteArrayOutputStream ||
+           out instanceof BufferedOutputStream ||
+           out instanceof BufferOutput ? out : new BufferOutput(out));
+  }
+
+  /**
+   * Sets the maximum number of bytes to be written.
+   * If the number is negative, all bytes will be written.
+   * Note that the limit might break unicode characters.
+   * @param m maximum
+   */
+  public void setLimit(final int m) {
+    max = m < 0 ? Long.MAX_VALUE : m;
   }
 
   @Override

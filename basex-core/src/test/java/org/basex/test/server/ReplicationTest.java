@@ -1,22 +1,28 @@
 package org.basex.test.server;
 
-import static org.junit.Assert.*;
-import static org.basex.core.Text.*;
+import org.basex.BaseXServer;
+import org.basex.SandboxTest;
+import org.basex.core.BaseXException;
+import org.basex.core.Command;
+import org.basex.core.GlobalOptions;
+import org.basex.core.cmd.*;
+import org.basex.io.IOFile;
+import org.basex.io.out.ArrayOutput;
+import org.basex.server.Session;
+import org.basex.util.Prop;
+import org.basex.util.Util;
+import org.basex.util.list.StringList;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 
-import org.basex.*;
-import org.basex.core.*;
-import org.basex.core.cmd.*;
-import org.basex.io.*;
-import org.basex.io.out.*;
-import org.basex.server.*;
-import org.basex.test.*;
-import org.basex.util.*;
-import org.basex.util.list.*;
-import org.junit.*;
+import static org.basex.core.Text.DB_NOT_FOUND_X;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests the basic replication infrastructure.
@@ -295,7 +301,7 @@ public class ReplicationTest extends SandboxTest {
         System.setOut(NULL);
         final StringList sl = new StringList().add("-z").add("-p" + port).add("-e" + (port -1));
         final BaseXServer srv = new BaseXServer(sl.toArray());
-        srv.context.mprop.set(MainProp.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
+        srv.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
         return srv;
       } finally {
         System.setOut(OUT);
@@ -360,7 +366,7 @@ public class ReplicationTest extends SandboxTest {
         System.setOut(NULL);
         final StringList sl = new StringList().add("-z").add("-p" + port).add("-e" + (port -1));
         final BaseXServer srv = new BaseXServer(sl.toArray());
-        srv.context.mprop.set(MainProp.DBPATH, new IOFile(Prop.TMP, "sandbox-slave" + port).path());
+        srv.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-slave" + port).path());
         return srv;
       } finally {
         System.setOut(OUT);

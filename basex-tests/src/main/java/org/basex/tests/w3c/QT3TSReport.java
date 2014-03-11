@@ -6,11 +6,12 @@ import org.basex.core.*;
 import org.basex.core.cmd.*;
 import org.basex.io.out.*;
 import org.basex.query.value.node.*;
+import org.basex.util.*;
 
 /**
  * QT3TS Report builder.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class QT3TSReport {

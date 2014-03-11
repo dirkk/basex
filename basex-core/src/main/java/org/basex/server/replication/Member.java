@@ -1,9 +1,7 @@
 package org.basex.server.replication;
 
-import akka.actor.ActorContext;
 import akka.actor.ActorRef;
-import akka.actor.ActorSelection;
-import org.basex.core.Prop;
+import org.basex.util.Prop;
 
 import java.io.Serializable;
 

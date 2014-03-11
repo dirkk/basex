@@ -10,7 +10,7 @@ import org.basex.util.*;
 /**
  * This is an efficient and memory-saving hash map for storing tokens and integers.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class TokenIntMap extends TokenSet {
@@ -34,7 +34,7 @@ public final class TokenIntMap extends TokenSet {
   }
 
   @Override
-  public void read(final DataInput in) throws IOException {
+  protected void read(final DataInput in) throws IOException {
     super.read(in);
     values = in.readNums();
   }

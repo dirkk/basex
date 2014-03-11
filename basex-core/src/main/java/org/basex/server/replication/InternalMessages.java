@@ -1,6 +1,6 @@
 package org.basex.server.replication;
 
-import org.basex.core.Prop;
+import org.basex.util.Prop;
 
 import java.io.Serializable;
 import java.util.Iterator;

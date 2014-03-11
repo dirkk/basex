@@ -8,4 +8,4 @@
 org.maven.ide.eclipse.prefs
 .idea/*
 *.class
-/bin
+/target

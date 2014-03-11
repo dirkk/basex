@@ -13,7 +13,7 @@ import org.basex.util.*;
  * This class can be used to build new node sequences.
  * At the same time, it serves as an iterator.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class NodeSeqBuilder extends AxisIter {
@@ -188,11 +188,8 @@ public final class NodeSeqBuilder extends AxisIter {
       // remove duplicates and merge scores
       int i = 1;
       for(int j = 1; j < size; ++j) {
-        while(j < size && nodes[i - 1].is(nodes[j])) {
-          nodes[i - 1].score(Math.max(nodes[j++].score(), nodes[i - 1].score()));
-        }
-        if(j == size) break;
-        nodes[i++] = nodes[j];
+        while(j < size && nodes[i - 1].is(nodes[j])) j++;
+        if(j < size) nodes[i++] = nodes[j];
       }
       size = i;
     }
@@ -243,9 +240,8 @@ public final class NodeSeqBuilder extends AxisIter {
       s(b++, c--);
     }
 
-    int k;
     final int n = s + e;
-    k = Math.min(a - s, b - a);
+    int k = Math.min(a - s, b - a);
     s(s, b - k, k);
     k = Math.min(d - c, n - d - 1);
     s(b, n - k, k);
@@ -290,7 +286,7 @@ public final class NodeSeqBuilder extends AxisIter {
 
   @Override
   public String toString() {
-    return Util.name(this) + Arrays.toString(Arrays.copyOf(nodes, size));
+    return Util.className(this) + Arrays.toString(Arrays.copyOf(nodes, size));
   }
 
   /**

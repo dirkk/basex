@@ -11,18 +11,17 @@ import org.basex.util.hash.*;
 /**
  * Filter expression.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 final class CachedFilter extends Filter {
-
   /**
    * Constructor.
    * @param ii input info
    * @param r expression
    * @param p predicates
    */
-  public CachedFilter(final InputInfo ii, final Expr r, final Expr... p) {
+  CachedFilter(final InputInfo ii, final Expr r, final Expr... p) {
     super(ii, r, p);
   }
 
@@ -43,7 +42,11 @@ final class CachedFilter extends Filter {
       for(int s = 0; s < is; ++s) {
         final Item it = val.itemAt(s);
         ctx.value = it;
-        if(p.test(ctx, info) != null) vb.add(it);
+        final Item i = p.test(ctx, info);
+        if(i != null) {
+          it.score(i.score());
+          vb.add(it);
+        }
         ctx.pos++;
       }
       // save memory
@@ -76,15 +79,13 @@ final class CachedFilter extends Filter {
   }
 
   @Override
-  public Filter addPred(final QueryContext ctx, final VarScope scp, final Expr p)
-      throws QueryException {
-    preds = Array.add(preds, p);
+  public Filter addPred(final QueryContext ctx, final VarScope scp, final Expr p) {
+    preds = Array.add(preds, new Expr[preds.length + 1], p);
     return this;
   }
 
   @Override
-  public Filter copy(final QueryContext ctx, final VarScope scp,
-      final IntObjMap<Var> vs) {
+  public Filter copy(final QueryContext ctx, final VarScope scp, final IntObjMap<Var> vs) {
     final Filter f = new CachedFilter(info, root == null ? null : root.copy(ctx, scp, vs),
         Arr.copyAll(ctx, scp, vs, preds));
     f.pos = pos;

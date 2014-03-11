@@ -8,12 +8,12 @@ import org.basex.util.*;
  * This is an efficient and memory-saving hash map for storing primitive integers.
  * It is related to the {@link TokenSet} class.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class IntSet extends ASet {
   /** Hashed keys. */
-  protected int[] keys;
+  int[] keys;
 
   /**
    * Default constructor.
@@ -34,7 +34,7 @@ public class IntSet extends ASet {
   /**
    * Stores the specified key if it has not been stored before.
    * @param key key to be added
-   * @return {@Code true} if the key did not exist yet and was stored
+   * @return {@code true} if the key did not exist yet and was stored
    */
   public final boolean add(final int key) {
     return index(key) > 0;
@@ -45,7 +45,7 @@ public class IntSet extends ASet {
    * @param key key to be added
    * @return unique id of stored key (larger than zero)
    */
-  public final int put(final int key) {
+  final int put(final int key) {
     final int i = index(key);
     return Math.abs(i);
   }
@@ -64,7 +64,7 @@ public class IntSet extends ASet {
    * @param key key to be looked up
    * @return id, or {@code 0} if key does not exist
    */
-  public final int id(final int key) {
+  final int id(final int key) {
     final int p = key & bucket.length - 1;
     for(int id = bucket[p]; id != 0; id = next[id]) if(key == keys[id]) return id;
     return 0;
@@ -87,7 +87,7 @@ public class IntSet extends ASet {
    * @param key key
    * @return deleted key or 0
    */
-  public int delete(final int key) {
+  int delete(final int key) {
     final int b = key & bucket.length - 1;
     for(int p = 0, i = bucket[b]; i != 0; p = i, i = next[i]) {
       if(key != keys[i]) continue;

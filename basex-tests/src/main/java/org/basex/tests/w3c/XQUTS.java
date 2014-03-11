@@ -8,7 +8,7 @@ import org.basex.util.*;
 /**
  * XQuery Update Test Suite wrapper.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class XQUTS extends W3CTS {
@@ -25,8 +25,8 @@ public final class XQUTS extends W3CTS {
    * Constructor.
    */
   public XQUTS() {
-    super(Util.name(XQUTS.class));
-    context.prop.set(Prop.FORCECREATE, true);
+    super(Util.className(XQUTS.class));
+    context.options.set(MainOptions.FORCECREATE, true);
   }
 
   @Override

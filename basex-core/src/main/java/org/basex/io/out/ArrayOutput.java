@@ -10,23 +10,12 @@ import org.basex.util.*;
  * {@link ByteArrayOutputStream} class. Bytes that exceed an
  * optional maximum are ignored.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class ArrayOutput extends PrintOutput {
   /** Byte buffer. */
   private byte[] buf = new byte[8];
-
-  /**
-   * Sets the maximum number of bytes to be written.
-   * Note that the limit might break unicode characters.
-   * @param m maximum
-   * @return self reference
-   */
-  public ArrayOutput max(final int m) {
-    max = m;
-    return this;
-  }
 
   @Override
   public void write(final int b) {

@@ -20,7 +20,7 @@ import org.basex.util.*;
  * the target path and file name have been merged and are now specified
  * as first argument.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class Add extends ACreate {
@@ -32,9 +32,6 @@ public final class Add extends ACreate {
   /**
    * Constructor, specifying a target path.
    * The input needs to be set via {@link #setInput(InputStream)}.
-   * Note that the constructors of this class have changed with Version 7.0:
-   * the target path and file name have been merged and are now specified
-   * as first argument.
    * @param path target path, optionally terminated by a new file name
    */
   public Add(final String path) {
@@ -43,9 +40,6 @@ public final class Add extends ACreate {
 
   /**
    * Constructor, specifying a target path and an input.
-   * Note that the constructors of this class have changed with Version 7.0:
-   * the target path and file name have been merged and are now specified
-   * as first argument.
    * @param path target path, optionally terminated by a new file name.
    * If {@code null}, the name of the input will be set as path.
    * @param input input file or XML string
@@ -57,7 +51,7 @@ public final class Add extends ACreate {
   @Override
   protected boolean run() {
     String name = MetaData.normPath(args[0]);
-    if(name == null || name.endsWith(".")) return error(NAME_INVALID_X, args[0]);
+    if(name == null) return error(NAME_INVALID_X, args[0]);
 
     // retrieve input
     final IO io;
@@ -82,26 +76,28 @@ public final class Add extends ACreate {
     }
 
     final Data data = context.data();
-    final Parser parser;
 
-    // set name of document
-    if(!name.isEmpty()) io.name(name);
     // get name from io reference
-    else name = io.name();
+    if(name.isEmpty()) name = io.name();
+    else io.name(name);
 
     // ensure that the final name is not empty
     if(name.isEmpty()) return error(NAME_INVALID_X, name);
 
-    parser = new DirParser(io, prop, data.meta.path);
-    parser.target(target);
-
-    // create random database name for disk-based creation
-    final boolean cache = cache(parser);
-    final String db = cache ? context.mprop.random(data.meta.name) : name;
-    build = cache ? new DiskBuilder(db, parser, context) : new MemBuilder(db, parser);
-
+    String db = null;
     Data tmp = null;
     try {
+      final Parser parser = new DirParser(io, options, data.meta.path);
+      parser.target(target);
+
+      // create random database name for disk-based creation
+      if(cache(parser)) {
+        db = context.globalopts.random(data.meta.name);
+        build = new DiskBuilder(db, parser, context);
+      } else {
+        build = new MemBuilder(name, parser);
+      }
+
       tmp = build.build();
       // skip update if fragment is empty
       if(tmp.meta.size > 1) {
@@ -119,7 +115,7 @@ public final class Add extends ACreate {
     } finally {
       // close and drop intermediary database instance
       if(tmp != null) tmp.close();
-      if(cache) DropDB.drop(db, context);
+      if(db != null) DropDB.drop(db, context);
     }
   }
 
@@ -130,9 +126,9 @@ public final class Add extends ACreate {
    */
   private boolean cache(final Parser parser) {
     // main memory mode: never write to disk
-    if(prop.is(Prop.MAINMEM)) return false;
+    if(options.get(MainOptions.MAINMEM)) return false;
     // explicit caching
-    if(prop.is(Prop.ADDCACHE)) return true;
+    if(options.get(MainOptions.ADDCACHE)) return true;
 
     // create disk instances for large documents
     // (does not work for input streams and directories)
@@ -155,7 +151,7 @@ public final class Add extends ACreate {
 
   @Override
   public void build(final CmdBuilder cb) {
-    cb.init().arg(C_TO, 0).arg(1);
+    cb.init().arg(S_TO, 0).arg(1);
   }
 
   @Override

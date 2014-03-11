@@ -1,10 +1,14 @@
 package org.basex.test.server.replication;
 
-import org.basex.core.*;
+import org.basex.core.BaseXException;
+import org.basex.core.Context;
+import org.basex.core.GlobalOptions;
+import org.basex.core.Replication;
 import org.basex.core.cmd.*;
 import org.basex.io.IOFile;
 import org.basex.server.replication.ReplicationActor;
 import org.basex.util.Performance;
+import org.basex.util.Prop;
 import org.basex.util.Util;
 import org.junit.After;
 import org.junit.Before;
@@ -15,9 +19,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Testing the primary election handling of a replica set.
@@ -58,14 +60,14 @@ public class WriteTest {
   }
 
   private Context createSandbox(final int number) {
-    final IOFile sb =  new IOFile(Prop.TMP, Util.name(WriteTest.class) + number);
+    final IOFile sb =  new IOFile(Prop.TMP, Util.className(WriteTest.class) + number);
     sb.delete();
     assertTrue("Sandbox could not be created.", sb.md());
     Context ctx = new Context();
-    ctx.mprop.set(MainProp.DBPATH, sb.path() + "/data");
-    ctx.mprop.set(MainProp.WEBPATH, sb.path() + "/webapp");
-    ctx.mprop.set(MainProp.RESTXQPATH, sb.path() + "/webapp");
-    ctx.mprop.set(MainProp.REPOPATH, sb.path() + "/repo");
+    ctx.globalopts.set(GlobalOptions.DBPATH, sb.path() + "/data");
+    ctx.globalopts.set(GlobalOptions.WEBPATH, sb.path() + "/webapp");
+    ctx.globalopts.set(GlobalOptions.RESTXQPATH, sb.path() + "/webapp");
+    ctx.globalopts.set(GlobalOptions.REPOPATH, sb.path() + "/repo");
 
     return ctx;
   }

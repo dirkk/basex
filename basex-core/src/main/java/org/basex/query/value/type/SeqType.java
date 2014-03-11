@@ -18,7 +18,7 @@ import org.basex.util.*;
 /**
  * Stores a sequence type definition.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class SeqType {
@@ -124,6 +124,8 @@ public final class SeqType {
   public static final SeqType DBL_ZM = new SeqType(AtomType.DBL, Occ.ZERO_MORE);
   /** Zero or one double. */
   public static final SeqType DBL_ZO = new SeqType(AtomType.DBL, Occ.ZERO_ONE);
+  /** Float number. */
+  public static final SeqType FLT = AtomType.FLT.seqType();
   /** Zero or one decimal number. */
   public static final SeqType DEC_ZO = new SeqType(AtomType.DEC, Occ.ZERO_ONE);
   /** Single integer; for simplicity, numbers are summarized by this type. */
@@ -219,6 +221,8 @@ public final class SeqType {
   public static final SeqType HEX = AtomType.HEX.seqType();
   /** Single xs:base64Binary. */
   public static final SeqType B64 = AtomType.B64.seqType();
+  /** Zero or one xs:base64Binary. */
+  public static final SeqType B64_ZO = new SeqType(AtomType.B64, Occ.ZERO_ONE);
   /** Zero or more xs:base64Binary. */
   public static final SeqType B64_ZM = new SeqType(AtomType.B64, Occ.ZERO_MORE);
 
@@ -271,7 +275,7 @@ public final class SeqType {
    * @return sequence type
    */
   public static SeqType get(final Type t, final Occ o) {
-    return o == Occ.ONE ? t.seqType() : new SeqType(t, o);
+    return o == Occ.ONE ? t.seqType() : o == Occ.ZERO ? EMP : new SeqType(t, o);
   }
 
   /**
@@ -281,8 +285,7 @@ public final class SeqType {
    * @return sequence type
    */
   public static SeqType get(final Type t, final long o) {
-    return get(t, o == 0 ? Occ.ZERO : o == 1 ? Occ.ONE : o > 1 ?
-        Occ.ONE_MORE : Occ.ZERO_MORE);
+    return get(t, o == 0 ? Occ.ZERO : o == 1 ? Occ.ONE : o > 1 ? Occ.ONE_MORE : Occ.ZERO_MORE);
   }
 
   /**
@@ -293,7 +296,7 @@ public final class SeqType {
    * @return sequence type
    */
   public static SeqType get(final Type t, final Occ o, final Test k) {
-    return new SeqType(t, o, k);
+    return k == null ? get(t, o) : new SeqType(t, o, k);
   }
 
   /**
@@ -314,7 +317,6 @@ public final class SeqType {
     final long size = val.size();
     if(!occ.check(size)) return false;
     for(long i = 0; i < size; i++) {
-      // maps don't have type information attached to them, you have to look...
       if(!instance(val.itemAt(i), true)) return false;
       if(i == 0 && val.homogeneous()) break;
     }
@@ -338,23 +340,24 @@ public final class SeqType {
    * Tries to cast the given item to this sequence type.
    * @param it item to cast
    * @param ctx query context
+   * @param sc static context
    * @param ii input info
    * @param e expression for error message
    * @return promoted item
    * @throws QueryException query exception
    */
-  public Value cast(final Item it, final QueryContext ctx, final InputInfo ii,
-      final ExprInfo e) throws QueryException {
+  public Value cast(final Item it, final QueryContext ctx, final StaticContext sc,
+      final InputInfo ii, final ExprInfo e) throws QueryException {
 
     if(it == null) {
-      if(!occ.check(0)) INVEMPTYEX.thrw(ii, e.description(), this);
+      if(!occ.check(0)) throw INVEMPTYEX.get(ii, e, this);
       return Empty.SEQ;
     }
 
-    if(!occ.check(1)) INVCAST.thrw(ii, it.type, this);
-    final Value v = it.type.eq(type) ? it : type.cast(it, ctx, ii);
+    if(!occ.check(1)) throw INVCAST.get(ii, it.type, this);
+    final Value v = it.type.eq(type) ? it : type.cast(it, ctx, sc, ii);
     if(kind != null) {
-      for(final Item i : v) if(!kind.eq(it)) Err.cast(ii, type, i);
+      for(final Item i : v) if(!kind.eq(it)) throw Err.castError(ii, type, i);
     }
     return v;
   }
@@ -363,18 +366,19 @@ public final class SeqType {
    * Casts a sequence to this type.
    * @param val value to cast
    * @param ctx query context
+   * @param sc static context
    * @param ii input info
    * @param e expression
    * @return resulting value
    * @throws QueryException query exception
    */
-  public Value cast(final Value val, final QueryContext ctx, final InputInfo ii,
-      final ExprInfo e) throws QueryException {
-    if(val.size() < 2) return cast(val.isEmpty() ? null : val.itemAt(0), ctx, ii, e);
+  public Value cast(final Value val, final QueryContext ctx, final StaticContext sc,
+      final InputInfo ii, final ExprInfo e) throws QueryException {
+    if(val.size() < 2) return cast(val.isEmpty() ? null : val.itemAt(0), ctx, sc, ii, e);
 
-    if(!occ.check(val.size())) INVCAST.thrw(ii, val.type(), this);
+    if(!occ.check(val.size())) throw INVCAST.get(ii, val.type(), this);
     final ValueBuilder vb = new ValueBuilder((int) val.size());
-    for(int i = 0; i < val.size(); i++) vb.add(cast(val.itemAt(i), ctx, ii, e));
+    for(int i = 0; i < val.size(); i++) vb.add(cast(val.itemAt(i), ctx, sc, ii, e));
     return vb.value();
   }
 
@@ -389,7 +393,7 @@ public final class SeqType {
     if(val.type().instanceOf(this)) return val;
 
     final int size = (int) val.size();
-    if(!occ.check(size)) Err.treat(ii, this, val);
+    if(!occ.check(size)) throw Err.treatError(ii, this, val);
 
     // empty sequence has all types
     if(size == 0) return Empty.SEQ;
@@ -399,68 +403,72 @@ public final class SeqType {
     // check heterogeneous sequences
     if(!val.homogeneous())
       for(int i = 1; ins && i < size; i++) ins = instance(val.itemAt(i), true);
-    if(!ins) Err.treat(ii, this, val);
+    if(!ins) throw Err.treatError(ii, this, val);
     return val;
   }
 
   /**
-   * Tries to promote an item to this type's element type.
+   * Promotes an item to the type of this sequence type.
    * @param ctx query context
+   * @param sc static context
    * @param ii input info
    * @param it item to promote
+   * @param opt if the result should be optimized
    * @return promoted item
    * @throws QueryException query exception
    */
-  private Value funcConv(final QueryContext ctx, final InputInfo ii, final Item it)
-      throws QueryException {
+  private Value promote(final QueryContext ctx, final StaticContext sc, final InputInfo ii,
+      final Item it, final boolean opt) throws QueryException {
 
     if(type instanceof AtomType) {
       final Item atom = StandardFunc.atom(it, ii);
       if(atom != it && atom.type.instanceOf(type)) return it;
       if(atom.type == AtomType.ATM) {
         if(type.nsSensitive()) {
-          if(ctx.sc.xquery3()) NSSENS.thrw(ii, it.type, type);
-          Err.treat(ii, withOcc(Occ.ONE), it);
+          if(sc.xquery3()) throw NSSENS.get(ii, it.type, type);
+          throw Err.treatError(ii, withOcc(Occ.ONE), it);
         }
-        return type.cast(atom, ctx, ii);
+        return type.cast(atom, ctx, sc, ii);
       }
 
       final Type at = atom.type, tt = type;
-      if(tt == AtomType.DBL
-          && (at.instanceOf(AtomType.FLT) || at.instanceOf(AtomType.DEC)))
+      if(tt == AtomType.DBL && (at.instanceOf(AtomType.FLT) || at.instanceOf(AtomType.DEC)))
         return Dbl.get(atom.dbl(ii));
       if(tt == AtomType.FLT && at.instanceOf(AtomType.DEC))
         return Flt.get(atom.flt(ii));
       if(tt == AtomType.STR && at.instanceOf(AtomType.URI))
         return Str.get(atom.string(ii));
     } else if(it instanceof FItem && type instanceof FuncType) {
-      return ((FItem) it).coerceTo((FuncType) type, ctx, ii);
+      return ((FItem) it).coerceTo((FuncType) type, ctx, ii, opt);
     }
 
-    throw Err.treat(ii, withOcc(Occ.ONE), it);
+    throw Err.treatError(ii, withOcc(Occ.ONE), it);
   }
 
   /**
-   * Performs function conversion on the given value.
+   * Promotes a value to the type of this sequence type.
    * @param ctx query context
+   * @param sc static context
    * @param ii input info
    * @param val value to convert
+   * @param opt if the result should be optimized
    * @return converted value
-   * @throws QueryException if the conversion ws not possible
+   * @throws QueryException if the conversion was not possible
    */
-  public Value funcConvert(final QueryContext ctx, final InputInfo ii,
-      final Value val) throws QueryException {
+  public Value promote(final QueryContext ctx, final StaticContext sc, final InputInfo ii,
+      final Value val, final boolean opt) throws QueryException {
+
     final long n = val.size();
-    if(!occ.check(n)) throw Err.treat(ii, this, val);
+    if(!occ.check(n)) throw Err.treatError(ii, this, val);
     if(n == 0) return Empty.SEQ;
     if(val.isItem())
-      return instance((Item) val, true) ? val : funcConv(ctx, ii, (Item) val);
+      return instance((Item) val, true) ? val : promote(ctx, sc, ii, (Item) val, opt);
 
     ValueBuilder vb = null;
     final Item fst = val.itemAt(0);
     if(!instance(fst, true)) {
       vb = new ValueBuilder(new Item[(int) val.size()], 0);
-      vb.add(funcConv(ctx, ii, fst));
+      vb.add(promote(ctx, sc, ii, fst, opt));
     } else if(val.homogeneous()) {
       return val;
     }
@@ -468,14 +476,14 @@ public final class SeqType {
     for(int i = 1; i < n; i++) {
       final Item it = val.itemAt(i);
       if(vb != null) {
-        vb.add(instance(it, true) ? it : funcConv(ctx, ii, it));
+        vb.add(instance(it, true) ? it : promote(ctx, sc, ii, it, opt));
       } else if(!instance(it, true)) {
         vb = new ValueBuilder(new Item[(int) val.size()], 0);
         for(int j = 0; j < i; j++) vb.add(val.itemAt(j));
-        vb.add(funcConv(ctx, ii, it));
+        vb.add(promote(ctx, sc, ii, it, opt));
       }
     }
-    return vb != null ? Seq.get(vb.item, (int) vb.size(), type) : val;
+    return vb != null ? Seq.get(vb.items(), (int) vb.size(), type) : val;
   }
 
   /**
@@ -483,7 +491,7 @@ public final class SeqType {
    * @param t type to convert to
    * @return result of check
    */
-  public boolean convertibleTo(final SeqType t) {
+  public boolean promotable(final SeqType t) {
     if(intersect(t) != null) return true;
     if(occ.intersect(t.occ) == null) return false;
     final Type to = t.type;
@@ -583,14 +591,14 @@ public final class SeqType {
   }
 
   /**
-   * Checks if the specified SeqType is an instance of the current SeqType.
-   * @param t SeqType to check
+   * Checks if this sequence type is an instance of the specified sequence type.
+   * @param t sequence type to check
    * @return result of check
    */
   public boolean instanceOf(final SeqType t) {
-    return type.instanceOf(t.type) && occ.instanceOf(t.occ)
+    return (t.type == AtomType.ITEM || type.instanceOf(t.type)) && occ.instanceOf(t.occ)
       // [LW] complete kind check
-      && t.kind == null || kind != null && kind.intersect(t.kind) != null;
+      && (t.kind == null || kind != null && kind.intersect(t.kind) != null);
   }
 
   @Override

@@ -13,10 +13,10 @@ import org.basex.util.*;
 /**
  * Rename node primitive.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Lukas Kircher
  */
-public final class RenameNode extends UpdatePrimitive {
+public final class RenameNode extends NodeUpdate {
   /** New name. */
   private final QNm name;
 
@@ -29,25 +29,25 @@ public final class RenameNode extends UpdatePrimitive {
    */
   public RenameNode(final int p, final Data d, final InputInfo i,
       final QNm nm) {
-    super(PrimitiveType.RENAMENODE, p, d, i);
+    super(UpdateType.RENAMENODE, p, d, i);
     name = nm;
   }
 
   @Override
-  public void merge(final UpdatePrimitive p) throws QueryException {
-    UPMULTREN.thrw(info, getTargetNode());
+  public void merge(final Update up) throws QueryException {
+    throw UPMULTREN.get(info, node());
   }
 
   @Override
   public void update(final NamePool pool) {
-    final DBNode node = getTargetNode();
+    final DBNode node = node();
     pool.add(name, node.nodeType());
     pool.remove(node);
   }
 
   @Override
   public String toString() {
-    return Util.name(this) + '[' + getTargetNode() + ", " + name + ']';
+    return Util.className(this) + '[' + node() + ", " + name + ']';
   }
 
   @Override
@@ -56,12 +56,12 @@ public final class RenameNode extends UpdatePrimitive {
   }
 
   @Override
-  public void addAtomics(final AtomicUpdateList l) {
-    l.addRename(targetPre, data.kind(targetPre), name.string(), name.uri());
+  public void addAtomics(final AtomicUpdateCache l) {
+    l.addRename(pre, name.string(), name.uri());
   }
 
   @Override
-  public UpdatePrimitive[] substitute(final MemData tmp) {
-    return new UpdatePrimitive[] { this };
+  public NodeUpdate[] substitute(final MemData tmp) {
+    return new NodeUpdate[] { this };
   }
 }

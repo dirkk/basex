@@ -1,19 +1,17 @@
 package org.basex.core.cmd;
 
-import org.basex.core.Perm;
-import org.basex.data.Data;
-import org.basex.data.atomic.AtomicUpdateList;
-import org.basex.io.IOFile;
-import org.basex.util.list.IntList;
-import org.basex.util.list.TokenList;
+import static org.basex.core.Text.*;
 
-import static org.basex.core.Text.DB_PINNED_X;
-import static org.basex.core.Text.RES_DELETED_X_X;
+import org.basex.core.*;
+import org.basex.data.*;
+import org.basex.data.atomic.*;
+import org.basex.io.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'delete' command and deletes resources from a database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class Delete extends ACreate {
@@ -35,9 +33,9 @@ public final class Delete extends ACreate {
 
     // delete all documents
     final IntList docs = data.resources.docs(target);
-    final AtomicUpdateList atomics = new AtomicUpdateList(data);
-    for(int d = docs.size() - 1; d >= 0; d--)
-      atomics.addDelete(docs.get(d));
+    final AtomicUpdateCache atomics = new AtomicUpdateCache(data);
+    final int ds = docs.size();
+    for(int d = 0; d < ds; d++) atomics.addDelete(docs.get(d));
     atomics.execute(false);
     context.update();
 
@@ -53,7 +51,6 @@ public final class Delete extends ACreate {
     // return info message
     return info(RES_DELETED_X_X, docs.size() + bins.size(), perf);
   }
-
 
   /**
    * Deletes the specified resources.

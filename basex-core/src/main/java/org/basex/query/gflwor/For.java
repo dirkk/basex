@@ -24,10 +24,10 @@ import org.basex.util.hash.*;
 /**
  * FLWOR {@code for} clause, iterating over a sequence.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Leo Woerteler
  */
-public final class For extends GFLWOR.Clause {
+public final class For extends Clause {
   /** Item variable. */
   final Var var;
   /** Position variable. */
@@ -102,13 +102,13 @@ public final class For extends GFLWOR.Clause {
     if(empty) e.add(planAttr(Token.token(EMPTYORD), Token.TRUE));
     var.plan(e);
     if(pos != null) {
-      final FElem e2 = new FElem(QueryText.AT);
+      final FElem e2 = new FElem(AT);
       pos.plan(e2);
       e.add(e2);
     }
 
     if(score != null) {
-      final FElem e2 = new FElem(QueryText.SCORE);
+      final FElem e2 = new FElem(SCORE);
       score.plan(e2);
       e.add(e2);
     }
@@ -209,7 +209,7 @@ public final class For extends GFLWOR.Clause {
    * @param p position
    * @return {@code true} if the clause was converted, {@code false} otherwise
    */
-  boolean asLet(final List<GFLWOR.Clause> clauses, final int p) {
+  boolean asLet(final List<Clause> clauses, final int p) {
     if(expr.size() != 1 && !expr.type().one()) return false;
     clauses.set(p, Let.fromFor(this));
     if(score != null) clauses.add(p + 1, Let.fromForScore(this));
@@ -221,25 +221,28 @@ public final class For extends GFLWOR.Clause {
    * Tries to add the given expression as an attribute to this loop's sequence.
    * @param ctx query context
    * @param scp variable scope
-   * @param p expression to add
+   * @param prd expression to add as predicate
    * @return success
    * @throws QueryException query exception
    */
-  boolean toPred(final QueryContext ctx, final VarScope scp, final Expr p)
-      throws QueryException {
-    if(empty || vars.length > 1 || !p.removable(var)) return false;
-    final Expr r = p.inline(ctx, scp, var, new Context(info)), e = r == null ? p : r;
+  boolean toPred(final QueryContext ctx, final VarScope scp, final Expr prd) throws QueryException {
+    if(empty || !(vars.length == 1 && prd.uses(var) && prd.removable(var))) return false;
+
+    // assign type of iterated items to context expression
+    final Context c = new Context(info);
+    c.type = expr.type().type.seqType();
+    final Expr r = prd.inline(ctx, scp, var, c), inl = r == null ? prd : r;
 
     // attach predicates to axis path or filter, or create a new filter
-    final Expr a = e.type().mayBeNumber() ? Function.BOOLEAN.get(info, e) : e;
+    final Expr pred = inl.type().mayBeNumber() ? Function.BOOLEAN.get(null, info, inl) : inl;
 
     // add to clause expression
     if(expr instanceof AxisPath) {
-      expr = ((AxisPath) expr).addPreds(ctx, scp, a);
+      expr = ((Path) expr).addPreds(ctx, scp, pred);
     } else if(expr instanceof Filter) {
-      expr = ((Filter) expr).addPred(ctx, scp, a);
+      expr = ((Filter) expr).addPred(ctx, scp, pred);
     } else {
-      expr = Filter.get(info, expr, a).optimize(ctx, scp);
+      expr = Filter.get(info, expr, pred).optimize(ctx, scp);
     }
 
     return true;

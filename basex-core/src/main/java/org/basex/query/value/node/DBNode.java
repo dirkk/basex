@@ -1,6 +1,7 @@
 package org.basex.query.value.node;
 
 import static org.basex.query.QueryText.*;
+import static org.basex.query.func.Function.*;
 
 import java.io.*;
 
@@ -18,14 +19,13 @@ import org.basex.query.value.type.*;
 import org.basex.query.value.type.Type.ID;
 import org.basex.query.var.*;
 import org.basex.util.*;
-import org.basex.util.ft.*;
 import org.basex.util.hash.*;
 import org.basex.util.list.*;
 
 /**
  * Database nodes.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class DBNode extends ANode {
@@ -80,11 +80,11 @@ public class DBNode extends ANode {
   /**
    * Constructor, specifying an XML input reference.
    * @param input input reference
-   * @param prop database properties
+   * @param opts database options
    * @throws IOException I/O exception
    */
-  public DBNode(final IO input, final Prop prop) throws IOException {
-    this(Parser.xmlParser(input, prop));
+  public DBNode(final IO input, final MainOptions opts) throws IOException {
+    this(Parser.xmlParser(input, opts));
   }
 
   /**
@@ -101,7 +101,7 @@ public class DBNode extends ANode {
    * @param p pre value
    * @param k node kind
    */
-  public final void set(final int p, final int k) {
+  final void set(final int p, final int k) {
     type = type(k);
     par = null;
     val = null;
@@ -161,8 +161,7 @@ public class DBNode extends ANode {
     if(pref || data.nspaces.size() != 0) {
       final int n = pref ? data.nspaces.uri(nm, pre, data) :
         data.uri(pre, data.kind(pre));
-      final byte[] u = n > 0 ? data.nspaces.uri(n) : pref ?
-          NSGlobal.uri(Token.prefix(nm)) : null;
+      final byte[] u = n > 0 ? data.nspaces.uri(n) : pref ? NSGlobal.uri(Token.prefix(nm)) : null;
       if(u != null) uri = u;
     }
     name.set(nm, uri);
@@ -224,15 +223,15 @@ public class DBNode extends ANode {
   }
 
   @Override
-  public final DBNode dbCopy(final Prop prop) {
-    final MemData md = data.inMemory() ? new MemData(data) : new MemData(prop);
+  public final DBNode dbCopy(final MainOptions opts) {
+    final MemData md = new MemData(opts);
     new DataBuilder(md).build(this);
     return new DBNode(md).parent(par);
   }
 
   @Override
   public final DBNode deepCopy() {
-    return dbCopy(data.meta.prop);
+    return dbCopy(data.meta.options);
   }
 
   @Override
@@ -248,12 +247,11 @@ public class DBNode extends ANode {
 
     final DBNode node = copy();
     node.set(p, data.kind(p));
-    node.score(Scoring.step(node.score()));
     return node;
   }
 
   @Override
-  public final DBNode parent(final ANode p) {
+  protected final DBNode parent(final ANode p) {
     par = p;
     return this;
   }
@@ -268,9 +266,7 @@ public class DBNode extends ANode {
   public final AxisIter ancestor() {
     return new AxisIter() {
       private final DBNode node = copy();
-      int p = pre;
-      int k = data.kind(p);
-      final double sc = node.score();
+      int p = pre, k = data.kind(p);
 
       @Override
       public ANode next() {
@@ -278,7 +274,6 @@ public class DBNode extends ANode {
         if(p == -1) return null;
         k = data.kind(p);
         node.set(p, k);
-        node.score(Scoring.step(sc));
         return node;
       }
     };
@@ -288,16 +283,13 @@ public class DBNode extends ANode {
   public final AxisIter ancestorOrSelf() {
     return new AxisIter() {
       private final DBNode node = copy();
-      int p = pre;
-      int k = data.kind(p);
-      final double sc = node.score();
+      int p = pre, k = data.kind(p);
 
       @Override
       public ANode next() {
         if(p == -1) return null;
         k = data.kind(p);
         node.set(p, k);
-        node.score(Scoring.step(sc));
         p = data.parent(p, k);
         return node;
       }
@@ -328,11 +320,9 @@ public class DBNode extends ANode {
   @Override
   public final AxisMoreIter children() {
     return new AxisMoreIter() {
-      int k = data.kind(pre);
-      int p = pre + data.attSize(pre, k);
+      int k = data.kind(pre), p = pre + data.attSize(pre, k);
       final int s = pre + data.size(pre, k);
       final DBNode node = copy();
-      final double sc = node.score();
 
       @Override
       public boolean more() {
@@ -344,7 +334,6 @@ public class DBNode extends ANode {
         if(!more()) return null;
         k = data.kind(p);
         node.set(p, k);
-        node.score(Scoring.step(sc));
         p += data.size(p, k);
         return node;
       }
@@ -354,11 +343,9 @@ public class DBNode extends ANode {
   @Override
   public final AxisIter descendant() {
     return new AxisIter() {
-      int k = data.kind(pre);
-      int p = pre + data.attSize(pre, k);
+      int k = data.kind(pre), p = pre + data.attSize(pre, k);
       final int s = pre + data.size(pre, k);
       final DBNode node = copy();
-      final double sc = node.score();
 
       @Override
       public DBNode next() {
@@ -366,7 +353,6 @@ public class DBNode extends ANode {
         k = data.kind(p);
         node.set(p, k);
         p += data.attSize(p, k);
-        node.score(Scoring.step(sc));
         return node;
       }
     };
@@ -466,7 +452,7 @@ public class DBNode extends ANode {
   @Override
   public final ID typeId() {
     // check if a document has a single element as child
-    Type.ID t = type.id();
+    ID t = type.id();
     if(type == NodeType.DOC) {
       final AxisMoreIter ai = children();
       if(ai.more() && ai.next().type == NodeType.ELM && !ai.more()) t = NodeType.DEL.id();
@@ -476,6 +462,8 @@ public class DBNode extends ANode {
 
   @Override
   public String toString() {
+    if(!data.inMemory()) return _DB_OPEN_PRE.args(data.meta.name, pre);
+
     final TokenBuilder tb = new TokenBuilder(type.string()).add(' ');
     switch((NodeType) type) {
       case ATT:

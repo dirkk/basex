@@ -11,92 +11,79 @@ import org.basex.data.*;
 import org.basex.data.atomic.*;
 import org.basex.query.*;
 import org.basex.query.func.*;
-import org.basex.query.value.node.*;
 import org.basex.util.*;
-import org.basex.util.hash.*;
+import org.basex.util.options.*;
 
 /**
  * Update primitive for the {@link Function#_DB_CREATE} function.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Lukas Kircher
  */
-public final class DBCreate extends DBNew {
-  /** Name of new database. */
-  public final String name;
+public final class DBCreate extends NameUpdate {
+  /** Container for new database documents. */
+  private final DBNew add;
+  /** Database update options. */
+  private final DBOptions updates;
 
   /**
    * Constructor.
-   * @param ii input info
-   * @param nm name for created database
-   * @param in input (ANode and QueryInput references)
-   * @param map index options
-   * @param c query context
+   * @param info input info
+   * @param name name for created database
+   * @param input input (ANode and QueryInput references)
+   * @param opts database options
+   * @param qc query context
    * @throws QueryException query exception
    */
-  public DBCreate(final InputInfo ii, final String nm, final List<NewInput> in,
-      final TokenMap map, final QueryContext c) throws QueryException {
+  public DBCreate(final InputInfo info, final String name, final List<NewInput> input,
+      final Options opts, final QueryContext qc) throws QueryException {
 
-    super(TYPE.DBCREATE, null, c, ii);
-    inputs = in;
-    name = nm;
-    options = map;
-    check(true);
+    super(UpdateType.DBCREATE, name, info, qc);
+    updates = new DBOptions(qc, opts.free(), info);
+    add = new DBNew(qc, input, info);
+    updates.check(true);
   }
 
   @Override
-  public DBNode getTargetNode() {
-    return null;
-  }
-
-  @Override
-  public void merge(final BasicOperation o) throws QueryException {
-    BXDB_CREATE.thrw(info, ((DBCreate) o).name);
-  }
-
-  @Override
-  public void prepare(final MemData tmp) throws QueryException {
-    if(inputs != null && !inputs.isEmpty()) addDocs(new MemData(qc.context.prop), name);
+  public void prepare() throws QueryException {
+    if(add.inputs != null && !add.inputs.isEmpty())
+      add.addDocs(new MemData(updates.qc.context.options), name);
   }
 
   @Override
   public void apply() throws QueryException {
-    // remove data instance from list of opened resources
-    qc.resource.removeData(name);
-    // check if addressed database is still pinned by any other process
-    if(qc.context.pinned(name)) BXDB_OPENED.thrw(info, name);
+    close();
 
-    initOptions();
-    assignOptions();
+    updates.initOptions();
+    updates.assignOptions();
     try {
-      data = CreateDB.create(name, Parser.emptyParser(qc.context.prop), qc.context);
-    } catch(final IOException ex) {
-      UPDBOPTERR.thrw(info, ex);
-    } finally {
-      resetOptions();
-    }
-    qc.resource.addData(data);
+      final Data data = CreateDB.create(name, Parser.emptyParser(updates.qc.context.options),
+          updates.qc.context);
 
-    // add initial documents
-    if(md != null) {
-      if(!data.startUpdate()) BXDB_OPENED.thrw(null, data.meta.name);
-      data.insert(data.meta.size, -1, new DataClip(md));
-      try {
-        Optimize.optimize(data, false, null);
-      } catch(final IOException ex) {
-        data.finishUpdate();
-        UPDBOPTERR.thrw(info, ex);
+      // add initial documents and optimize database
+      if(add.md != null) {
+        if(!data.startUpdate()) throw BXDB_OPENED.get(null, data.meta.name);
+        try {
+          data.insert(data.meta.size, -1, new DataClip(add.md));
+          Optimize.optimize(data, null);
+        } finally {
+          data.finishUpdate();
+        }
       }
-    }
-  }
+      Close.close(data, qc.context);
 
-  @Override
-  public int size() {
-    return 1;
+    } catch(final IOException ex) {
+      throw UPDBOPTERR.get(info, ex);
+    } finally {
+      updates.resetOptions();
+    }
   }
 
   @Override
   public String toString() {
-    return Util.name(this) + '[' + inputs + ']';
+    return Util.className(this) + '[' + add.inputs + ']';
   }
+
+  @Override
+  public String operation() { return "created"; }
 }

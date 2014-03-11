@@ -1,32 +1,25 @@
 package org.basex.core.cmd;
 
-import org.basex.build.DirParser;
-import org.basex.build.DiskBuilder;
-import org.basex.build.MemBuilder;
-import org.basex.build.Parser;
-import org.basex.core.*;
-import org.basex.core.parse.CmdBuilder;
-import org.basex.core.parse.Commands.Cmd;
-import org.basex.core.parse.Commands.CmdCreate;
-import org.basex.data.Data;
-import org.basex.data.MemData;
-import org.basex.index.IndexType;
-import org.basex.index.ft.FTBuilder;
-import org.basex.index.value.ValueIndexBuilder;
-import org.basex.io.IO;
-import org.basex.io.IOStream;
-import org.basex.io.in.LookupInput;
-import org.basex.util.Util;
-
-import java.io.IOException;
-import java.io.InputStream;
-
 import static org.basex.core.Text.*;
+
+import java.io.*;
+
+import org.basex.build.*;
+import org.basex.core.*;
+import org.basex.core.parse.*;
+import org.basex.core.parse.Commands.*;
+import org.basex.data.*;
+import org.basex.index.*;
+import org.basex.index.ft.*;
+import org.basex.index.value.*;
+import org.basex.io.*;
+import org.basex.io.in.*;
+import org.basex.util.*;
 
 /**
  * Evaluates the 'create db' command and creates a new database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class CreateDB extends ACreate {
@@ -76,19 +69,19 @@ public final class CreateDB extends ACreate {
       return error(Util.message(ex));
     }
 
-    // create parser instance
-    if(io != null) {
-      if(!io.exists()) return error(RES_NOT_FOUND_X, io);
-      parser = new DirParser(io, prop, mprop.dbpath(name));
-    } else if(parser == null) {
-      parser = Parser.emptyParser(context.prop);
-    }
-
-    // close open database
-    new Close().run(context);
-
     try {
-      if(prop.is(Prop.MAINMEM)) {
+      // create parser instance
+      if(io != null) {
+        if(!io.exists()) return error(RES_NOT_FOUND_X, io);
+        parser = new DirParser(io, options, goptions.dbpath(name));
+      } else if(parser == null) {
+        parser = Parser.emptyParser(context.options);
+      }
+
+      // close open database
+      new Close().run(context);
+
+      if(options.get(MainOptions.MAINMEM)) {
         // create main memory instance
         final Data data = proc(new MemBuilder(name, parser)).build();
         context.openDB(data);
@@ -108,12 +101,11 @@ public final class CreateDB extends ACreate {
           if(data.meta.createattr) create(IndexType.ATTRIBUTE, data, this);
           if(data.meta.createftxt) create(IndexType.FULLTEXT,  data, this);
         } finally {
-
           context.triggers.afterCreateDb(name);
           data.finishUpdate();
         }
       }
-      if(prop.is(Prop.CREATEONLY)) new Close().run(context);
+      if(options.get(MainOptions.CREATEONLY)) new Close().run(context);
 
       return info(parser.info() + DB_CREATED_X_X, name, perf);
     } catch(final ProcException ex) {
@@ -144,15 +136,15 @@ public final class CreateDB extends ACreate {
    * @return new database instance
    * @throws IOException I/O exception
    */
-  public static synchronized Data create(final String name, final Parser parser,
-      final Context ctx) throws IOException {
+  public static synchronized Data create(final String name, final Parser parser, final Context ctx)
+      throws IOException {
 
     // check permissions
     if(!ctx.user.has(Perm.CREATE)) throw new BaseXException(PERM_REQUIRED_X, Perm.CREATE);
 
     // create main memory database instance
-    final Prop prop = ctx.prop;
-    if(prop.is(Prop.MAINMEM)) return MemBuilder.build(name, parser);
+    final MainOptions opts = ctx.options;
+    if(opts.get(MainOptions.MAINMEM)) return MemBuilder.build(name, parser);
 
     // database is currently locked by another process
     if(ctx.pinned(name)) throw new BaseXException(DB_PINNED_X, name);
@@ -183,9 +175,8 @@ public final class CreateDB extends ACreate {
    * @return new database instance
    * @throws IOException I/O exception
    */
-  public static synchronized MemData mainMem(final Parser parser, final Context ctx)
+  private static synchronized MemData mainMem(final Parser parser, final Context ctx)
       throws IOException {
-
     if(ctx.user.has(Perm.CREATE)) return MemBuilder.build(parser);
     throw new BaseXException(PERM_REQUIRED_X, Perm.CREATE);
   }
@@ -199,33 +190,21 @@ public final class CreateDB extends ACreate {
    */
   public static synchronized MemData mainMem(final IO source, final Context ctx)
       throws IOException {
-
     if(!source.exists()) throw new BaseXException(RES_NOT_FOUND_X, source);
-    return mainMem(new DirParser(source, ctx.prop, null), ctx);
+    return mainMem(new DirParser(source, ctx.options, null), ctx);
   }
 
   /**
-   * Creates a new database if a valid path was specified.
-   * @param source document source
-   * @param single expect single document
+   * Creates a new database from the specified source.
+   * @param source source path
    * @param ctx database context
    * @return data reference
    * @throws IOException I/O exception
    */
-  public static synchronized Data create(final IO source, final boolean single,
-      final Context ctx) throws IOException {
-
-    // check if input is an existing file
-    if(!source.exists() || single && source.isDir())
-      throw new BaseXException(RES_NOT_FOUND_X, source);
-
-    // default: create a main memory instance
-    if(!ctx.prop.is(Prop.FORCECREATE)) return CreateDB.mainMem(source, ctx);
-
-    // otherwise, create a persistent database instance
+  public static synchronized Data create(final IO source, final Context ctx) throws IOException {
     final String nm = source.dbname();
-    final DirParser dp = new DirParser(source, ctx.prop, ctx.mprop.dbpath(nm));
-    return CreateDB.create(nm, dp, ctx);
+    final DirParser dp = new DirParser(source, ctx.options, ctx.globalopts.dbpath(nm));
+    return create(nm, dp, ctx);
   }
 
   @Override

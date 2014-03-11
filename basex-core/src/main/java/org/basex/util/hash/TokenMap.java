@@ -6,7 +6,7 @@ import org.basex.util.*;
  * This is an efficient and memory-saving hash map for storing tokens.
  * It extends the {@link TokenSet} class.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class TokenMap extends TokenSet {
@@ -71,7 +71,7 @@ public class TokenMap extends TokenSet {
       if(!tb.isEmpty()) tb.add(", ");
       if(keys[i] != null) tb.add(keys[i]).add(" = ").add(values[i]);
     }
-    return new TokenBuilder(Util.name(getClass())).add('[').add(tb.finish()).
+    return new TokenBuilder(Util.className(getClass())).add('[').add(tb.finish()).
         add(']').toString();
   }
 }

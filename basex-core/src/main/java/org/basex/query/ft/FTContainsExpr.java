@@ -18,11 +18,10 @@ import org.basex.util.hash.*;
 /**
  * FTContains expression.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class FTContainsExpr extends FTContains {
-
   /**
    * Constructor.
    * @param e expression
@@ -36,10 +35,10 @@ public final class FTContainsExpr extends FTContains {
   @Override
   public Bln item(final QueryContext ctx, final InputInfo ii) throws QueryException {
     final Iter iter = expr.iter(ctx);
-    final FTLexer tmp = ctx.fttoken;
-    double s = 0;
+    final FTLexer tmp = ctx.ftToken;
 
-    ctx.fttoken = lex;
+    ctx.ftToken = lex;
+    double s = 0;
     for(Item it; (it = iter.next()) != null;) {
       lex.init(it.string(info));
       final FTNode item = ftexpr.item(ctx, info);
@@ -49,16 +48,16 @@ public final class FTContainsExpr extends FTContains {
         // no scoring found - use default value
         if(d == 0) d = 1;
       }
-      s = Scoring.and(s, d);
+      s = s == 0 ? d : Scoring.merge(s, d);
 
       // cache entry for visualizations or ft:mark/ft:extract
-      if(d > 0 && ctx.ftpos != null && it instanceof DBNode) {
+      if(d > 0 && ctx.ftPosData != null && it instanceof DBNode) {
         final DBNode node = (DBNode) it;
-        ctx.ftpos.add(node.data, node.pre, item.all);
+        ctx.ftPosData.add(node.data, node.pre, item.all);
       }
     }
 
-    ctx.fttoken = tmp;
+    ctx.ftToken = tmp;
     return Bln.get(s);
   }
 
@@ -87,9 +86,6 @@ public final class FTContainsExpr extends FTContains {
 
   @Override
   public Expr copy(final QueryContext ctx, final VarScope scp, final IntObjMap<Var> vs) {
-    final FTContains ftc =  new FTContainsExpr(expr.copy(ctx, scp, vs),
-        ftexpr.copy(ctx, scp, vs), info);
-    if(lex != null) ftc.lex = new FTLexer(new FTOpt());
-    return ftc;
+    return new FTContainsExpr(expr.copy(ctx, scp, vs), ftexpr.copy(ctx, scp, vs), info);
   }
 }

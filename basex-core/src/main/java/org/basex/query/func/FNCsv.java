@@ -6,43 +6,43 @@ import static org.basex.util.Token.*;
 
 import java.io.*;
 
+import org.basex.build.*;
+import org.basex.io.*;
+import org.basex.io.parse.csv.*;
+import org.basex.io.serial.*;
 import org.basex.query.*;
 import org.basex.query.expr.*;
-import org.basex.query.util.csv.*;
+import org.basex.query.iter.*;
 import org.basex.query.value.item.*;
-import org.basex.query.value.node.*;
 import org.basex.util.*;
-import org.basex.util.hash.*;
 
 /**
  * Functions for parsing CSV input.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class FNCsv extends StandardFunc {
   /** Element: options. */
-  private static final QNm Q_OPTIONS = QNm.get("options", CSVURI);
-  /** The {@code header} key. */
-  private static final byte[] HEADER = token("header");
-  /** The {@code separator} key. */
-  private static final byte[] SEPARATOR = token("separator");
+  private static final QNm Q_OPTIONS = QNm.get("csv:options", CSVURI);
 
   /**
    * Constructor.
+   * @param sctx static context
    * @param ii input info
    * @param f function definition
    * @param e arguments
    */
-  public FNCsv(final InputInfo ii, final Function f, final Expr... e) {
-    super(ii, f, e);
+  public FNCsv(final StaticContext sctx, final InputInfo ii, final Function f, final Expr... e) {
+    super(sctx, ii, f, e);
   }
 
   @Override
   public Item item(final QueryContext ctx, final InputInfo ii) throws QueryException {
     switch(sig) {
-      case _CSV_PARSE: return parse(ctx);
-      default:         return super.item(ctx, ii);
+      case _CSV_PARSE:     return parse(ctx);
+      case _CSV_SERIALIZE: return serialize(ctx);
+      default:             return super.item(ctx, ii);
     }
   }
 
@@ -52,23 +52,31 @@ public class FNCsv extends StandardFunc {
    * @return element node
    * @throws QueryException query exception
    */
-  private FElem parse(final QueryContext ctx) throws QueryException {
-    final Item opt = expr.length > 1 ? expr[1].item(ctx, info) : null;
-    final TokenMap map = new FuncParams(Q_OPTIONS, info).parse(opt);
-
-    final boolean header = map.contains(HEADER) && eq(map.get(HEADER), TRUE);
-    byte sep = CsvParser.SEPMAPPINGS[0];
-    final byte[] s = map.get(SEPARATOR);
-    if(s != null) {
-      if(s.length != 1) BXCS_SEP.thrw(info);
-      sep = s[0];
-    }
-    final CsvParser parser = new CsvParser(sep, header);
-
+  private Item parse(final QueryContext ctx) throws QueryException {
+    final byte[] input = checkStr(expr[0], ctx);
+    final CsvParserOptions opts = checkOptions(1, Q_OPTIONS, new CsvParserOptions(), ctx);
     try {
-      return parser.convert(checkStr(expr[0], ctx));
+      final CsvConverter conv = CsvConverter.get(opts);
+      conv.convert(new IOContent(input));
+      return conv.finish();
     } catch(final IOException ex) {
-      throw BXCS_ERROR.thrw(info, ex);
+      throw BXCS_PARSE.get(info, ex);
     }
+  }
+
+  /**
+   * Serializes the specified XML document as CSV.
+   * @param ctx query context
+   * @return string representation
+   * @throws QueryException query exception
+   */
+  private Str serialize(final QueryContext ctx) throws QueryException {
+    final Iter iter = ctx.iter(expr[0]);
+    final CsvOptions copts = checkOptions(1, Q_OPTIONS, new CsvOptions(), ctx);
+
+    final SerializerOptions sopts = new SerializerOptions();
+    sopts.set(SerializerOptions.METHOD, SerialMethod.CSV);
+    sopts.set(SerializerOptions.CSV, copts);
+    return Str.get(delete(serialize(iter, sopts, INVALIDOPT), '\r'));
   }
 }

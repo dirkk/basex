@@ -1,42 +1,57 @@
 package org.basex.server;
 
-import static org.basex.core.Text.*;
-import static org.basex.util.Token.*;
-
-import java.io.*;
-import java.net.*;
-import java.util.*;
-
-import org.basex.*;
-import org.basex.core.*;
+import org.basex.BaseXServer;
+import org.basex.core.BaseXException;
+import org.basex.core.Command;
+import org.basex.core.Context;
+import org.basex.core.GlobalOptions;
 import org.basex.core.cmd.*;
-import org.basex.core.parse.*;
-import org.basex.io.in.*;
-import org.basex.io.out.*;
-import org.basex.query.*;
-import org.basex.util.*;
-import org.basex.util.list.*;
+import org.basex.core.parse.CommandParser;
+import org.basex.io.in.BufferInput;
+import org.basex.io.in.DecodingInput;
+import org.basex.io.out.EncodingOutput;
+import org.basex.io.out.PrintOutput;
+import org.basex.query.QueryException;
+import org.basex.util.Performance;
+import org.basex.util.Util;
+import org.basex.util.list.ByteList;
+
+import java.io.IOException;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Timer;
+
+import static org.basex.core.Text.*;
+import static org.basex.util.Token.md5;
 
 /**
  * Server-side client session in the client-server architecture.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Andreas Weiler
  * @author Christian Gruen
  */
 public final class ClientListener extends AListener {
+  /** Timer for authentication time out. */
+  public final Timer auth = new Timer();
   /** Active queries. */
   private final HashMap<String, QueryListener> queries =
     new HashMap<String, QueryListener>();
-
   /** Performance measurement. */
-  protected final Performance perf = new Performance();
+  private final Performance perf = new Performance();
+  /** Database context. */
+  private final Context context;
+
   /** Socket for events. */
   private Socket esocket;
   /** Output for events. */
   private PrintOutput eout;
   /** Flag for active events. */
   private boolean events;
+  /** Input stream. */
+  private BufferInput in;
+  /** Output stream. */
+  private PrintOutput out;
   /** Current command. */
   private Command command;
   /** Query id counter. */
@@ -56,14 +71,15 @@ public final class ClientListener extends AListener {
 
   @Override
   public void run() {
-    ServerCmd sc;
-    String cmd;
+    if(!authenticate()) return;
 
     try {
       running = true;
       setStreams();
       while(running) {
         command = null;
+        String cmd;
+        final ServerCmd sc;
         try {
           final int b = in.read();
           if(b == -1) {
@@ -151,6 +167,53 @@ public final class ClientListener extends AListener {
     command = null;
   }
 
+
+  /**
+   * Initializes a session via cram-md5.
+   * @return success flag
+   */
+  private boolean authenticate() {
+    try {
+      final String ts = Long.toString(System.nanoTime());
+      final byte[] address = socket.getInetAddress().getAddress();
+
+      // send {TIMESTAMP}0
+      out = PrintOutput.get(socket.getOutputStream());
+      out.print(ts);
+      send(true);
+
+      // evaluate login data
+      in = new BufferInput(socket.getInputStream());
+      // receive {USER}0{PASSWORD}0
+      final String us = in.readString();
+      final String pw = in.readString();
+      context.user = context.users.get(us);
+      running = context.user != null && md5(context.user.password + ts).equals(pw);
+
+      // write log information
+      if(running) {
+        // send {OK}
+        send(true);
+        context.blocker.remove(address);
+        context.sessions.add(this);
+      } else {
+        if(!us.isEmpty()) log(ACCESS_DENIED, false);
+        // delay users with wrong passwords
+        for(int d = context.blocker.delay(address); d > 0; d--) Performance.sleep(1000);
+        send(false);
+      }
+    } catch(final IOException ex) {
+      if(running) {
+        Util.stack(ex);
+        log(ex, false);
+        running = false;
+      }
+    }
+
+    server.remove(this);
+    return running;
+  }
+
   /**
    * Checks, whether this connection is timed out. If it is inactive, the connection
    * will be dropped.
@@ -164,6 +227,18 @@ public final class ClientListener extends AListener {
     if(inactive) quit();
 
     return inactive;
+  }
+
+  /**
+   * Quits the authentication.
+   */
+  public synchronized void quitAuth() {
+    try {
+      socket.close();
+      log(TIMEOUT_EXCEEDED, false);
+    } catch(final Throwable ex) {
+      log(ex, false);
+    }
   }
 
   /**
@@ -221,9 +296,7 @@ public final class ClientListener extends AListener {
    * @param msg event message
    * @throws IOException I/O exception
    */
-  public synchronized void notify(final byte[] name, final byte[] msg)
-      throws IOException {
-
+  public synchronized void notify(final byte[] name, final byte[] msg) throws IOException {
     last = System.currentTimeMillis();
     eout.print(name);
     eout.write(0);
@@ -295,7 +368,7 @@ public final class ClientListener extends AListener {
 
     // initialize server-based event handling
     if(!events) {
-      out.writeString(Integer.toString(context.mprop.num(MainProp.EVENTPORT)));
+      out.writeString(Integer.toString(context.globalopts.get(GlobalOptions.EVENTPORT)));
       out.writeString(Long.toString(getId()));
       out.flush();
       events = true;
@@ -387,7 +460,7 @@ public final class ClientListener extends AListener {
         } else if(sc == ServerCmd.INFO) {
           out.print(qp.info());
         } else if(sc == ServerCmd.OPTIONS) {
-          out.print(qp.options());
+          out.print(qp.parameters());
         } else if(sc == ServerCmd.UPDATING) {
           out.print(Boolean.toString(qp.updating()));
         } else if(sc == ServerCmd.CLOSE) {

@@ -2,7 +2,6 @@ package org.basex.query.up.primitives;
 
 import org.basex.data.*;
 import org.basex.data.atomic.*;
-import org.basex.query.*;
 import org.basex.query.up.*;
 import org.basex.query.util.*;
 import org.basex.query.value.node.*;
@@ -11,7 +10,7 @@ import org.basex.util.*;
 /**
  * Insert into as first primitive.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Lukas Kircher
  */
 public final class InsertIntoAsFirst extends NodeCopy {
@@ -24,24 +23,24 @@ public final class InsertIntoAsFirst extends NodeCopy {
    */
   public InsertIntoAsFirst(final int p, final Data d, final InputInfo i,
       final ANodeList c) {
-    super(PrimitiveType.INSERTINTOFIRST, p, d, i, c);
+    super(UpdateType.INSERTINTOFIRST, p, d, i, c);
   }
 
   @Override
-  public void merge(final UpdatePrimitive p) throws QueryException {
-    final ANodeList newInsert = ((NodeCopy) p).insert;
+  public void merge(final Update up) {
+    final ANodeList newInsert = ((NodeCopy) up).insert;
     for(final ANode n : newInsert) insert.add(n);
   }
 
   @Override
-  public void addAtomics(final AtomicUpdateList l) {
-    l.addInsert(targetPre + data.attSize(targetPre, data.kind(targetPre)), targetPre,
+  public void addAtomics(final AtomicUpdateCache l) {
+    l.addInsert(pre + data.attSize(pre, data.kind(pre)), pre,
         insseq, false);
   }
 
   @Override
-  public UpdatePrimitive[] substitute(final MemData tmp) {
-    return new UpdatePrimitive[] { this };
+  public NodeUpdate[] substitute(final MemData tmp) {
+    return new NodeUpdate[] { this };
   }
 
   @Override

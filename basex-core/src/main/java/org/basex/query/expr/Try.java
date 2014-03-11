@@ -13,7 +13,7 @@ import org.basex.util.hash.*;
 /**
  * Project specific try/catch expression.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class Try extends Single {
@@ -33,7 +33,7 @@ public final class Try extends Single {
 
   @Override
   public void checkUp() throws QueryException {
-    // check if none or all try/catch expressions are updating
+    // check if no or all try/catch expressions are updating
     final Expr[] tmp = new Expr[ctch.length + 1];
     tmp[0] = expr;
     for(int c = 0; c < ctch.length; ++c) tmp[c + 1] = ctch[c].expr;
@@ -86,8 +86,8 @@ public final class Try extends Single {
   }
 
   @Override
-  public Expr inline(final QueryContext ctx, final VarScope scp, final Var v,
-      final Expr e) throws QueryException {
+  public Expr inline(final QueryContext ctx, final VarScope scp, final Var v, final Expr e)
+      throws QueryException {
 
     boolean change = false;
     try {
@@ -102,7 +102,8 @@ public final class Try extends Single {
       for(final Catch c : ctch) {
         if(c.matches(qe)) {
           // found a matching clause, inline variable and error message
-          return optPre(c.inline(ctx, scp, v, e).asExpr(qe, ctx, scp), ctx);
+          final Catch nw = c.inline(ctx, scp, v, e);
+          return optPre((nw == null ? c : nw).asExpr(qe, ctx, scp), ctx);
         }
       }
       throw qe;
@@ -132,6 +133,12 @@ public final class Try extends Single {
   @Override
   public void plan(final FElem plan) {
     addPlan(plan, planElem(), expr, ctch);
+  }
+
+  @Override
+  public void markTailCalls(final QueryContext ctx) {
+    for(final Catch c : ctch) c.markTailCalls(ctx);
+    expr.markTailCalls(ctx);
   }
 
   @Override

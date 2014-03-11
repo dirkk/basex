@@ -11,7 +11,7 @@ import org.basex.util.*;
 /**
  * Wrapper for representing XQuery items.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public abstract class XdmItem extends XdmValue {
@@ -64,7 +64,7 @@ public abstract class XdmItem extends XdmValue {
 
       @Override
       public void remove() {
-        Util.notexpected();
+        throw Util.notExpected();
       }
     };
   }

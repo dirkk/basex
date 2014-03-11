@@ -16,31 +16,29 @@ import org.basex.util.hash.*;
 /**
  * Update primitive for the {@link Function#_DB_STORE} function.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
-public final class DBStore extends BasicOperation {
+public final class DBStore extends DBUpdate {
   /** Keys. */
   private final TokenObjMap<Object> map = new TokenObjMap<Object>();
 
   /**
    * Constructor.
-   * @param d data
+   * @param data data
    * @param path target path
    * @param it item to be stored
-   * @param ii input info
+   * @param inf input info
    */
-  public DBStore(final Data d, final String path, final Object it, final InputInfo ii) {
-    super(TYPE.DBSTORE, d, ii);
+  public DBStore(final Data data, final String path, final Object it, final InputInfo inf) {
+    super(UpdateType.DBSTORE, data, inf);
     map.put(token(path), it);
   }
 
   @Override
-  public void merge(final BasicOperation o) {
-    final DBStore put = (DBStore) o;
-    for(final byte[] path : put.map) {
-      map.put(path, put.map.get(path));
-    }
+  public void merge(final Update up) {
+    final DBStore put = (DBStore) up;
+    for(final byte[] path : put.map) map.put(path, put.map.get(path));
   }
 
   @Override
@@ -48,14 +46,14 @@ public final class DBStore extends BasicOperation {
     for(final byte[] path : map) {
       try {
         final IOFile file = data.meta.binary(string(path));
-        if(file == null) UPDBPUTERR.thrw(info, path);
+        if(file == null) throw UPDBPUTERR.get(info, path);
         file.dir().md();
         final Object item = map.get(path);
         file.write(item instanceof Item ? ((Item) item).input(info) :
           ((QueryInput) item).input.inputStream());
       } catch(final IOException ex) {
         Util.debug(ex);
-        UPDBPUTERR.thrw(info, path);
+        throw UPDBPUTERR.get(info, path);
       }
     }
   }
@@ -66,5 +64,5 @@ public final class DBStore extends BasicOperation {
   }
 
   @Override
-  public void prepare(final MemData tmp) throws QueryException { }
+  public void prepare(final MemData tmp) { }
 }

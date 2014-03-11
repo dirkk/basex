@@ -15,7 +15,7 @@ import org.basex.util.*;
 /**
  * Set expression.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 abstract class Set extends Arr {
@@ -66,8 +66,8 @@ abstract class Set extends Arr {
   protected abstract NodeIter iter(final Iter[] iter);
 
   @Override
-  public boolean iterable() {
-    return true;
+  public final boolean iterable() {
+    return iterable;
   }
 
   /**
@@ -96,7 +96,7 @@ abstract class Set extends Arr {
      * @return true if another item was found
      * @throws QueryException query exception
      */
-    protected boolean next(final int i) throws QueryException {
+    boolean next(final int i) throws QueryException {
       final Item it = iter[i].next();
       item[i] = it == null ? null : checkNode(it);
       return it != null;
@@ -106,6 +106,6 @@ abstract class Set extends Arr {
   @Override
   public final String toString() {
     return PAR1 + toString(' ' +
-        Util.name(this).toLowerCase(Locale.ENGLISH) + ' ') + PAR2;
+        Util.className(this).toLowerCase(Locale.ENGLISH) + ' ') + PAR2;
   }
 }

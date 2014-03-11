@@ -1,6 +1,6 @@
 (:~
  : This XQuery module is evaluated by some JUnit tests.
- : @author BaseX Team 2005-13, BSD License
+ : @author BaseX Team 2005-14, BSD License
  : @version 1.0
  : @unknown tag
  :)
@@ -24,5 +24,10 @@ declare function hello:inlined() {
 
 (:~ Function returning a simple string. :)
 declare %public function hello:world() as xs:string {
+  hello:internal()
+};
+
+(:~ Private function returning a simple string. :)
+declare %private function hello:internal() as xs:string {
   "hello world"
 };

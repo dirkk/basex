@@ -1,6 +1,7 @@
 package org.basex.core.cmd;
 
 import static org.basex.core.Text.*;
+import static org.basex.data.DataText.*;
 
 import java.io.*;
 import java.util.*;
@@ -9,6 +10,7 @@ import org.basex.core.*;
 import org.basex.core.parse.*;
 import org.basex.core.parse.Commands.Cmd;
 import org.basex.core.parse.Commands.CmdCreate;
+import org.basex.data.*;
 import org.basex.io.*;
 import org.basex.util.*;
 import org.basex.util.list.*;
@@ -16,11 +18,10 @@ import org.basex.util.list.*;
 /**
  * Evaluates the 'backup' command and creates a backup of a database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class CreateBackup extends ABackup {
-
   /**
    * Default constructor.
    * @param arg optional argument
@@ -41,13 +42,22 @@ public final class CreateBackup extends ABackup {
     // loop through all databases
     boolean ok = true;
     for(final String db : dbs) {
-      if(!mprop.dbpath(db).isDir()) continue;
-      if(backup(db)) {
-        // backup was successful
-        info(DB_BACKUP_X, db, perf);
-      } else {
-        info(DB_NOT_BACKUP_X, db);
+      if(!goptions.dbpath(db).isDir()) continue;
+
+      // don't open databases marked as updating
+      if(MetaData.file(context.globalopts.dbpath(db), DATAUPD).exists()) {
+        // reject backups of databases that are currently being updated (or corrupt)
+        info(Text.DB_UPDATED_X, db);
         ok = false;
+      } else {
+        try {
+          backup(db, context, this);
+          // backup was successful
+          info(DB_BACKUP_X, db, perf);
+        } catch(final IOException ex) {
+          info(DB_NOT_BACKUP_X, db);
+          ok = false;
+        }
       }
     }
     return ok;
@@ -56,22 +66,23 @@ public final class CreateBackup extends ABackup {
   /**
    * Backups the specified database.
    * @param db name of the database
-   * @return success flag
+   * @param ctx database context
+   * @param cmd calling command instance
+   * @throws IOException I/O Exception
    */
-  private boolean backup(final String db) {
-    final String backup = db + '-' + DateTime.format(new Date(), DateTime.DATETIME) +
-        IO.ZIPSUFFIX;
-    final IOFile zf = mprop.dbpath(backup);
-    final Zip zip = proc(new Zip(zf));
+  public static void backup(final String db, final Context ctx, final CreateBackup cmd)
+      throws IOException {
 
-    try {
-      final IOFile path = mprop.dbpath(db);
-      zip.zip(path, path.descendants());
-      return true;
-    } catch(final IOException ex) {
-      Util.debug(ex);
-      return false;
-    }
+    final String backup = db + '-' + DateTime.format(new Date(), DateTime.DATETIME) + IO.ZIPSUFFIX;
+    final IOFile zf = ctx.globalopts.dbpath(backup);
+    final Zip zip = new Zip(zf);
+    if(cmd != null) cmd.proc(zip);
+
+    // skip file that indicates a current update operation (will be the case when using XQuery)
+    final IOFile dbpath = ctx.globalopts.dbpath(db);
+    final StringList files = dbpath.descendants();
+    files.delete(DATAUPD + IO.BASEXSUFFIX);
+    zip.zip(dbpath, files);
   }
 
   @Override

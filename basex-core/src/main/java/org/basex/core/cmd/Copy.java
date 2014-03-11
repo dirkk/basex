@@ -1,23 +1,19 @@
 package org.basex.core.cmd;
 
-import org.basex.core.Command;
-import org.basex.core.Databases;
-import org.basex.core.LockResult;
-import org.basex.core.Perm;
-import org.basex.io.IO;
-import org.basex.io.IOFile;
-import org.basex.util.Util;
-import org.basex.util.list.StringList;
-
-import java.io.IOException;
-import java.util.regex.Pattern;
-
 import static org.basex.core.Text.*;
+
+import java.io.*;
+import java.util.regex.*;
+
+import org.basex.core.*;
+import org.basex.io.*;
+import org.basex.util.*;
+import org.basex.util.list.*;
 
 /**
  * Evaluates the 'copy' command and creates a copy of a database.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Andreas Weiler
  */
 public final class Copy extends Command {
@@ -46,42 +42,52 @@ public final class Copy extends Command {
     if(!Databases.validName(trg)) return error(NAME_INVALID_X, trg);
 
     // source database does not exist
-    if(!mprop.dbexists(src)) return error(DB_NOT_FOUND_X, src);
+    if(!goptions.dbexists(src)) return error(DB_NOT_FOUND_X, src);
     // target database already exists
-    if(mprop.dbexists(trg)) return error(DB_EXISTS_X, trg);
+    if(goptions.dbexists(trg)) return error(DB_EXISTS_X, trg);
 
     // try to copy database
-    return copy(src, trg) ? info(DB_COPIED_X, src, perf) : error(DB_NOT_COPIED_X, src);
+    try {
+      copy(src, trg, context, this);
+      return info(DB_COPIED_X, src, perf);
+    } catch(final IOException ex) {
+      return error(DB_NOT_COPIED_X, src);
+    }
   }
 
   /**
    * Copies the specified database.
    * @param source name of the database
    * @param target new database name
-   * @return success flag
+   * @param context database context
+   * @param cmd calling command
+   * @throws IOException I/O exception
    */
-  private boolean copy(final String source, final String target) {
-    final IOFile src = mprop.dbpath(source);
-    final IOFile trg = mprop.dbpath(target);
+  public static void copy(final String source, final String target, final Context context,
+      final Copy cmd) throws IOException {
+
+    final GlobalOptions goptions = context.globalopts;
+    final IOFile src = goptions.dbpath(source);
+    final IOFile trg = goptions.dbpath(target);
+
+    // drop target database
+    DropDB.drop(target, context);
 
     // return false if source cannot be opened, or target cannot be created
     final StringList files = src.descendants();
-    tf = files.size();
+    if(cmd != null) cmd.tf = files.size();
     try {
       for(final String file : files) {
-        if(FILES.matcher(file).matches()) {
-          new IOFile(src, file).copyTo(new IOFile(trg, file));
-        }
-        of++;
+        if(FILES.matcher(file).matches()) new IOFile(src, file).copyTo(new IOFile(trg, file));
+        if(cmd != null) cmd.of++;
       }
 
       context.triggers.afterCopy(source, target);
-      return true;
     } catch(final IOException ex) {
       // drop new database if error occurred
       Util.debug(ex);
       DropDB.drop(target, context);
-      return false;
+      throw ex;
     }
   }
 

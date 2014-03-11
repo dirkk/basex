@@ -10,7 +10,7 @@ import org.basex.util.hash.*;
 /**
  * This is a simple container for tokens (byte arrays).
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class TokenList extends ElementList implements Iterable<byte[]> {
@@ -41,24 +41,6 @@ public final class TokenList extends ElementList implements Iterable<byte[]> {
   public TokenList(final double resize) {
     this();
     factor = resize;
-  }
-
-  /**
-   * Lightweight constructor, adopting the specified array.
-   * @param tokens initial array
-   */
-  public TokenList(final byte[][] tokens) {
-    list = tokens;
-    size = list.length;
-  }
-
-  /**
-   * Constructor, adopting the elements from the specified array.
-   * @param strings initial array
-   */
-  public TokenList(final String[] strings) {
-    this(strings.length);
-    for(final String s : strings) add(s);
   }
 
   /**
@@ -113,9 +95,12 @@ public final class TokenList extends ElementList implements Iterable<byte[]> {
   /**
    * Deletes the element at the specified position.
    * @param index index of the element to delete
+   * @return deleted element
    */
-  public void deleteAt(final int index) {
+  public byte[] deleteAt(final int index) {
+    final byte[] l = list[index];
     Array.move(list, index + 1, -1, --size - index);
+    return l;
   }
 
   /**
@@ -209,7 +194,7 @@ public final class TokenList extends ElementList implements Iterable<byte[]> {
 
   @Override
   public String toString() {
-    final TokenBuilder tb = new TokenBuilder(Util.name(this) + '[');
+    final TokenBuilder tb = new TokenBuilder(Util.className(this) + '[');
     for(int i = 0; i < size; ++i) {
       if(i != 0) tb.add(", ");
       tb.add(list[i]);

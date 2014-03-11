@@ -17,12 +17,13 @@ import com.bradmcevoy.http.*;
 /**
  * WebDAV resource factory. Main class for generating WebDAV resources.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Rositsa Shadura
  * @author Dimitar Popov
  */
 public final class BXResourceFactory implements ResourceFactory,
-  ResourceMetaDataFactory<BXAbstractResource> {
+    ResourceMetaDataFactory<BXAbstractResource> {
+
   /** HTTP Context. */
   private final HTTPContext http;
   /** WebDAV service. */
@@ -31,10 +32,18 @@ public final class BXResourceFactory implements ResourceFactory,
   /**
    * Constructor.
    * @param ht http context
+   * @throws LoginException login exception
    */
-  BXResourceFactory(final HTTPContext ht) {
+  BXResourceFactory(final HTTPContext ht) throws LoginException {
     http = ht;
     service = new WebDAVService<BXAbstractResource>(this, http);
+  }
+
+  /**
+   * Closes the database session.
+   */
+  void close() {
+    service.session.close();
   }
 
   @Override
@@ -64,20 +73,17 @@ public final class BXResourceFactory implements ResourceFactory,
   }
 
   @Override
-  public BXFile file(final WebDAVService<BXAbstractResource> s,
-      final ResourceMetaData d) {
+  public BXFile file(final WebDAVService<BXAbstractResource> s, final ResourceMetaData d) {
     return new BXFile(d, s);
   }
 
   @Override
-  public BXFolder folder(final WebDAVService<BXAbstractResource> s,
-      final ResourceMetaData d) {
+  public BXFolder folder(final WebDAVService<BXAbstractResource> s, final ResourceMetaData d) {
     return new BXFolder(d, s);
   }
 
   @Override
-  public BXDatabase database(final WebDAVService<BXAbstractResource> s,
-      final ResourceMetaData d) {
+  public BXDatabase database(final WebDAVService<BXAbstractResource> s, final ResourceMetaData d) {
     return new BXDatabase(d, s);
   }
 }

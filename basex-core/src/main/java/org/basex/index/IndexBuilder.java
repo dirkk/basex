@@ -12,7 +12,7 @@ import org.basex.util.*;
  * This interface defines the functions which are needed for building
  * new index structures.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public abstract class IndexBuilder extends Proc {
@@ -21,12 +21,10 @@ public abstract class IndexBuilder extends Proc {
   /** Total parsing value. */
   protected final int size;
   /** Number of index operations to perform before writing a partial index to disk. */
-  protected final int splitSize;
+  private final int splitSize;
 
-  /** Runtime for memory consumption. */
-  private final Runtime rt = Runtime.getRuntime();
   /** Maximum memory to consume. */
-  private final long maxMem = (long) (rt.maxMemory() * 0.8);
+  private final long maxMem = (long) (Runtime.getRuntime().maxMemory() * 0.8);
 
   /** Current pre value. */
   protected int pre;
@@ -65,7 +63,7 @@ public abstract class IndexBuilder extends Proc {
       split = count >= (splits + 1L) * splitSize;
     } else {
       // if not, estimate how much main memory is left
-      split = rt.totalMemory() - rt.freeMemory() >= maxMem;
+      split = Performance.memory() >= maxMem;
       // stop operation if index splitting degenerates
       int gc = gcCount;
       if(split) {
@@ -95,9 +93,9 @@ public abstract class IndexBuilder extends Proc {
     if(!Prop.debug) return;
 
     final StringBuilder sb = new StringBuilder();
-    if(splits > 1) sb.append(" " + splits + " splits,");
-    sb.append(" " + count + " operations, ");
-    sb.append(perf + " (" + Performance.getMemory() + ')');
+    if(splits > 1) sb.append(' ').append(splits).append(" splits,");
+    sb.append(' ').append(count).append(" operations, ");
+    sb.append(perf).append(" (").append(Performance.getMemory()).append(')');
     Util.errln(sb);
   }
 
@@ -110,7 +108,7 @@ public abstract class IndexBuilder extends Proc {
     data = d;
     size = data.meta.size;
     splitSize = max;
-    if(rt.totalMemory() - rt.freeMemory() >= maxMem) Performance.gc(1);
+    if(Performance.memory() >= maxMem) Performance.gc(1);
   }
 
   @Override

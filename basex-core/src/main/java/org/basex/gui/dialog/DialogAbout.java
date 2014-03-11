@@ -16,7 +16,7 @@ import org.basex.gui.layout.*;
 /**
  * Dialog window for displaying information about the project.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class DialogAbout extends BaseXDialog {
@@ -28,11 +28,10 @@ public final class DialogAbout extends BaseXDialog {
     super(main, ABOUT);
 
     BaseXBack p = new BaseXBack(new BorderLayout(12, 0));
-    p.setBackground(Color.white);
     p.setBorder(new CompoundBorder(new EtchedBorder(), new EmptyBorder(10, 10, 15, 22)));
 
     final BaseXLabel label = new BaseXLabel();
-    label.setIcon(BaseXLayout.icon("logo"));
+    label.setIcon(BaseXImages.icon("logo"));
     label.setVerticalAlignment(SwingConstants.TOP);
 
     p.add(label, BorderLayout.WEST);
@@ -61,8 +60,8 @@ public final class DialogAbout extends BaseXDialog {
     pp.add(new BaseXLabel(TEAM2));
     pp.add(new BaseXLabel(AND_OTHERS));
     pp.add(Box.createVerticalStrut(7));
-    final String lang = main.context.mprop.get(MainProp.LANG);
-    pp.add(new BaseXLabel(TRANSLATION + " (" + lang + "): " + DialogPrefs.creds(lang)));
+    final String lang = main.context.globalopts.get(GlobalOptions.LANG);
+    pp.add(new BaseXLabel(TRANSLATION + " (" + lang + "): " + DialogGeneralPrefs.creds(lang)));
     p.add(pp, BorderLayout.EAST);
     add(p, BorderLayout.NORTH);
 

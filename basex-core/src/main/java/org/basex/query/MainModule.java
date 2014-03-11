@@ -18,21 +18,23 @@ import org.basex.util.list.*;
 /**
  * An XQuery main module.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Leo Woerteler
  */
-public class MainModule extends StaticScope {
+public final class MainModule extends StaticScope {
   /** Declared type, {@code null} if not specified. */
-  public final SeqType declType;
+  private final SeqType declType;
 
   /**
    * Constructor.
    * @param rt root expression
    * @param scp variable scope
    * @param xqdoc documentation
+   * @param sctx static context
    */
-  public MainModule(final Expr rt, final VarScope scp, final String xqdoc) {
-    this(rt, scp, null, xqdoc, null);
+  public MainModule(final Expr rt, final VarScope scp, final String xqdoc,
+      final StaticContext sctx) {
+    this(rt, scp, null, xqdoc, sctx, null);
   }
 
   /**
@@ -41,12 +43,13 @@ public class MainModule extends StaticScope {
    * @param scp variable scope
    * @param xqdoc documentation
    * @param type optional type
+   * @param sctx static context
    * @param ii input info
    */
-  public MainModule(final Expr rt, final VarScope scp, final SeqType type,
-      final String xqdoc, final InputInfo ii) {
+  public MainModule(final Expr rt, final VarScope scp, final SeqType type, final String xqdoc,
+      final StaticContext sctx, final InputInfo ii) {
 
-    super(scp, xqdoc, ii);
+    super(scp, xqdoc, sctx, ii);
     expr = rt;
     declType = type;
   }
@@ -71,12 +74,12 @@ public class MainModule extends StaticScope {
    * @throws QueryException evaluation exception
    */
   public Value value(final QueryContext ctx) throws QueryException {
+    final int fp = scope.enter(ctx);
     try {
-      scope.enter(ctx);
       final Value v = ctx.value(expr);
       return declType != null ? declType.treat(v, info) : v;
     } finally {
-      scope.exit(ctx, 0);
+      scope.exit(ctx, fp);
     }
   }
 
@@ -89,13 +92,13 @@ public class MainModule extends StaticScope {
   public Iter iter(final QueryContext ctx) throws QueryException {
     if(declType != null) return value(ctx).iter();
 
-    scope.enter(ctx);
+    final int fp = scope.enter(ctx);
     final Iter iter = expr.iter(ctx);
     return new Iter() {
       @Override
       public Item next() throws QueryException {
         final Item it = iter.next();
-        if(it == null) scope.exit(ctx, 0);
+        if(it == null) scope.exit(ctx, fp);
         return it;
       }
 
@@ -148,8 +151,7 @@ public class MainModule extends StaticScope {
    */
   static class LockVisitor extends ASTVisitor {
     /** Already visited scopes. */
-    private final IdentityHashMap<Scope, Object> funcs =
-        new IdentityHashMap<Scope, Object>();
+    private final IdentityHashMap<Scope, Object> funcs = new IdentityHashMap<Scope, Object>();
     /** List of databases to be locked. */
     private final StringList sl;
     /** Focus level. */
@@ -190,7 +192,7 @@ public class MainModule extends StaticScope {
     }
 
     @Override
-    public boolean funcCall(final StaticFuncCall call) {
+    public boolean staticFuncCall(final StaticFuncCall call) {
       return func(call.func());
     }
 
@@ -220,6 +222,5 @@ public class MainModule extends StaticScope {
       exitFocus();
       return ac;
     }
-  };
-
+  }
 }

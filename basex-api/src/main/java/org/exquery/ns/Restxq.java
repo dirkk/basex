@@ -9,7 +9,7 @@ import org.basex.query.value.node.*;
 /**
  * This module contains standard RESTXQ functions.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class Restxq extends QueryModule {
@@ -47,7 +47,7 @@ public final class Restxq extends QueryModule {
    * @throws QueryException query exception
    */
   private HTTPContext http() throws QueryException {
-    if(context.http != null) return (HTTPContext) context.http;
+    if(queryContext.http != null) return (HTTPContext) queryContext.http;
     throw new QueryException("Servlet context required.");
   }
 }

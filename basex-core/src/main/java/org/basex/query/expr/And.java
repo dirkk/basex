@@ -3,17 +3,17 @@ package org.basex.query.expr;
 import static org.basex.query.QueryText.*;
 
 import org.basex.query.*;
+import org.basex.query.func.*;
 import org.basex.query.util.*;
 import org.basex.query.value.item.*;
 import org.basex.query.var.*;
 import org.basex.util.*;
-import org.basex.util.ft.*;
 import org.basex.util.hash.*;
 
 /**
  * And expression.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public final class And extends Logical {
@@ -22,7 +22,7 @@ public final class And extends Logical {
    * @param ii input info
    * @param e expression list
    */
-  public And(final InputInfo ii, final Expr[] e) {
+  public And(final InputInfo ii, final Expr... e) {
     super(ii, e);
   }
 
@@ -30,8 +30,11 @@ public final class And extends Logical {
   public Expr compile(final QueryContext ctx, final VarScope scp) throws QueryException {
     // remove atomic values
     final Expr c = super.compile(ctx, scp);
-    if(c != this) return c;
+    return c != this ? c : optimize(ctx, scp);
+  }
 
+  @Override
+  public Expr optimize(final QueryContext ctx, final VarScope scp) throws QueryException {
     // merge predicates if possible
     final int es = expr.length;
     final ExprList el = new ExprList(es);
@@ -57,29 +60,48 @@ public final class And extends Logical {
         else if(tmp != null) return tmp;
       }
       // no optimization found; add original expression
-      if(tmp == null) el.add(e);
+      if(tmp == null && e != Bln.TRUE) {
+        if(e == Bln.FALSE) return optPre(Bln.FALSE, ctx);
+        el.add(e);
+      }
     }
     if(ps != null) el.add(ps);
     if(cr != null) el.add(cr);
     if(cs != null) el.add(cs);
+
+    // all arguments were true()
+    if(el.size() == 0) return optPre(Bln.TRUE, ctx);
+
     if(es != el.size()) ctx.compInfo(OPTWRITE, this);
     expr = el.finish();
     compFlatten(ctx);
+
+    boolean not = true;
+    for(final Expr e : expr) {
+      if(!e.isFunction(Function.NOT)) {
+        not = false;
+        break;
+      }
+    }
+
+    if(not) {
+      ctx.compInfo(OPTWRITE, this);
+      final Expr[] inner = new Expr[expr.length];
+      for(int i = 0; i < inner.length; i++) inner[i] = ((Arr) expr[i]).expr[0];
+      final Expr or = new Or(info, inner).optimize(ctx, scp);
+      return Function.NOT.get(null, or).optimize(ctx, scp);
+    }
 
     // return single expression if it yields a boolean
     return expr.length == 1 ? compBln(expr[0], info) : this;
   }
 
   @Override
-  public Bln item(final QueryContext ctx, final InputInfo ii) throws QueryException {
-    double s = 0;
-    for(final Expr e : expr) {
-      final Item it = e.ebv(ctx, info);
-      if(!it.bool(info)) return Bln.FALSE;
-      s = Scoring.and(s, it.score());
-    }
-    // no scoring - return default boolean
-    return s == 0 ? Bln.TRUE : Bln.get(s);
+  public Item item(final QueryContext ctx, final InputInfo ii) throws QueryException {
+    for(int i = 0; i < expr.length - 1; i++)
+      if(!expr[i].ebv(ctx, info).bool(info)) return Bln.FALSE;
+    final Expr last = expr[expr.length - 1];
+    return tailCall ? last.item(ctx, ii) : last.ebv(ctx, ii).bool(ii) ? Bln.TRUE : Bln.FALSE;
   }
 
   @Override

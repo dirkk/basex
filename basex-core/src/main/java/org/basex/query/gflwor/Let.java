@@ -2,6 +2,8 @@ package org.basex.query.gflwor;
 
 import static org.basex.query.QueryText.*;
 
+import java.util.*;
+
 import org.basex.query.*;
 import org.basex.query.expr.*;
 import org.basex.query.func.*;
@@ -14,13 +16,12 @@ import org.basex.query.value.node.*;
 import org.basex.query.value.type.*;
 import org.basex.query.var.*;
 import org.basex.util.*;
-import org.basex.util.ft.*;
 import org.basex.util.hash.*;
 
 /**
  * FLWOR {@code let} clause, binding an expression to a variable.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Leo Woerteler
  */
 public final class Let extends GFLWOR.Clause {
@@ -29,7 +30,7 @@ public final class Let extends GFLWOR.Clause {
   /** Bound expression. */
   public Expr expr;
   /** Score flag. */
-  final boolean score;
+  private final boolean score;
 
   /**
    * Constructor.
@@ -67,15 +68,11 @@ public final class Let extends GFLWOR.Clause {
   }
 
   @Override
-  Eval eval(final Eval sub) {
-    return new Eval() {
-      @Override
-      public boolean next(final QueryContext ctx) throws QueryException {
-        if(!sub.next(ctx)) return false;
-        ctx.set(var, score ? score(expr.iter(ctx)) : ctx.value(expr), info);
-        return true;
-      }
-    };
+  LetEval eval(final Eval sub) {
+    if(!(sub instanceof LetEval)) return new LetEval(this, sub);
+    final LetEval eval = (LetEval) sub;
+    eval.lets.add(this);
+    return eval;
   }
 
   /**
@@ -84,11 +81,11 @@ public final class Let extends GFLWOR.Clause {
    * @return score
    * @throws QueryException evaluation exception
    */
-  static Dbl score(final Iter iter) throws QueryException {
+  private static Dbl score(final Iter iter) throws QueryException {
     double sum = 0;
     int sz = 0;
     for(Item it; (it = iter.next()) != null; sum += it.score(), sz++);
-    return Dbl.get(Scoring.let(sum, sz));
+    return Dbl.get(sum / sz);
   }
 
   @Override
@@ -112,6 +109,7 @@ public final class Let extends GFLWOR.Clause {
 
   @Override
   public Let compile(final QueryContext ctx, final VarScope scp) throws QueryException {
+    var.refineType(score ? SeqType.DBL : expr.type(), ctx, info);
     expr = expr.compile(ctx, scp);
     return optimize(ctx, scp);
   }
@@ -121,7 +119,7 @@ public final class Let extends GFLWOR.Clause {
     if(!score && expr instanceof TypeCheck) {
       final TypeCheck tc = (TypeCheck) expr;
       if(tc.isRedundant(var) || var.adoptCheck(tc.type, tc.promote)) {
-        ctx.compInfo(QueryText.OPTCAST, tc.type);
+        ctx.compInfo(OPTCAST, tc.type);
         expr = tc.expr;
       }
     }
@@ -129,7 +127,7 @@ public final class Let extends GFLWOR.Clause {
     type = score ? SeqType.DBL : expr.type();
     var.refineType(type, ctx, info);
     if(var.checksType() && expr.isValue()) {
-      expr = var.checkType((Value) expr, ctx, info);
+      expr = var.checkType((Value) expr, ctx, info, true);
       var.refineType(expr.type(), ctx, info);
     }
     size = score ? 1 : expr.size();
@@ -143,7 +141,7 @@ public final class Let extends GFLWOR.Clause {
    */
   void bindConst(final QueryContext ctx) throws QueryException {
     if(expr.isValue()) {
-      ctx.compInfo(QueryText.OPTBIND, var);
+      ctx.compInfo(OPTBIND, var);
       ctx.set(var, score ? score(expr.iter(ctx)) : (Value) expr, info);
     }
   }
@@ -196,14 +194,40 @@ public final class Let extends GFLWOR.Clause {
    * @return inlineable expression
    * @throws QueryException query exception
    */
-  public Expr inlineExpr(final QueryContext ctx, final VarScope scp)
-      throws QueryException {
-    return score ? Function._FT_SCORE.get(expr).optimize(ctx, scp)
+  public Expr inlineExpr(final QueryContext ctx, final VarScope scp) throws QueryException {
+    return score ? Function._FT_SCORE.get(null, expr).optimize(ctx, scp)
                  : var.checked(expr, ctx, scp, info);
   }
 
   @Override
   public int exprSize() {
     return expr.exprSize();
+  }
+
+  /** Evaluator for a block of {@code let} expressions. */
+  private static class LetEval implements Eval {
+    /** Let expressions of the current block, in declaration order. */
+    private final ArrayList<Let> lets;
+    /** Sub-evaluator. */
+    private final Eval sub;
+
+    /**
+     * Constructor for the first let binding in the block.
+     * @param let first let binding
+     * @param subEval sub-evaluator
+     */
+    LetEval(final Let let, final Eval subEval) {
+      lets = new ArrayList<Let>();
+      lets.add(let);
+      sub = subEval;
+    }
+
+    @Override
+    public boolean next(final QueryContext ctx) throws QueryException {
+      if(!sub.next(ctx)) return false;
+      for(final Let let : lets)
+        ctx.set(let.var, let.score ? score(let.expr.iter(ctx)) : ctx.value(let.expr), let.info);
+      return true;
+    }
   }
 }

@@ -1,25 +1,34 @@
 package org.basex.query.up.expr;
 
-import static org.basex.query.QueryText.*;
-import static org.basex.query.util.Err.*;
+import org.basex.query.QueryContext;
+import org.basex.query.QueryException;
+import org.basex.query.expr.Arr;
+import org.basex.query.expr.Expr;
+import org.basex.query.gflwor.Let;
+import org.basex.query.iter.Iter;
+import org.basex.query.iter.ValueIter;
+import org.basex.query.up.ContextModifier;
+import org.basex.query.up.TransformModifier;
+import org.basex.query.up.Updates;
+import org.basex.query.util.ASTVisitor;
+import org.basex.query.value.Value;
+import org.basex.query.value.item.Item;
+import org.basex.query.value.node.ANode;
+import org.basex.query.value.node.FElem;
+import org.basex.query.var.Var;
+import org.basex.query.var.VarScope;
+import org.basex.query.var.VarUsage;
+import org.basex.util.InputInfo;
+import org.basex.util.hash.IntObjMap;
 
-import org.basex.query.*;
-import org.basex.query.expr.*;
-import org.basex.query.gflwor.*;
-import org.basex.query.iter.*;
-import org.basex.query.up.*;
-import org.basex.query.util.*;
-import org.basex.query.value.*;
-import org.basex.query.value.item.*;
-import org.basex.query.value.node.*;
-import org.basex.query.var.*;
-import org.basex.util.*;
-import org.basex.util.hash.*;
+import static org.basex.query.QueryText.*;
+import static org.basex.query.util.Err.UPCOPYMULT;
+import static org.basex.query.util.Err.UPMODIFY;
 
 /**
  * Transform expression.
  *
- * @author BaseX Team 2005-12, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Lukas Kircher
  */
 public final class Transform extends Arr {
@@ -28,14 +37,14 @@ public final class Transform extends Arr {
 
   /**
    * Constructor.
-   * @param ii input info
-   * @param c copy expressions
-   * @param m modify expression
-   * @param r return expression
+   * @param info input info
+   * @param copies copy expressions
+   * @param mod modify expression
+   * @param ret return expression
    */
-  public Transform(final InputInfo ii, final Let[] c, final Expr m, final Expr r) {
-    super(ii, m, r);
-    copies = c;
+  public Transform(final InputInfo info, final Let[] copies, final Expr mod, final Expr ret) {
+    super(info, mod, ret);
+    this.copies = copies;
   }
 
   @Override
@@ -43,7 +52,7 @@ public final class Transform extends Arr {
     for(final Let c : copies) c.checkUp();
     final Expr m = expr[0];
     m.checkUp();
-    if(!m.isVacuous() && !m.has(Flag.UPD)) UPMODIFY.thrw(info);
+    if(!m.isVacuous() && !m.has(Flag.UPD)) throw UPMODIFY.get(info);
     checkNoUp(expr[1]);
   }
 
@@ -71,16 +80,16 @@ public final class Transform extends Arr {
       for(final Let fo : copies) {
         final Iter ir = ctx.iter(fo.expr);
         Item i = ir.next();
-        if(!(i instanceof ANode) || ir.next() != null) UPCOPYMULT.thrw(info);
+        if(!(i instanceof ANode) || ir.next() != null) throw UPCOPYMULT.get(fo.info, fo.var.name);
 
         // copy node to main memory data instance
-        i = ((ANode) i).dbCopy(ctx.context.prop);
+        i = ((ANode) i).dbCopy(ctx.context.options);
         // add resulting node to variable
         ctx.set(fo.var, i, info);
         pu.addData(i.data());
       }
       ctx.value(expr[0]);
-      ctx.updates.apply();
+      ctx.updates.apply(ctx.context.triggers);
       return ctx.value(expr[1]);
     } finally {
       ctx.output.size(o);
@@ -125,7 +134,8 @@ public final class Transform extends Arr {
   @Override
   public String toString() {
     final StringBuilder sb = new StringBuilder(COPY + ' ');
-    for(final Let t : copies) sb.append(t.var + " " + ASSIGN + ' ' + t.expr + ' ');
+    for(final Let t : copies)
+      sb.append(t.var).append(' ').append(ASSIGN).append(' ').append(t.expr).append(' ');
     return sb.append(MODIFY + ' ' + expr[0] + ' ' + RETURN + ' ' + expr[1]).toString();
   }
 

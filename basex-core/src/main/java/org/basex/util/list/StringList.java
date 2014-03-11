@@ -7,7 +7,7 @@ import org.basex.util.*;
 /**
  * This is a simple container for strings.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Christian Gruen
  */
 public class StringList extends ElementList implements Iterable<String> {
@@ -110,7 +110,7 @@ public class StringList extends ElementList implements Iterable<String> {
     int i = 0;
     for(final String e : elements) {
       int result;
-      while(0 != (result = list[i].compareTo(e))) {
+      while((result = list[i].compareTo(e)) != 0) {
         if(++i >= size() || result > 0) return false;
       }
     }
@@ -118,11 +118,26 @@ public class StringList extends ElementList implements Iterable<String> {
   }
 
   /**
-   * Deletes the specified element.
-   * @param index index of element to be deleted
+   * Deletes the element at the specified position.
+   * @param index index of the element to delete
+   * @return deleted element
    */
-  public final void deleteAt(final int index) {
+  public final String deleteAt(final int index) {
+    final String l = list[index];
     Array.move(list, index + 1, -1, --size - index);
+    return l;
+  }
+
+  /**
+   * Removes all occurrences of the specified element from the list.
+   * @param element element to be removed
+   */
+  public final void delete(final String element) {
+    int s = 0;
+    for(int i = 0; i < size; ++i) {
+      if(!list[i].equals(element)) list[s++] = list[i];
+    }
+    size = s;
   }
 
   /**
@@ -179,30 +194,6 @@ public class StringList extends ElementList implements Iterable<String> {
       size = s + 1;
     }
     return this;
-  }
-
-  /**
-   * Returns the uppermost element from the stack.
-   * @return the uppermost element
-   */
-  public final String peek() {
-    return list[size - 1];
-  }
-
-  /**
-   * Pops the uppermost element from the stack.
-   * @return the popped element
-   */
-  public final String pop() {
-    return list[--size];
-  }
-
-  /**
-   * Pushes an element onto the stack.
-   * @param element element
-   */
-  public final void push(final String element) {
-    add(element);
   }
 
   @Override

@@ -5,16 +5,16 @@ import java.util.*;
 
 import com.bradmcevoy.http.*;
 import com.bradmcevoy.http.Request.Method;
-import org.basex.core.Prop;
+import org.basex.util.*;
 
 /**
  * Dummy resource to be returned when no authorization is provided.
  *
- * @author BaseX Team 2005-13, BSD License
+ * @author BaseX Team 2005-14, BSD License
  * @author Rositsa Shadura
  * @author Dimitar Popov
  */
-public final class BXNotAuthorizedResource implements FolderResource {
+final class BXNotAuthorizedResource implements FolderResource {
   /** The only instance of this class. */
   public static final Resource NOAUTH = new BXNotAuthorizedResource();
 
