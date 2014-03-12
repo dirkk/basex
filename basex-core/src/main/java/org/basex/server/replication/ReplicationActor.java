@@ -8,11 +8,11 @@ import akka.cluster.ClusterEvent.CurrentClusterState;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Procedure;
+import akka.routing.FromConfig;
 import akka.util.Timeout;
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
 import org.basex.core.Replication;
-import org.basex.core.cmd.*;
 import org.basex.server.election.ElectionActor;
 import org.basex.server.election.ElectionMember;
 import org.basex.server.election.ProcessNumber;
@@ -22,12 +22,9 @@ import org.basex.server.replication.InternalMessages.RequestStatus;
 import org.basex.server.replication.InternalMessages.StartSet;
 import org.basex.server.replication.InternalMessages.StatusMessage;
 import org.basex.util.Prop;
-import org.basex.util.Token;
 import scala.concurrent.duration.Duration;
 
 import java.util.*;
-import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
@@ -63,6 +60,8 @@ public class ReplicationActor extends UntypedActor {
   private String id;
   /** Cluster. */
   private Cluster cluster = Cluster.get(getContext().system());
+  /** Router for database operations, just relevant for a Secondary. */
+  private ActorRef dbRouter;
   /** Timeout. */
   private final Timeout timeout = new Timeout(Duration.create(5, "seconds"));
   /** Logging. */
@@ -110,14 +109,6 @@ public class ReplicationActor extends UntypedActor {
    */
   private List<Member> getSecondaries() {
     return new LinkedList<Member>(secondaries.values());
-  }
-
-  /**
-   * The actor was asked to send the status, so respond with the status to the
-   * sender.
-   */
-  private void handleStatusRequest() {
-    getSender().tell(toString(), getSelf());
   }
 
   private Set<ElectionMember> getVotingMembers() {
@@ -192,7 +183,6 @@ public class ReplicationActor extends UntypedActor {
         log.info("Got datamessage, {} secondaries", secondaries.values().size());
         // publish to all secondaries
         for (Member m : secondaries.values()) {
-          log.info("SEC Send to {}", m.getActor());
           m.getActor().tell(msg, getSelf());
         }
       } else {
@@ -208,54 +198,10 @@ public class ReplicationActor extends UntypedActor {
   private Procedure<Object> secondaryProcedure = new Procedure<Object>() {
     @Override
     public void apply(Object msg) throws Exception {
-      if (msg instanceof RequestStatus) {
-        handleStatusRequest();
-      } else if (msg instanceof DataMessage) {
-        // got an update from the primary
-        DataMessage dm = (DataMessage) msg;
-
-        if (dm instanceof DataMessages.AddMessage) {
-          log.info("AddMessage received");
-          DataMessages.AddMessage am = (DataMessages.AddMessage) dm;
-
-          String content = Token.string(am.getContent());
-          log.info("Database: {}, Path: {}, Content: {}", am.getDatabaseName(), am.getPath(), content);
-
-          new Open(am.getDatabaseName()).execute(dbCtx);
-          new Add(am.getPath(), content).execute(dbCtx);
-        } else if (dm instanceof DataMessages.UpdateMessage) {
-          log.info("UpdateMessage received");
-          DataMessages.UpdateMessage um = (DataMessages.UpdateMessage) dm;
-
-          String content = Token.string(um.getContent());
-          log.info("Database: {}, Path: {}, Content: {}", um.getDatabaseName(), um.getPath(), content);
-
-          new Open(um.getDatabaseName()).execute(dbCtx);
-          new Replace(um.getPath(), content).execute(dbCtx);
-        } else if (dm instanceof DataMessages.RenameMessage) {
-          log.info("RenameMessage received");
-          DataMessages.RenameMessage rm = (DataMessages.RenameMessage) dm;
-          new Rename(rm.getSource(), rm.getTarget()).execute(dbCtx);
-        } else if (dm instanceof DataMessages.DeleteMessage) {
-          log.info("DeleteMessage received");
-          new Delete(((DataMessages.DeleteMessage) dm).getTarget()).execute(dbCtx);
-        } else if (dm instanceof DataMessages.CreateDbMessage) {
-          log.info("CreateDbMessage received");
-          new CreateDB(((DataMessages.CreateDbMessage) dm).getName()).execute(dbCtx);
-        } else if (dm instanceof DataMessages.AlterMessage) {
-          log.info("AlterMessage received");
-          DataMessages.AlterMessage am = (DataMessages.AlterMessage) dm;
-          new AlterDB(am.getSource(), am.getTarget()).execute(dbCtx);
-        } else if (dm instanceof DataMessages.DropMessage) {
-          log.info("DropMessage received");
-          new DropDB(((DataMessages.DropMessage) dm).getName()).execute(dbCtx);
-        } else if (dm instanceof DataMessages.CopyMessage) {
-          log.info("CopyMessage received");
-          DataMessages.CopyMessage cm = (DataMessages.CopyMessage) dm;
-          new Copy(cm.getSource(), cm.getTarget()).execute(dbCtx);
-        }
+      if (msg instanceof DataMessage) {
+        dbRouter.forward(msg, getContext());
       } else {
-        unhandled(msg);
+        handleAll(msg);
       }
     }
   };
@@ -307,7 +253,7 @@ public class ReplicationActor extends UntypedActor {
     } else if (msg instanceof SyncFinished) {
       setState(State.SECONDARY);
     } else {
-      unhandled(msg);
+      handleAll(msg);
     }
   }
 
@@ -317,7 +263,7 @@ public class ReplicationActor extends UntypedActor {
    */
   private void handleAll(Object msg) {
     if (msg instanceof RequestStatus) {
-      handleStatusRequest();
+      getSender().tell(toString(), getSelf());
     } else {
       unhandled(msg);
     }
@@ -360,6 +306,8 @@ public class ReplicationActor extends UntypedActor {
           }
           break;
         case SECONDARY:
+          dbRouter = getContext().actorOf(DataExecutionActor.mkProps(dbCtx).withRouter(
+            new FromConfig()), "dbrouter");
           getContext().become(secondaryProcedure);
           break;
       }

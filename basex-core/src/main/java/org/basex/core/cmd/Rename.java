@@ -64,7 +64,7 @@ public final class Rename extends ACreate {
       c++;
     }
 
-    if (ok) context.triggers.afterRename(src, trg);
+    if (ok) context.triggers.afterRename(src, trg, context.data().meta.name);
 
     // finish update
     data.finishUpdate();

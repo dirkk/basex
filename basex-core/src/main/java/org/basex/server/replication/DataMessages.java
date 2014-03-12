@@ -7,12 +7,20 @@ import java.io.Serializable;
  * @author Dirk Kirsten
  */
 public interface DataMessages {
+  /**
+   * Generic interface for all messages which aim to replicate an updating
+   * operation from a Primary to a Secondary.
+   */
   public interface DataMessage {
-
   }
 
+  /**
+   * Add a document to a database.
+   */
   public class AddMessage implements Serializable, DataMessage {
+    /** Document path. */
     private final String path;
+    /** Serialized document content. */
     private final byte[] content;
 
     public AddMessage(final String path, final byte[] content) {
@@ -24,7 +32,7 @@ public interface DataMessages {
       return path;
     }
 
-    public String getDatabaseName() {
+    public String getDatabase() {
       return getPath().substring(0, getPath().indexOf("/"));
     }
 
@@ -33,8 +41,15 @@ public interface DataMessages {
     }
   }
 
+  /**
+   * An existing document was updated using XQuery Update. The whole
+   * document is serialiuzed and replicated to all Secondaries within
+   * the replica set.
+   */
   public class UpdateMessage implements Serializable, DataMessage {
+    /** Document path. */
     private final String path;
+    /** Serialized document content. */
     private final byte[] content;
 
     public UpdateMessage(final String path, final byte[] content) {
@@ -55,13 +70,21 @@ public interface DataMessages {
     }
   }
 
+  /**
+   * A document was renamed.
+   */
   public class RenameMessage implements Serializable, DataMessage {
+    /** Old document path. */
     private final String source;
+    /** New document path. */
     private final String target;
+    /** Database name. */
+    private final String database;
 
-    public RenameMessage(String source, String target) {
+    public RenameMessage(String source, String target, String database) {
       this.source = source;
       this.target = target;
+      this.database = database;
     }
 
     public String getSource() {
@@ -71,22 +94,40 @@ public interface DataMessages {
     public String getTarget() {
       return target;
     }
+
+    public String getDatabase() {
+      return database;
+    }
   }
 
-
+  /**
+   * A document was removed.
+   */
   public class DeleteMessage implements Serializable, DataMessage {
+    /** Document path to be removed. */
     private final String target;
+    /** Database name. */
+    private final String database;
 
-    public DeleteMessage(final String target) {
+    public DeleteMessage(final String target, String database) {
       this.target = target;
+      this.database = database;
     }
 
     public String getTarget() {
       return target;
     }
+
+    public String getDatabase() {
+      return database;
+    }
   }
 
+  /**
+   * A new database is being created.
+   */
   public class CreateDbMessage implements Serializable, DataMessage {
+    /** Name of the database. */
     private final String name;
 
     public CreateDbMessage(String name) {
@@ -98,8 +139,13 @@ public interface DataMessages {
     }
   }
 
+  /**
+   * A database is being renamed.
+   */
   public class AlterMessage implements Serializable, DataMessage {
+    /** Old database name. */
     private final String source;
+    /** New database name. */
     private final String target;
 
     public AlterMessage(String source, String target) {
@@ -116,8 +162,11 @@ public interface DataMessages {
     }
   }
 
-
+  /**
+   * A database is being deleted.
+   */
   public class DropMessage implements Serializable, DataMessage {
+    /** Database to deleted. */
     private final String name;
 
     public DropMessage(String name) {
@@ -129,9 +178,13 @@ public interface DataMessages {
     }
   }
 
-
+  /**
+   * A database is being copied.
+   */
   public class CopyMessage implements Serializable, DataMessage {
+    /** Name of the database to copy from. */
     private final String source;
+    /** New database name of the database to be copied into. */
     private final String target;
 
     public CopyMessage(String source, String target) {

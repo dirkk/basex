@@ -180,16 +180,16 @@ public class TriggerManager implements DocumentTrigger, DatabaseTrigger{
   }
 
   @Override
-  public void afterDelete(final String path) {
+  public void afterDelete(final String path, final String database) {
     for(DocumentTrigger t : getDocumentTriggers("*")) {
-      t.afterDelete(path);
+      t.afterDelete(path, database);
     }
   }
 
   @Override
-  public void afterRename(final String oldPath, final String newPath) {
+  public void afterRename(final String oldPath, final String newPath, final String database) {
     for(DocumentTrigger t : getDocumentTriggers("*")) {
-      t.afterRename(oldPath, newPath);
+      t.afterRename(oldPath, newPath, database);
     }
   }
 

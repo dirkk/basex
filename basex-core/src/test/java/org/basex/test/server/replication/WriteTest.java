@@ -30,6 +30,7 @@ public class WriteTest {
   private Context ctx1;
   private Context ctx2;
   private List<Replication> repls;
+  private static int sandboxCounter = 0;
 
   @BeforeClass
   public static void setup() {
@@ -37,8 +38,8 @@ public class WriteTest {
 
   @Before
   public void startup() throws Exception, ReplicationAlreadyRunningException {
-    ctx1 = createSandbox(1);
-    ctx2 = createSandbox(2);
+    ctx1 = createSandbox();
+    ctx2 = createSandbox();
 
     repls = new LinkedList<Replication>();
     repls.add(Replication.getInstance(ctx1));
@@ -58,8 +59,8 @@ public class WriteTest {
     Thread.sleep(1000);
   }
 
-  private Context createSandbox(final int number) {
-    final IOFile sb =  new IOFile(Prop.TMP, Util.className(WriteTest.class) + number);
+  private Context createSandbox() {
+    final IOFile sb =  new IOFile(Prop.TMP, Util.className(WriteTest.class) + sandboxCounter++);
     sb.delete();
     assertTrue("Sandbox could not be created.", sb.md());
     Context ctx = new Context();
@@ -270,11 +271,11 @@ public class WriteTest {
 
   @Test
   public void performanceTest() throws Exception, ReplicationAlreadyRunningException {
-    final int TRIES = 1000;
+    final int TRIES = 10;
 
-    for (int j = 0; j < 20; ++j) {
+    for (int j = 0; j < 2; ++j) {
       // normal version
-      final Context ctx3 = createSandbox(3);
+      final Context ctx3 = createSandbox();
       for (int i = 0; i < TRIES; ++i) {
         new CreateDB("test").execute(ctx3);
         new Add("test.xml", "<A />").execute(ctx3);
@@ -298,7 +299,7 @@ public class WriteTest {
 
     }
 
-    Performance.sleep(10000);
+    Performance.sleep(500);
   }
 
 }

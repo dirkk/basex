@@ -54,18 +54,18 @@ public class ReplicationTrigger implements DocumentTrigger, DatabaseTrigger {
   }
 
   @Override
-  public void afterUpdate(DBNode node) {
+  public void afterUpdate(final DBNode node) {
     repl.publish(new UpdateMessage(getPath(node), getData(node)));
   }
 
   @Override
-  public void afterDelete(String path) {
-    repl.publish(new DeleteMessage(path));
+  public void afterDelete(final String path, final String database) {
+    repl.publish(new DeleteMessage(path, database));
   }
 
   @Override
-  public void afterRename(final String source, final String target) {
-    repl.publish(new RenameMessage(source, target));
+  public void afterRename(final String source, final String target, final String database) {
+    repl.publish(new RenameMessage(source, target, database));
   }
 
   @Override
