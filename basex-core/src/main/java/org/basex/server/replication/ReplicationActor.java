@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
 import static org.basex.server.replication.DataMessages.DataMessage;
 import static org.basex.server.replication.InternalMessages.Start;
+import static org.basex.server.replication.Settings.SettingsProvider;
 
 /**
  * Replication actor. Root actor for BaseX replication system.
@@ -62,6 +63,8 @@ public class ReplicationActor extends UntypedActor {
   private Cluster cluster = Cluster.get(getContext().system());
   /** Router for database operations, just relevant for a Secondary. */
   private ActorRef dbRouter;
+  /** Settings from the application.conf. */
+  private final SettingsImpl settings = SettingsProvider.get(getContext().system());
   /** Timeout. */
   private final Timeout timeout = new Timeout(Duration.create(5, "seconds"));
   /** Logging. */
@@ -88,7 +91,7 @@ public class ReplicationActor extends UntypedActor {
     getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), timeout), "election");
 
     // TODO get voting value
-    self = new Member(getSelf(), id, true);
+    self = new Member(getSelf(), id, settings.VOTING);
   }
 
   @Override
