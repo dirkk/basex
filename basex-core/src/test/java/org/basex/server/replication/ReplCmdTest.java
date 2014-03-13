@@ -45,10 +45,10 @@ public class ReplCmdTest extends SimpleSandboxTest {
     final Context ctx1 = createSandbox();
     final Context ctx2 = createSandbox();
     new ReplicationStart("127.0.0.1", 8765).execute(ctx1);
-    Performance.sleep(2000);
+    Performance.sleep(1000);
 
     new ReplicationConnect("127.0.0.1", 8800, "127.0.0.1", 8765).execute(ctx2);
-    Performance.sleep(2000);
+    Performance.sleep(1000);
 
     new CreateDB("test").execute(ctx1);
     for (int i = 0; i < TRIES; ++i) {
@@ -90,7 +90,7 @@ public class ReplCmdTest extends SimpleSandboxTest {
       router.tell(new DataMessages.AddMessage("test/test.xml", new byte[]{60, 65, 47, 62}), ActorRef.noSender());
     }
 
-    Performance.sleep(5000);
+    Performance.sleep(1000);
   }
 
 
