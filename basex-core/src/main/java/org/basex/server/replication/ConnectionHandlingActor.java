@@ -2,14 +2,15 @@ package org.basex.server.replication;
 
 import akka.actor.Props;
 import akka.actor.UntypedActor;
-import akka.cluster.Member;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
-import akka.japi.Procedure;
 import akka.util.Timeout;
 import org.basex.core.Context;
 
 import java.util.Iterator;
+
+import static org.basex.server.replication.ConnectionMessages.ConnectionStart;
+import static org.basex.server.replication.ConnectionMessages.SyncFinished;
 
 /**
  * This actor handles a new incoming member on a primary within a replica set. It must
@@ -19,6 +20,8 @@ import java.util.Iterator;
  * @author Dirk Kirsten
  */
 public class ConnectionHandlingActor extends UntypedActor {
+  /** Replica set. */
+  private final ReplicaSet set;
   /** Database context. */
   private final Context dbContext;
   /** Timeout. */
@@ -32,8 +35,8 @@ public class ConnectionHandlingActor extends UntypedActor {
    *
    * @return Props, can be further configured
    */
-  public static Props mkProps(final Context dbContext, final Timeout timeout) {
-    return Props.create(ConnectionHandlingActor.class, dbContext, timeout);
+  public static Props mkProps(final ReplicaSet set, final Context dbContext, final Timeout timeout) {
+    return Props.create(ConnectionHandlingActor.class, set, dbContext, timeout);
   }
 
   /**
@@ -42,50 +45,41 @@ public class ConnectionHandlingActor extends UntypedActor {
    * @param dbContext database context
    * @param timeout standard timeout
    */
-  public ConnectionHandlingActor(final Context dbContext, final Timeout timeout) {
+  public ConnectionHandlingActor(final ReplicaSet set, final Context dbContext, final Timeout timeout) {
+    this.set = set;
     this.dbContext = dbContext;
     this.timeout = timeout;
   }
 
   @Override
   public void onReceive(Object msg) throws Exception {
-    if (msg instanceof akka.cluster.Member) {
-      Member member = (Member) msg;
-      log.info("Trying to let member {} join the replica set", member.address());
+    if (msg instanceof ConnectionStart) {
+      log.info("Got a connection start from {}", getSender().path());
+      ConnectionStart resp = (ConnectionStart) msg;
+      org.basex.server.replication.Member m = new org.basex.server.replication.Member(getSender(), resp.getId(), resp.isVoting());
 
-      getContext().actorSelection(member.address().toString() + "/user/replication").tell(new ConnectionMessages.ConnectionStart(), getSelf());
-      getContext().become(new Procedure<Object>() {
-        @Override
-        public void apply(Object msg) throws Exception {
-          if (msg instanceof ConnectionMessages.ConnectionResponse) {
-            log.info("Got a connection response from {}", getSender().path());
-            ConnectionMessages.ConnectionResponse resp = (ConnectionMessages.ConnectionResponse) msg;
-            org.basex.server.replication.Member m = new org.basex.server.replication.Member(getSender(), resp.getId(), resp.isVoting());
+      for (Iterator<String> it = dbContext.databases.listDBs().iterator(); it.hasNext();) {
+        String db = it.next();
 
-            for (Iterator<String> it = dbContext.databases.listDBs().iterator(); it.hasNext();) {
-              String db = it.next();
-
-              // TODO respect timestamps
-              if (!resp.getDatabases().containsKey(db)) {
-                // todo send actual database content
-                byte [] d = {0x00};
-                log.info("Sync database {} to {}", db, getSender().path());
-                getSender().tell(new ConnectionMessages.SyncDatabase(db, d), getSelf());
-              }
-            }
-
-            log.info("Connection to member {} established, ID: {}", getSender().path(), resp.getId());
-            // send connection finished message
-            getContext().system().actorSelection(resp.getId() + "/user/replication").tell(new ConnectionMessages.SyncFinished(m.getState()), getSelf());
-            getContext().parent().tell(m, getSelf());
-
-            // terminate yourself
-            getContext().stop(getSelf());
-          } else {
-            unhandled(msg);
-          }
+        // TODO respect timestamps
+        if (!resp.getDatabases().containsKey(db)) {
+          // todo send actual database content
+          byte [] d = {0x00};
+          log.info("Sync database {} to {}", db, getSender().path());
+          getSender().tell(new ConnectionMessages.SyncDatabase(db, d), getSelf());
         }
-      });
+      }
+
+      log.info("Connection to member {} established, ID: {}", getSender().path(), resp.getId());
+      // send connection finished message
+      getContext().system().actorSelection(resp.getId() + "/user/replication").tell(
+        new SyncFinished(set.getState(), set.getPrimary(), set.getSecondaries()),
+        getSelf()
+      );
+      getContext().parent().tell(m, getSelf());
+
+      // terminate yourself
+      getContext().stop(getSelf());
     } else {
       unhandled(msg);
     }

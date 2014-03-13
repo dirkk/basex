@@ -1,5 +1,8 @@
 package org.basex.server.replication;
 
+import akka.actor.ActorPath;
+import akka.actor.Address;
+import akka.actor.RootActorPath;
 import org.basex.util.Prop;
 
 import java.io.Serializable;
@@ -63,6 +66,21 @@ public interface InternalMessages {
   }
 
   public class Start implements Serializable {}
-  public class StartSet implements Serializable {}
+  public class Connect implements Serializable {
+    /** Cluster address to connect to. */
+    private final Address addr;
+
+    public Connect(Address addr) {
+      this.addr = addr;
+    }
+
+    public Address getAddr() {
+      return addr;
+    }
+
+    public ActorPath getPath() {
+      return new RootActorPath(getAddr(), "/user/replication");
+    }
+  }
   public class RequestStatus implements Serializable {}
 }

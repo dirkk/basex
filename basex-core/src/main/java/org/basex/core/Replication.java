@@ -3,7 +3,6 @@ package org.basex.core;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Address;
-import akka.cluster.Cluster;
 import akka.util.Timeout;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -13,8 +12,7 @@ import scala.concurrent.Await;
 import scala.concurrent.duration.Duration;
 
 import static akka.pattern.Patterns.ask;
-import static org.basex.server.replication.InternalMessages.RequestStatus;
-import static org.basex.server.replication.InternalMessages.Start;
+import static org.basex.server.replication.InternalMessages.*;
 import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
 
 /**
@@ -57,15 +55,9 @@ public class Replication {
    */
   public boolean start(final Context context, final String host, final int port) throws ReplicationAlreadyRunningException {
     systemStart(host, port);
-    Cluster.get(system).join(Cluster.get(system).selfAddress());
 
-    Cluster.get(system).registerOnMemberUp(new Runnable() {
-      @Override
-      public void run() {
-        repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
-        repl.tell(new Start(), ActorRef.noSender());
-      }
-    });
+    repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
+    repl.tell(new Start(), ActorRef.noSender());
 
     return true;
   }
@@ -92,14 +84,8 @@ public class Replication {
     systemStart(localHost, localPort);
 
     Address addr = new Address("akka.tcp", "replBaseX", remoteHost, remotePort);
-    Cluster.get(system).join(addr);
-
-    Cluster.get(system).registerOnMemberUp(new Runnable() {
-      @Override
-      public void run() {
-        repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
-      }
-    });
+    repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
+    repl.tell(new Connect(addr), ActorRef.noSender());
   }
 
   /**

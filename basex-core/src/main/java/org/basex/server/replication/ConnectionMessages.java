@@ -1,7 +1,10 @@
 package org.basex.server.replication;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
+
+import static org.basex.server.replication.ReplicaSet.ReplicaSetState;
 
 /**
  * All messages related to the initial connection of a new member in a replica set.
@@ -11,16 +14,11 @@ import java.util.Map;
  */
 public interface ConnectionMessages {
   /**
-   * Send from primary to newly connected cluster member.
-   */
-  public class ConnectionStart implements Serializable {  }
-
-  /**
    * Send from a newly connected cluster member to the primary.
    * Gives information about the member itself (id, weight, voting
    * or non-voting member) and about all databases and their latest timestamp.
    */
-  public class ConnectionResponse implements Serializable {
+  public class ConnectionStart implements Serializable {
     /** ID. */
     private final String id;
     /** Voting or non-voting member in a primary election. */
@@ -30,8 +28,8 @@ public interface ConnectionMessages {
     /** Latest write timestamp for each database. */
     private final Map<String, Integer> databases;
 
-    public ConnectionResponse(final String id, final boolean isVoting, final int weight,
-                              final Map<String, Integer> databases) {
+    public ConnectionStart(final String id, final boolean isVoting, final int weight,
+                           final Map<String, Integer> databases) {
       this.id = id;
       this.isVoting = isVoting;
       this.weight = weight;
@@ -74,18 +72,32 @@ public interface ConnectionMessages {
 
   /**
    * The synchronization of all databases is finished and the new member
-   * is now connected and will get all updates form now on.
+   * is now connected and will get all updates from now on.
    */
   public class SyncFinished implements Serializable {
     /** New member status. */
-    private final ReplicationActor.State state;
+    private final ReplicaSetState state;
+    /** Primary of the replica set. */
+    private final Member primary;
+    /** List of secondaries. */
+    private final List<Member> secondaries;
 
-    public SyncFinished(ReplicationActor.State state) {
+    public SyncFinished(ReplicaSetState state, Member primary, List<Member> secondaries) {
       this.state = state;
+      this.primary = primary;
+      this.secondaries = secondaries;
     }
 
-    public ReplicationActor.State getState() {
+    public ReplicaSetState getState() {
       return state;
+    }
+
+    public Member getPrimary() {
+      return primary;
+    }
+
+    public List<Member> getSecondaries() {
+      return secondaries;
     }
   }
 }

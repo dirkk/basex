@@ -4,7 +4,6 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.cluster.Cluster;
-import akka.cluster.ClusterEvent.CurrentClusterState;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Procedure;
@@ -14,22 +13,19 @@ import org.basex.core.BaseXException;
 import org.basex.core.Context;
 import org.basex.server.election.ElectionActor;
 import org.basex.server.election.ProcessNumber;
-import org.basex.server.replication.ConnectionMessages.ConnectionResponse;
-import org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import org.basex.server.replication.InternalMessages.RequestStatus;
-import org.basex.server.replication.InternalMessages.StartSet;
 import org.basex.server.replication.InternalMessages.StatusMessage;
 import scala.concurrent.duration.Duration;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
+import static org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
 import static org.basex.server.replication.DataMessages.DataMessage;
+import static org.basex.server.replication.InternalMessages.Connect;
 import static org.basex.server.replication.InternalMessages.Start;
-import static org.basex.server.replication.ReplicaSet.ReplicaSetState.RUNNING;
 import static org.basex.server.replication.Settings.SettingsProvider;
 
 /**
@@ -100,38 +96,12 @@ public class ReplicationActor extends UntypedActor {
     @Override
     public void apply(Object msg) throws Exception {
       if (msg instanceof Start) {
-        // TODO for now we wait till the primary issues the startup, so the replication actors at the secondaries are able to start up
-        set.setPrimary(new Member(getSelf(), id, settings.VOTING));
-        getContext().system().scheduler().scheduleOnce(
-          Duration.create(500, TimeUnit.MILLISECONDS),
-          new Runnable() {
-            @Override
-            public void run() {
-              cluster.sendCurrentClusterState(getSelf());
-            }
-          }, getContext().system().dispatcher());
-      } else if (msg instanceof CurrentClusterState) {
-        log.info("A replica set is going up. Connect all members to the replica set.");
-        CurrentClusterState state = (CurrentClusterState) msg;
-
-        for (akka.cluster.Member member : state.getMembers()) {
-          if (!member.address().equals(cluster.selfAddress())) {
-            ActorRef ref = getContext().actorOf(ConnectionHandlingActor.mkProps(dbCtx, timeout));
-            ref.tell(member, getSelf());
-          }
-        }
-
-        //electionActor.tell(new Init(electionMembers), getSelf());
-      } else if (msg instanceof StartSet) {
-        // the replica set is ready, go to up state
-        log.info("Put replica set to RUNNING");
-        set.setState(RUNNING);
-        for (Member m : set.getSecondaries()) {
-          log.info("Send StatusMessage to {}, path {}", m.getActor(), m.getActor().path());
-          m.getActor().tell(new StatusMessage(set.getState(), set.getPrimary(), set.getSecondaries()), getSelf());
-        }
-
-        //electionActor.tell(new Init(getVotingMembers()), getSelf());
+        // register yourself as member of this cluster
+        cluster.join(cluster.selfAddress());
+      } else if (msg instanceof ConnectionStart) {
+        log.info("Incoming connection request");
+        ActorRef connHandler = getContext().actorOf(ConnectionHandlingActor.mkProps(set, dbCtx, timeout));
+        connHandler.forward(msg, getContext());
       } else if (msg instanceof Member) {
         Member newMember = (Member) msg;
 
@@ -172,20 +142,28 @@ public class ReplicationActor extends UntypedActor {
    * @throws Exception exception
    */
   @Override
-  public void onReceive(Object msg) throws Exception {
+  public void onReceive(final Object msg) throws Exception {
     if (msg instanceof Start) {
       log.info("Replica set startup command");
       setState(State.PRIMARY);
       getSelf().forward(msg, getContext());
-    } else if (msg instanceof ConnectionStart)  {
-      log.info("Got a connection start from {}", getSender().path());
-      Map<String, Integer> dbTimestamps = new HashMap<String, Integer>();
-      for (Iterator<String> it = dbCtx.databases.listDBs().iterator(); it.hasNext(); ) {
-        String db = it.next();
-        dbTimestamps.put(db, 0);
-      }
+    } else if (msg instanceof Connect) {
+      cluster.join(((Connect) msg).getAddr());
 
-      getSender().tell(new ConnectionResponse(id, true, 1, dbTimestamps), getSelf());
+      cluster.registerOnMemberUp(new Runnable() {
+        @Override
+        public void run() {
+          log.info("Start a connection process.");
+          Map<String, Integer> dbTimestamps = new HashMap<String, Integer>();
+          for (Iterator<String> it = dbCtx.databases.listDBs().iterator(); it.hasNext(); ) {
+            String db = it.next();
+            dbTimestamps.put(db, 0);
+          }
+
+          getContext().actorSelection(((Connect) msg).getPath().toString())
+            .tell(new ConnectionStart(id, settings.VOTING, settings.WEIGHT, dbTimestamps), getSelf());
+        }
+      });
     } else if (msg instanceof StatusMessage) {
       StatusMessage sm = (StatusMessage) msg;
       log.info("Status: {}", sm);
@@ -198,6 +176,14 @@ public class ReplicationActor extends UntypedActor {
 
       set.setState(sm.getState());
     } else if (msg instanceof SyncFinished) {
+      SyncFinished fin = (SyncFinished) msg;
+
+      set.setState(fin.getState());
+      set.setPrimary(fin.getPrimary());
+      for (Member m : fin.getSecondaries()) {
+        set.addMember(m);
+      }
+
       setState(State.SECONDARY);
     } else {
       handleAll(msg);
@@ -246,6 +232,9 @@ public class ReplicationActor extends UntypedActor {
           break;
         case PRIMARY:
           getContext().become(primaryProcedure);
+          Member m = new Member(getSelf(), id, settings.VOTING);
+          m.setPrimary(true);
+          set.addMember(m);
           try {
             dbCtx.triggers.register(new ReplicationTrigger(dbCtx.replication));
           } catch (BaseXException e) {

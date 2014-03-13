@@ -17,10 +17,10 @@ import java.util.List;
 public class ReplicaSet {
   /** Replica set states. */
   public enum ReplicaSetState {
-    INACTIVE, RUNNING, READONLY
+    UNCONNECTED, RUNNING, READONLY
   }
   /** Current replica set state. */
-  private ReplicaSetState state = ReplicaSetState.INACTIVE;
+  private ReplicaSetState state = ReplicaSetState.UNCONNECTED;
   /** Primary, if any. */
   private Member primary;
   /** Map of all secondaries, key is member ID. */
@@ -51,6 +51,14 @@ public class ReplicaSet {
   }
 
   /**
+   * The replica set is currently in state {@code UNCONNECTED}. Check, if this still apllies and if not,
+   * go to the {@code RUNNING} state.
+   */
+  private void checkState() {
+    if (getPrimary() != null && getSecondaries().size() > 0) setState(ReplicaSetState.RUNNING);
+  }
+
+  /**
    * Add a new member to the replica set, either a primary or a secondary.
    * @param newMember new member
    */
@@ -60,6 +68,8 @@ public class ReplicaSet {
     } else {
       addSecondary(newMember);
     }
+
+    if (getState() == ReplicaSetState.UNCONNECTED) checkState();
   }
 
   /**
