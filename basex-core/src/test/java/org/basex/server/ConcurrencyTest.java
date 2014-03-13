@@ -1,15 +1,19 @@
 package org.basex.server;
 
-import static org.junit.Assert.*;
+import org.basex.BaseXServer;
+import org.basex.SandboxTest;
+import org.basex.core.Command;
+import org.basex.core.cmd.CreateDB;
+import org.basex.core.cmd.DropDB;
+import org.basex.util.Util;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.util.Random;
 
-import org.basex.*;
-import org.basex.core.*;
-import org.basex.core.cmd.*;
-import org.basex.util.*;
-import org.junit.*;
+import static org.junit.Assert.fail;
 
 /**
  * This class tests the execution of parallel commands.

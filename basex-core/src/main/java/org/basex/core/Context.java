@@ -1,14 +1,19 @@
 package org.basex.core;
 
-import static org.basex.core.Text.*;
-
-import org.basex.data.*;
-import org.basex.io.random.*;
-import org.basex.query.util.pkg.*;
-import org.basex.server.*;
+import org.basex.data.Data;
+import org.basex.data.MetaData;
+import org.basex.data.Nodes;
+import org.basex.io.random.TableDiskAccess;
+import org.basex.query.util.pkg.Repo;
+import org.basex.server.ClientBlocker;
+import org.basex.server.ClientListener;
+import org.basex.server.Log;
+import org.basex.server.Sessions;
 import org.basex.trigger.TriggerManager;
-import org.basex.util.*;
-import org.basex.util.list.*;
+import org.basex.util.Token;
+import org.basex.util.list.StringList;
+
+import static org.basex.core.Text.S_ADMIN;
 
 /**
  * This class serves as a central database context.
@@ -41,6 +46,8 @@ public final class Context {
   public final Repo repo;
   /** Databases list. */
   public final Databases databases;
+  /** Replication. */
+  public final Replication replication;
   /** Trigger manager. */
   public final TriggerManager triggers;
 
@@ -98,6 +105,7 @@ public final class Context {
     repo = ctx.repo;
     log = ctx.log;
     user = ctx.user;
+    replication = ctx.replication;
     triggers = ctx.triggers;
   }
 
@@ -117,6 +125,7 @@ public final class Context {
     repo = new Repo(this);
     log = new Log(this);
     user = users.get(S_ADMIN);
+    replication = new Replication();
     triggers = new TriggerManager();
     listener = null;
   }

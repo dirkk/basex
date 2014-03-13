@@ -1,4 +1,4 @@
-package org.basex.test.server.replication;
+package org.basex.server.replication;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;

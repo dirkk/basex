@@ -1,20 +1,25 @@
 package org.basex.core.parse;
 
-import static org.basex.core.parse.Commands.*;
-
-import java.io.*;
-import java.util.*;
-
-import org.basex.core.*;
+import org.basex.core.Command;
+import org.basex.core.Context;
+import org.basex.core.Text;
 import org.basex.core.cmd.*;
-import org.basex.core.cmd.List;
-import org.basex.core.cmd.Set;
-import org.basex.io.*;
-import org.basex.query.*;
-import org.basex.query.iter.*;
-import org.basex.query.value.item.*;
-import org.basex.query.value.node.*;
-import org.basex.util.*;
+import org.basex.io.IO;
+import org.basex.query.QueryException;
+import org.basex.query.QueryProcessor;
+import org.basex.query.iter.Iter;
+import org.basex.query.iter.ValueBuilder;
+import org.basex.query.value.item.Item;
+import org.basex.query.value.item.QNm;
+import org.basex.query.value.item.Str;
+import org.basex.query.value.node.ANode;
+import org.basex.query.value.node.DBNode;
+import org.basex.util.TokenBuilder;
+
+import java.io.IOException;
+import java.util.ArrayList;
+
+import static org.basex.core.parse.Commands.*;
 
 /**
  * This is a parser for XML input, creating {@link Command} instances.
@@ -149,7 +154,7 @@ final class XMLParser extends CmdParser {
     if(e.equals(REPLICATION_START) && check(root))
       return new ReplicationStart(value(root), value(root));
     if(e.equals(REPLICATION_CONNECT) && check(root))
-      return new ReplicationConnect(value(root), value(root));
+      return new ReplicationConnect(value(root), value(root), value(root), value(root));
     if(e.equals(REPLICATION_STOP) && check(root))
       return new ReplicationStop();
     if(e.equals(RESTORE) && check(root, NAME))

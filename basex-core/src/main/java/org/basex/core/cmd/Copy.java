@@ -1,14 +1,15 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
-
-import java.io.*;
-import java.util.regex.*;
-
 import org.basex.core.*;
-import org.basex.io.*;
-import org.basex.util.*;
-import org.basex.util.list.*;
+import org.basex.io.IO;
+import org.basex.io.IOFile;
+import org.basex.util.Util;
+import org.basex.util.list.StringList;
+
+import java.io.IOException;
+import java.util.regex.Pattern;
+
+import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'copy' command and creates a copy of a database.
@@ -49,6 +50,7 @@ public final class Copy extends Command {
     // try to copy database
     try {
       copy(src, trg, context, this);
+      context.triggers.afterCopy(src, trg);
       return info(DB_COPIED_X, src, perf);
     } catch(final IOException ex) {
       return error(DB_NOT_COPIED_X, src);
@@ -81,8 +83,6 @@ public final class Copy extends Command {
         if(FILES.matcher(file).matches()) new IOFile(src, file).copyTo(new IOFile(trg, file));
         if(cmd != null) cmd.of++;
       }
-
-      context.triggers.afterCopy(source, target);
     } catch(final IOException ex) {
       // drop new database if error occurred
       Util.debug(ex);

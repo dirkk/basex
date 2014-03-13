@@ -9,8 +9,7 @@ import org.basex.core.Context;
 import org.basex.core.cmd.*;
 import org.basex.util.Token;
 
-import java.util.*;
-import java.util.List;
+import java.util.ArrayList;
 
 import static org.basex.server.replication.DataMessages.*;
 
@@ -40,7 +39,7 @@ public class DataExecutionActor extends UntypedActor {
     this.dbCtx = dbCtx;
   }
 
-  private void execute(List<Command> cmds) {
+  private void execute(ArrayList<Command> cmds) {
     new ReplCmd(cmds, dbCtx).run();
   }
 
@@ -58,38 +57,42 @@ public class DataExecutionActor extends UntypedActor {
         log.debug("Database: {}, Path: {}, Content: {}", addMessage.getDatabase(),
           addMessage.getPath(), content);
 
-        List<Command> cmds = new ArrayList<Command>();
+        ArrayList<Command> cmds = new ArrayList<Command>();
         cmds.add(new Open(addMessage.getDatabase()));
         cmds.add(new Add(addMessage.getPath(), content));
         execute(cmds);
       } else if (data instanceof UpdateMessage) {
         UpdateMessage updateMessage = (UpdateMessage) data;
-
         String content = Token.string(updateMessage.getContent());
         log.debug("Database: {}, Path: {}, Content: {}", updateMessage.getDatabaseName(),
           updateMessage.getPath(), content);
 
-        List<Command> cmds = new ArrayList<Command>();
+
+        ArrayList<Command> cmds = new ArrayList<Command>();
         cmds.add(new Open(updateMessage.getDatabaseName()));
         cmds.add(new Replace(updateMessage.getPath(), content));
         execute(cmds);
       } else if (data instanceof RenameMessage) {
         RenameMessage renameMessage = (RenameMessage) data;
-        List<Command> cmds = new ArrayList<Command>();
+        ArrayList<Command> cmds = new ArrayList<Command>();
         cmds.add(new Open(renameMessage.getDatabase()));
         cmds.add(new Rename(renameMessage.getSource(), renameMessage.getTarget()));
         execute(cmds);
       } else if (data instanceof DeleteMessage) {
         DeleteMessage deleteMessage = (DeleteMessage) data;
 
-        List<Command> cmds = new ArrayList<Command>();
+        ArrayList<Command> cmds = new ArrayList<Command>();
         cmds.add(new Open(deleteMessage.getDatabase()));
         cmds.add(new Delete(((DeleteMessage) data).getTarget()));
         execute(cmds);
       }
       // Database messages
       else if (data instanceof CreateDbMessage) {
-        new CreateDB(((CreateDbMessage) data).getName()).execute(dbCtx);
+        ArrayList<Command> cmds = new ArrayList<Command>();
+        cmds.add(new CreateDB(((CreateDbMessage) data).getName()));
+        //cmds.add(new Close());
+        System.out.println(getSelf().path());
+        execute(cmds);
       } else if (data instanceof AlterMessage) {
         AlterMessage am = (AlterMessage) data;
         new AlterDB(am.getSource(), am.getTarget()).execute(dbCtx);

@@ -1,9 +1,9 @@
 package org.basex.server.replication;
 
 import org.basex.core.*;
-import org.basex.core.cmd.Close;
 import org.basex.io.out.NullOutput;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -14,7 +14,7 @@ import java.util.List;
  */
 public class ReplCmd extends Command {
   /** Commands to execute. */
-  private final List<Command> cmds;
+  private final ArrayList<Command> cmds;
   /** Database context. */
   private final Context dbCtx;
 
@@ -22,7 +22,7 @@ public class ReplCmd extends Command {
    * Constructor.
    * @param cmds commands to execute
    */
-  public ReplCmd(final List<Command> cmds, final Context dbCtx) {
+  public ReplCmd(final ArrayList<Command> cmds, final Context dbCtx) {
     super(maxPerm(cmds));
 
     this.cmds = cmds;
@@ -57,18 +57,19 @@ public class ReplCmd extends Command {
 
   @Override
   public boolean updating(final Context ctx) {
-    boolean up = false;
+    boolean up = true;
     for(final Command c : cmds) up |= c.updating(ctx);
     return up;
   }
 
   @Override
-  protected final boolean run() {
+  public final boolean run() {
     try {
+      System.out.println("Run " + Thread.currentThread().getId());
       for(final Command c : cmds) c.run(dbCtx, new NullOutput());
       return true;
     } finally {
-      new Close().run(dbCtx);
+      //new Close().run(dbCtx);
     }
   }
 }

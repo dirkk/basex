@@ -1,4 +1,4 @@
-package org.basex.test.server.replication;
+package org.basex.server.replication;
 
 import org.basex.core.Context;
 import org.basex.core.Replication;
@@ -33,11 +33,13 @@ public class ConnectionTest {
   public void startConnection() throws Exception, ReplicationAlreadyRunningException {
     final int MAX_TRIES = 100;
 
-    Replication repl1 = Replication.getInstance(new Context());
-    Replication repl2 = Replication.getInstance(new Context());
-    repl1.start("127.0.0.1", 8765);
+    Context ctx1 = new Context();
+    Context ctx2 = new Context();
+    Replication repl1 = ctx1.replication;
+    Replication repl2 = ctx2.replication;
+    repl1.start(ctx1, "127.0.0.1", 8765);
 
-    repl2.connect("127.0.0.1", 8762, "127.0.0.1", 8765);
+    repl2.connect(ctx2, "127.0.0.1", 8762, "127.0.0.1", 8765);
 
     boolean infoAvailable = false;
     int tries = 0;
@@ -62,11 +64,12 @@ public class ConnectionTest {
 
   @Test
   public void noConnectAfterStart() throws Exception, ReplicationAlreadyRunningException {
-    Replication repl1 = Replication.getInstance(new Context());
-    repl1.start("127.0.0.1", 8765);
+    Context ctx1 = new Context();
+    Replication repl1 = ctx1.replication;
+    repl1.start(ctx1, "127.0.0.1", 8765);
 
     ExpectedException.none().expect(ReplicationAlreadyRunningException.class);
-    repl1.connect("127.0.0.1", 8762, "127.0.0.1", 8765);
+    repl1.connect(ctx1, "127.0.0.1", 8762, "127.0.0.1", 8765);
   }
 
 
@@ -74,13 +77,16 @@ public class ConnectionTest {
   public void startConnectionThreeMembers() throws Exception, ReplicationAlreadyRunningException {
     final int MAX_TRIES = 100;
 
-    Replication repl1 = Replication.getInstance(new Context());
-    Replication repl2 = Replication.getInstance(new Context());
-    Replication repl3 = Replication.getInstance(new Context());
-    repl1.start("127.0.0.1", 8765);
+    Context ctx1 = new Context();
+    Context ctx2 = new Context();
+    Context ctx3 = new Context();
+    Replication repl1 = ctx1.replication;
+    Replication repl2 = ctx2.replication;
+    Replication repl3 = ctx3.replication;
+    repl1.start(ctx1, "127.0.0.1", 8765);
 
-    repl2.connect("127.0.0.1", 8762, "127.0.0.1", 8765);
-    repl3.connect("127.0.0.1", 8760, "127.0.0.1", 8765);
+    repl2.connect(ctx2, "127.0.0.1", 8762, "127.0.0.1", 8765);
+    repl3.connect(ctx3, "127.0.0.1", 8760, "127.0.0.1", 8765);
 
     boolean infoAvailable = false;
     int tries = 0;
@@ -104,11 +110,13 @@ public class ConnectionTest {
     final int RUNS = 20;
     final int MAX_TRIES = 100;
 
-    Replication repl1 = Replication.getInstance(new Context());
-    repl1.start("127.0.0.1", 8765);
+    Context ctx1 = new Context();
+    Replication repl1 = ctx1.replication;
+    repl1.start(ctx1, "127.0.0.1", 8765);
 
     for (int i = 0; i < RUNS; ++i) {
-      Replication.getInstance(new Context()).connect("127.0.0.1", 8766 + i, "127.0.0.1", 8765);
+      Context ctx = new Context();
+      ctx.replication.connect(ctx, "127.0.0.1", 8766 + i, "127.0.0.1", 8765);
     }
 
     Thread.sleep(2000);

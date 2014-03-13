@@ -1,30 +1,23 @@
 package org.basex.core.parse;
 
+import org.basex.core.Command;
+import org.basex.core.Context;
+import org.basex.core.Databases;
+import org.basex.core.cmd.*;
+import org.basex.core.parse.Commands.*;
+import org.basex.query.QueryContext;
+import org.basex.query.QueryException;
+import org.basex.query.QueryParser;
+import org.basex.query.value.item.QNm;
+import org.basex.util.*;
+import org.basex.util.list.StringList;
+
+import java.util.ArrayList;
+import java.util.Locale;
+import java.util.Scanner;
+
 import static org.basex.core.Text.*;
 import static org.basex.util.Token.*;
-
-import java.util.*;
-
-import org.basex.core.*;
-import org.basex.core.cmd.*;
-import org.basex.core.cmd.List;
-import org.basex.core.cmd.Set;
-import org.basex.core.parse.Commands.Cmd;
-import org.basex.core.parse.Commands.CmdAlter;
-import org.basex.core.parse.Commands.CmdCreate;
-import org.basex.core.parse.Commands.CmdDrop;
-import org.basex.core.parse.Commands.CmdIndex;
-import org.basex.core.parse.Commands.CmdIndexInfo;
-import org.basex.core.parse.Commands.CmdInfo;
-import org.basex.core.parse.Commands.CmdOptimize;
-import org.basex.core.parse.Commands.CmdPerm;
-import org.basex.core.parse.Commands.CmdReplication;
-import org.basex.core.parse.Commands.CmdRepo;
-import org.basex.core.parse.Commands.CmdShow;
-import org.basex.query.*;
-import org.basex.query.value.item.*;
-import org.basex.util.*;
-import org.basex.util.list.*;
 
 /**
  * This is a parser for command strings, creating {@link Command} instances.
@@ -159,7 +152,7 @@ public final class StringParser extends CmdParser {
           case START:
             return new ReplicationStart(string(cmd), string(cmd));
           case CONNECT:
-            return new ReplicationConnect(string(cmd), string(cmd));
+            return new ReplicationConnect(string(cmd), string(cmd), string(cmd), string(cmd));
           case STOP:
             return new ReplicationStop();
         }

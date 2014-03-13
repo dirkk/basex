@@ -1,4 +1,4 @@
-package org.basex.test.server.replication;
+package org.basex.server.replication;
 
 import org.basex.server.election.ProcessNumber;
 import org.junit.Test;

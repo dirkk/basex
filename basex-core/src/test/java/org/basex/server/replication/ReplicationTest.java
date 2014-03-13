@@ -1,4 +1,4 @@
-package org.basex.test.server;
+package org.basex.server.replication;
 
 import org.basex.BaseXServer;
 import org.basex.SandboxTest;
@@ -381,8 +381,7 @@ public class ReplicationTest extends SandboxTest {
      */
     @Override
     public void startReplication(final int port) throws IOException {
-      session.execute(new ReplicationStart(HOST, port));
-      session.execute(new ReplicationConnect(HOST, PORT + 1));
+      session.execute(new ReplicationConnect(HOST, port, HOST, PORT + 1));
     }
     
     @Override

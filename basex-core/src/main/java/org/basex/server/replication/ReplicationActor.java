@@ -12,7 +12,6 @@ import akka.routing.FromConfig;
 import akka.util.Timeout;
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
-import org.basex.core.Replication;
 import org.basex.server.election.ElectionActor;
 import org.basex.server.election.ElectionMember;
 import org.basex.server.election.ProcessNumber;
@@ -64,7 +63,7 @@ public class ReplicationActor extends UntypedActor {
   /** Router for database operations, just relevant for a Secondary. */
   private ActorRef dbRouter;
   /** Settings from the application.conf. */
-  private final SettingsImpl settings = SettingsProvider.get(getContext().system());
+  public final SettingsImpl settings = SettingsProvider.get(getContext().system());
   /** Timeout. */
   private final Timeout timeout = new Timeout(Duration.create(5, "seconds"));
   /** Logging. */
@@ -303,7 +302,7 @@ public class ReplicationActor extends UntypedActor {
         case PRIMARY:
           getContext().become(primaryProcedure);
           try {
-            dbCtx.triggers.register(new ReplicationTrigger(Replication.getInstance(dbCtx)));
+            dbCtx.triggers.register(new ReplicationTrigger(dbCtx.replication));
           } catch (BaseXException e) {
             e.printStackTrace();
           }

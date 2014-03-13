@@ -71,7 +71,6 @@ public class ReplicationTrigger implements DocumentTrigger, DatabaseTrigger {
   @Override
   public void afterCreateDb(final String name) {
     repl.publish(new CreateDbMessage(name));
-
   }
 
   @Override

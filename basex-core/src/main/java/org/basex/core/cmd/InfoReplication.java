@@ -35,11 +35,11 @@ public final class InfoReplication extends AInfo {
    */
   private String replication() {
     final TokenBuilder tb = new TokenBuilder();
-    final Replication repl = Replication.getInstance(context);
+    final Replication repl = context.replication;
 
     if (repl.isEnabled()) {
       repl.info();
-      //infow(tb, "Running", true);
+      //info(tb, "Running", true);
       // TODO info(tb, "Address", context.replication.getBrokerAddress());
     } else {
       info(tb, "Running", false);

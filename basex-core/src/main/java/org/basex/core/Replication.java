@@ -7,15 +7,14 @@ import akka.cluster.Cluster;
 import akka.util.Timeout;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-import org.basex.server.replication.*;
+import org.basex.server.replication.DataMessages;
+import org.basex.server.replication.ReplicationActor;
 import scala.concurrent.Await;
 import scala.concurrent.duration.Duration;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import static akka.pattern.Patterns.ask;
-import static org.basex.server.replication.InternalMessages.*;
+import static org.basex.server.replication.InternalMessages.RequestStatus;
+import static org.basex.server.replication.InternalMessages.Start;
 import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
 
 /**
@@ -34,43 +33,29 @@ public class Replication {
   public static String SYSTEM_NAME = "replBaseX";
   /** running? . */
   private boolean running;
-  /** Database context. */
-  private final Context context;
   /** Akka system. */
   private ActorSystem system;
   /** Replication actor. */
   private ActorRef repl;
-  /*+ Default timeout. */
+  /** Default timeout. */
   private Timeout timeout = new Timeout(Duration.create(5, "seconds"));
-  /** Singleton replication instance. */
-  private static Map<Context, Replication> singleton = new HashMap<Context, Replication>();
 
-  public static Replication getInstance(final Context ctx) {
-    if (!singleton.containsKey(ctx)) {
-      Replication r = new Replication(ctx);
-      singleton.put(ctx, r);
-      return r;
-    }
-
-    return singleton.get(ctx);
-  }
   /**
    * Constructor.
-   * @param c database context
    */
-  private Replication(final Context c) {
+  protected Replication() {
     running = false;
-    context = c;
   }
   
   /**
    * Start the replication and subsequently the akka subsystem.
-   * 
+   *
+   * @param context context
    * @param host host name
    * @param port port
    * @return success
    */
-  public boolean start(final String host, final int port) throws ReplicationAlreadyRunningException {
+  public boolean start(final Context context, final String host, final int port) throws ReplicationAlreadyRunningException {
     systemStart(host, port);
     Cluster.get(system).join(Cluster.get(system).selfAddress());
 
@@ -102,7 +87,8 @@ public class Replication {
   /**
    *
    */
-  public void connect(final String localHost, final int localPort, final String remoteHost, final int remotePort) throws ReplicationAlreadyRunningException {
+  public void connect(final Context context, final String localHost, final int localPort,
+                      final String remoteHost, final int remotePort) throws ReplicationAlreadyRunningException {
     systemStart(localHost, localPort);
 
     Address addr = new Address("akka.tcp", "replBaseX", remoteHost, remotePort);

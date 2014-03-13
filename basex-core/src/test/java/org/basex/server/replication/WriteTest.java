@@ -1,4 +1,4 @@
-package org.basex.test.server.replication;
+package org.basex.server.replication;
 
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
@@ -29,7 +29,7 @@ import static org.junit.Assert.*;
 public class WriteTest {
   private Context ctx1;
   private Context ctx2;
-  private List<Replication> repls;
+  private List<Context> repls;
   private static int sandboxCounter = 0;
 
   @BeforeClass
@@ -38,25 +38,22 @@ public class WriteTest {
 
   @Before
   public void startup() throws Exception, ReplicationAlreadyRunningException {
-    ctx1 = createSandbox();
-    ctx2 = createSandbox();
-
-    repls = new LinkedList<Replication>();
-    repls.add(Replication.getInstance(ctx1));
-    repls.add(Replication.getInstance(ctx2));
+    repls = new LinkedList<Context>();
+    repls.add(createSandbox());
+    repls.add(createSandbox());
     startConnection(repls);
   }
 
   @After
   public void teardown() throws InterruptedException {
+    /*
     ctx1.close();
     ctx2.close();
 
     for (Replication r : repls) {
       r.stop();
     }
-
-    Thread.sleep(1000);
+    */
   }
 
   private Context createSandbox() {
@@ -72,16 +69,17 @@ public class WriteTest {
     return ctx;
   }
 
-  private void startConnection(List<Replication> repls) throws Exception, ReplicationAlreadyRunningException {
+  private void startConnection(List<Context> repls) throws Exception, ReplicationAlreadyRunningException {
     final int MAX_TRIES = 100;
 
-    repls.get(0).start("127.0.0.1", 8765);
+    repls.get(0).replication.start(repls.get(0), "127.0.0.1", 8765);
 
     for (int i = 1; i < repls.size(); ++i) {
-      repls.get(i).connect("127.0.0.1", 8770 + i * 2, "127.0.0.1", 8765);
+      repls.get(i).replication.connect(repls.get(i), "127.0.0.1", 8770 + i * 2, "127.0.0.1", 8765);
     }
 
-    for (Replication r : repls) {
+    for (Context c : repls) {
+      Replication r = c.replication;
       boolean infoAvailable = false;
       int tries = 0;
       String info;
@@ -94,7 +92,6 @@ public class WriteTest {
           infoAvailable = true;
         }
       }
-
 
       if (!infoAvailable) throw new Exception("Connection setup failed.");
     }
@@ -268,32 +265,72 @@ public class WriteTest {
 
   // public static Performance perf = ReplicationActor.perf;
 
+  @Test
+  public void addDocumentsConcurrently() throws BaseXException {
+    final int TRIES = 100;
+
+    new CreateDB("test").execute(ctx1);
+
+    for (int i = 0; i < TRIES; ++i) {
+      new Add("test.xml", "<A />").execute(ctx1);
+    }
+
+    Performance.sleep(500);
+  }
+
+  @Test
+  public void createDatabaseConcurrently() throws BaseXException {
+    final int TRIES = 100;
+
+    for (int i = 0; i < TRIES; ++i) {
+      new CreateDB("test").execute(ctx1);
+    }
+
+    Performance.sleep(500);
+  }
 
   @Test
   public void performanceTest() throws Exception, ReplicationAlreadyRunningException {
-    final int TRIES = 10;
+    final int TRIES = 100;
 
-    for (int j = 0; j < 2; ++j) {
+/*
+
+    final Context ctx3 = createSandbox();
+    for (int i = 0; i < 1000; ++i) {
+      new CreateDB("test").execute(ctx3);
+      //new Add("test.xml", "<A />").execute(ctx1);
+
+      //new XQuery("insert node <B/> into //A").execute(ctx1);
+
+      //new DropDB(("test")).execute(ctx1);
+    }
+    */
+
+
+    for (int j = 0; j < 1; ++j) {
       // normal version
-      final Context ctx3 = createSandbox();
-      for (int i = 0; i < TRIES; ++i) {
-        new CreateDB("test").execute(ctx3);
+
+      /*
+      new CreateDB("test").execute(ctx3);
+      for (int i = 0; i < 10; ++i) {
         new Add("test.xml", "<A />").execute(ctx3);
 
-        new XQuery("insert node <B/> into //A").execute(ctx3);
+        //new XQuery("insert node <B/> into //A").execute(ctx3);
 
-        new DropDB("test").execute(ctx3);
+        //new DropDB("test").execute(ctx3);
       }
-      //System.out.println("Normal    : " + perf);
+      //System.out.println("Normal    : " + perf);*/
+
 
       // replicated version
+
       for (int i = 0; i < TRIES; ++i) {
         new CreateDB("test").execute(ctx1);
-        new Add("test.xml", "<A />").execute(ctx1);
+        //new Add("test.xml", "<A />").execute(ctx1);
 
-        new XQuery("insert node <B/> into //A").execute(ctx1);
+        //new XQuery("insert node <B/> into //A").execute(ctx1);
 
-        new DropDB(("test")).execute(ctx1);
+        //new DropDB(("test")).execute(ctx1);
       }
       //System.out.println("Replicated: " + perf);
 

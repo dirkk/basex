@@ -1,11 +1,13 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
-
-import org.basex.core.*;
-import org.basex.core.parse.*;
+import org.basex.core.Context;
+import org.basex.core.Databases;
+import org.basex.core.LockResult;
+import org.basex.core.parse.CmdBuilder;
 import org.basex.core.parse.Commands.Cmd;
 import org.basex.core.parse.Commands.CmdAlter;
+
+import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'alter database' command and renames a database.
@@ -45,7 +47,9 @@ public final class AlterDB extends ACreate {
     if(context.pinned(src)) return error(DB_PINNED_X, src);
 
     // try to alter database
-    return alter(src, trg, context) && (!closed || new Open(trg).run(context)) ?
+    final boolean ok = alter(src, trg, context);
+    if (ok) context.triggers.afterAlter(src, trg);
+    return ok && (!closed || new Open(trg).run(context)) ?
         info(DB_RENAMED_X, src, trg) : error(DB_NOT_RENAMED_X, src);
   }
 
@@ -66,12 +70,7 @@ public final class AlterDB extends ACreate {
 
     // drop target database
     DropDB.drop(target, context);
-    boolean ok =  context.globalopts.dbpath(source).rename(context.globalopts.dbpath(target));
-
-    if (ok) {
-      context.triggers.afterAlter(source, target);
-    }
-    return ok;
+    return context.globalopts.dbpath(source).rename(context.globalopts.dbpath(target));
   }
 
   @Override
