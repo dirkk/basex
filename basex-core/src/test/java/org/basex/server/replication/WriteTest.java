@@ -82,11 +82,10 @@ public class WriteTest {
           Thread.sleep(100);
         } else {
           infoAvailable = true;
-          System.out.println(info);
         }
       }
 
-      if (!infoAvailable) throw new Exception("Connection setup failed. Last was: " + r.info());
+      if (!infoAvailable) throw new Exception("Connection setup failed.");
     }
 
     // TODO wait for connection setup...
