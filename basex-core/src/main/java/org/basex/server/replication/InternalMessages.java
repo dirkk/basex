@@ -6,6 +6,8 @@ import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
 
+import static org.basex.server.replication.ReplicaSet.ReplicaSetState;
+
 /**
  * Replica set messages.
  *
@@ -15,7 +17,7 @@ import java.util.List;
 public interface InternalMessages {
   public class StatusMessage implements Serializable {
     /** Cluster state. */
-    private final ReplicationActor.ClusterState state;
+    private final ReplicaSetState state;
     /** Primary member. Null, if there is no primary. */
     private final Member primary;
     /** All secondary members. */
@@ -27,13 +29,13 @@ public interface InternalMessages {
      * @param primary primary, if any
      * @param secondaries all secondaries
      */
-    public StatusMessage(ReplicationActor.ClusterState state, Member primary, List<Member> secondaries) {
+    public StatusMessage(ReplicaSetState state, Member primary, List<Member> secondaries) {
       this.state = state;
       this.primary = primary;
       this.secondaries = secondaries;
     }
 
-    public ReplicationActor.ClusterState getState() {
+    public ReplicaSetState getState() {
       return state;
     }
 

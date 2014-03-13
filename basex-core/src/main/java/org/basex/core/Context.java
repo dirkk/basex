@@ -137,6 +137,7 @@ public final class Context {
   public synchronized void close() {
     while(!sessions.isEmpty()) sessions.get(0).quit();
     dbs.close();
+    replication.stop();
     log.close();
   }
 

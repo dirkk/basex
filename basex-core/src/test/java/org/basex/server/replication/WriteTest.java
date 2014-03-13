@@ -11,7 +11,6 @@ import org.basex.util.Prop;
 import org.basex.util.Util;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.util.LinkedList;
@@ -32,28 +31,21 @@ public class WriteTest {
   private List<Context> repls;
   private static int sandboxCounter = 0;
 
-  @BeforeClass
-  public static void setup() {
-  }
-
   @Before
   public void startup() throws Exception, ReplicationAlreadyRunningException {
+    ctx1 = createSandbox();
+    ctx2 = createSandbox();
+
     repls = new LinkedList<Context>();
-    repls.add(createSandbox());
-    repls.add(createSandbox());
+    repls.add(ctx1);
+    repls.add(ctx2);
     startConnection(repls);
   }
 
   @After
   public void teardown() throws InterruptedException {
-    /*
     ctx1.close();
     ctx2.close();
-
-    for (Replication r : repls) {
-      r.stop();
-    }
-    */
   }
 
   private Context createSandbox() {
@@ -95,6 +87,9 @@ public class WriteTest {
 
       if (!infoAvailable) throw new Exception("Connection setup failed.");
     }
+
+    // TODO wait for connection setup...
+    Performance.sleep(1000);
 
     System.out.println("Connection setup completed.");
   }

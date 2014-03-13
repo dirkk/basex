@@ -13,22 +13,23 @@ import akka.util.Timeout;
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
 import org.basex.server.election.ElectionActor;
-import org.basex.server.election.ElectionMember;
 import org.basex.server.election.ProcessNumber;
 import org.basex.server.replication.ConnectionMessages.ConnectionResponse;
 import org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import org.basex.server.replication.InternalMessages.RequestStatus;
 import org.basex.server.replication.InternalMessages.StartSet;
 import org.basex.server.replication.InternalMessages.StatusMessage;
-import org.basex.util.Prop;
 import scala.concurrent.duration.Duration;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
 import static org.basex.server.replication.DataMessages.DataMessage;
 import static org.basex.server.replication.InternalMessages.Start;
+import static org.basex.server.replication.ReplicaSet.ReplicaSetState.RUNNING;
 import static org.basex.server.replication.Settings.SettingsProvider;
 
 /**
@@ -40,22 +41,12 @@ public class ReplicationActor extends UntypedActor {
   public enum State {
     UNCONNECTED, PRIMARY, SECONDARY
   }
-  /** Cluster states. */
-  public enum ClusterState {
-    INACTIVE, RUNNING, READONLY
-  }
-  /** Current cluster state. */
-  private ClusterState clusterState = ClusterState.INACTIVE;
   /** Finite State Machine. */
   private State state = State.UNCONNECTED;
+  /** Replica set. */
+  private ReplicaSet set = new ReplicaSet();
   /** Database context. */
   private final Context dbCtx;
-  /** This member. */
-  private Member self;
-  /** Primary. */
-  private Member primary;
-  /** Map of all secondaries, key is member ID. */
-  private Map<String, Member> secondaries = new HashMap<String, Member>();
   /** ID. */
   private String id;
   /** Cluster. */
@@ -78,6 +69,10 @@ public class ReplicationActor extends UntypedActor {
     return Props.create(ReplicationActor.class, dbContext);
   }
 
+  /**
+   * Constructor
+   * @param dbContext database context
+   */
   public ReplicationActor(final Context dbContext) {
     this.dbCtx = dbContext;
   }
@@ -88,45 +83,10 @@ public class ReplicationActor extends UntypedActor {
     id = cluster.selfAddress().toString();
 
     getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), timeout), "election");
-
-    // TODO get voting value
-    self = new Member(getSelf(), id, settings.VOTING);
   }
 
   @Override
   public void postStop() {
-  }
-
-  /**
-   * Get the current primary in the replica set.
-   * @return primary
-   */
-  private Member getPrimary() {
-    return primary;
-  }
-
-  /**
-   * Get a list of all secondaries.
-   * @return list of secondaries
-   */
-  private List<Member> getSecondaries() {
-    return new LinkedList<Member>(secondaries.values());
-  }
-
-  private Set<ElectionMember> getVotingMembers() {
-    Set<ElectionMember> set = new HashSet<ElectionMember>();
-
-    if (primary != null && primary.isVoting()) {
-      set.add(new ElectionMember(primary.getActor(), new ProcessNumber(primary.getWeight(), primary.getId())));
-    }
-
-    for (Member m : secondaries.values()) {
-      if (m != null && m.isVoting()) {
-        set.add(new ElectionMember(m.getActor(), new ProcessNumber(m.getWeight(), m.getId())));
-      }
-    }
-
-    return set;
   }
 
   /**
@@ -141,6 +101,7 @@ public class ReplicationActor extends UntypedActor {
     public void apply(Object msg) throws Exception {
       if (msg instanceof Start) {
         // TODO for now we wait till the primary issues the startup, so the replication actors at the secondaries are able to start up
+        set.setPrimary(new Member(getSelf(), id, settings.VOTING));
         getContext().system().scheduler().scheduleOnce(
           Duration.create(500, TimeUnit.MILLISECONDS),
           new Runnable() {
@@ -152,7 +113,6 @@ public class ReplicationActor extends UntypedActor {
       } else if (msg instanceof CurrentClusterState) {
         log.info("A replica set is going up. Connect all members to the replica set.");
         CurrentClusterState state = (CurrentClusterState) msg;
-        Set<ElectionMember> electionMembers = new HashSet<ElectionMember>();
 
         for (akka.cluster.Member member : state.getMembers()) {
           if (!member.address().equals(cluster.selfAddress())) {
@@ -165,10 +125,10 @@ public class ReplicationActor extends UntypedActor {
       } else if (msg instanceof StartSet) {
         // the replica set is ready, go to up state
         log.info("Put replica set to RUNNING");
-        clusterState = ClusterState.RUNNING;
-        for (Member m : secondaries.values()) {
+        set.setState(RUNNING);
+        for (Member m : set.getSecondaries()) {
           log.info("Send StatusMessage to {}, path {}", m.getActor(), m.getActor().path());
-          m.getActor().tell(new StatusMessage(clusterState, primary, new LinkedList<Member>(secondaries.values())), getSelf());
+          m.getActor().tell(new StatusMessage(set.getState(), set.getPrimary(), set.getSecondaries()), getSelf());
         }
 
         //electionActor.tell(new Init(getVotingMembers()), getSelf());
@@ -176,15 +136,11 @@ public class ReplicationActor extends UntypedActor {
         Member newMember = (Member) msg;
 
         log.info("New member {} joined the replica set.", newMember.getActor().path());
-        if (newMember.isPrimary()) {
-          primary = newMember;
-        } else {
-          secondaries.put(newMember.getId(), newMember);
-        }
+        set.addMember(newMember);
       } else if (msg instanceof DataMessage) {
-        log.info("Got datamessage, {} secondaries", secondaries.values().size());
+        log.info("Got datamessage, {} secondaries", set.getSecondaries().size());
         // publish to all secondaries
-        for (Member m : secondaries.values()) {
+        for (Member m : set.getSecondaries()) {
           m.getActor().tell(msg, getSelf());
         }
       } else {
@@ -234,24 +190,13 @@ public class ReplicationActor extends UntypedActor {
       StatusMessage sm = (StatusMessage) msg;
       log.info("Status: {}", sm);
 
-      if (sm.getPrimary() != null && sm.getPrimary().getId().equals(id)) {
-        self = sm.getPrimary();
-      } else {
-        for (Iterator<Member> it = sm.getSecondaries().iterator(); it.hasNext(); ) {
-          Member m = it.next();
-          if (m.getId().equals(id)) {
-            self = m;
-          }
-        }
-      }
-
-      if (self.isPrimary()) {
+      if (state == State.PRIMARY) {
         setState(State.PRIMARY);
       } else {
         setState(State.SECONDARY);
       }
 
-      clusterState = sm.getState();
+      set.setState(sm.getState());
     } else if (msg instanceof SyncFinished) {
       setState(State.SECONDARY);
     } else {
@@ -318,15 +263,6 @@ public class ReplicationActor extends UntypedActor {
 
   @Override
   public String toString() {
-    StringBuilder b = new StringBuilder();
-    b.append("State: " + getState() + Prop.NL);
-    b.append("Primary" + Prop.NL + getPrimary() + Prop.NL);
-    b.append("Number of secondaries: " + getSecondaries().size() + Prop.NL);
-    for (Iterator<Member> it = getSecondaries().iterator(); it.hasNext(); ) {
-      Member m = it.next();
-      b.append("Secondary " + Prop.NL + m + Prop.NL);
-    }
-
-    return b.toString();
+    return set.toString();
   }
 }

@@ -90,7 +90,7 @@ public class DataExecutionActor extends UntypedActor {
       else if (data instanceof CreateDbMessage) {
         ArrayList<Command> cmds = new ArrayList<Command>();
         cmds.add(new CreateDB(((CreateDbMessage) data).getName()));
-        //cmds.add(new Close());
+        cmds.add(new Close());
         System.out.println(getSelf().path());
         execute(cmds);
       } else if (data instanceof AlterMessage) {
