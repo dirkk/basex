@@ -1,14 +1,8 @@
 package org.basex.io.out;
 
-import org.basex.util.Array;
-
-import java.nio.*;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 
-import static org.basex.util.Token.*;
+import static org.basex.util.Token.token;
 
 /**
  * Outputs byte data, prepending with the length of the following block.
@@ -26,7 +20,7 @@ public class BlockOutput {
   public BlockOutput() {
     buffer = new byte[0];
   }
-  
+
   /**
    * Write a single byte.
    * @param b byte to write

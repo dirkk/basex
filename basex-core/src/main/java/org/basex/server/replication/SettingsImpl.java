@@ -1,6 +1,7 @@
 package org.basex.server.replication;
 
 import akka.actor.Extension;
+import akka.util.Timeout;
 import com.typesafe.config.Config;
 import scala.concurrent.duration.Duration;
 
@@ -18,11 +19,13 @@ public class SettingsImpl implements Extension {
   /** Weight of thide node in an election. */
   public final int WEIGHT;
   /** Standard timeout for operations. */
-  public final Duration TIMEOUT;
+  public final Timeout TIMEOUT;
 
   public SettingsImpl(Config cfg) {
     VOTING = cfg.hasPath("BaseX.voting") ? cfg.getBoolean("BaseX.voting") : true;
     WEIGHT = cfg.hasPath("BaseX.weight") ? cfg.getInt("BaseX.weight") : 1;
-    TIMEOUT = Duration.create(cfg.hasPath("BaseX.timeout") ? cfg.getMilliseconds("BaseX.timeout") : 5000, TimeUnit.MILLISECONDS);
+    TIMEOUT = Timeout.durationToTimeout(
+      Duration.create(cfg.hasPath("BaseX.timeout") ? cfg.getMilliseconds("BaseX.timeout") : 5000, TimeUnit.MILLISECONDS)
+    );
   }
 }

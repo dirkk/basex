@@ -9,7 +9,10 @@ import com.typesafe.config.ConfigFactory;
 import org.basex.server.replication.DataMessages;
 import org.basex.server.replication.ReplicationActor;
 import scala.concurrent.Await;
+import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
+
+import java.util.concurrent.TimeUnit;
 
 import static akka.pattern.Patterns.ask;
 import static org.basex.server.replication.InternalMessages.*;
@@ -36,7 +39,7 @@ public class Replication {
   /** Replication actor. */
   private ActorRef repl;
   /** Default timeout. */
-  private Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+  private static Timeout TIMEOUT = new Timeout(Duration.create(10, TimeUnit.SECONDS));
 
   /**
    * Constructor.
@@ -57,9 +60,13 @@ public class Replication {
     systemStart(host, port);
 
     repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
-    repl.tell(new Start(), ActorRef.noSender());
 
-    return true;
+    Future f = ask(repl,new Start(), TIMEOUT);
+    try {
+      return (Boolean) Await.result(f, TIMEOUT.duration());
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   private void systemStart(final String host, final int port) throws ReplicationAlreadyRunningException {
@@ -79,13 +86,19 @@ public class Replication {
   /**
    *
    */
-  public void connect(final Context context, final String localHost, final int localPort,
+  public boolean connect(final Context context, final String localHost, final int localPort,
                       final String remoteHost, final int remotePort) throws ReplicationAlreadyRunningException {
     systemStart(localHost, localPort);
 
     Address addr = new Address("akka.tcp", "replBaseX", remoteHost, remotePort);
     repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
-    repl.tell(new Connect(addr), ActorRef.noSender());
+
+    Future f = ask(repl,new Connect(addr), TIMEOUT);
+    try {
+      return (Boolean) Await.result(f, TIMEOUT.duration());
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   /**
@@ -97,9 +110,9 @@ public class Replication {
     if (repl == null)
       return "No information available";
 
-    scala.concurrent.Future<Object> f = ask(repl, new RequestStatus(), timeout);
+    scala.concurrent.Future<Object> f = ask(repl, new RequestStatus(), TIMEOUT);
     try {
-      return (String) Await.result(f, timeout.duration());
+      return (String) Await.result(f, TIMEOUT.duration());
     } catch (Exception e) {
       return "No information available";
     }

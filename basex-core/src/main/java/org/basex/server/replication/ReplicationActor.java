@@ -8,14 +8,11 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.japi.Procedure;
 import akka.routing.FromConfig;
-import akka.util.Timeout;
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
 import org.basex.server.election.ElectionActor;
 import org.basex.server.election.ProcessNumber;
 import org.basex.server.replication.InternalMessages.RequestStatus;
-import org.basex.server.replication.InternalMessages.StatusMessage;
-import scala.concurrent.duration.Duration;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -24,6 +21,7 @@ import java.util.Map;
 import static org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
 import static org.basex.server.replication.DataMessages.DataMessage;
+import static org.basex.server.replication.DataMessages.DatabaseMessage;
 import static org.basex.server.replication.InternalMessages.Connect;
 import static org.basex.server.replication.InternalMessages.Start;
 import static org.basex.server.replication.Settings.SettingsProvider;
@@ -51,8 +49,8 @@ public class ReplicationActor extends UntypedActor {
   private ActorRef dbRouter;
   /** Settings from the application.conf. */
   public final SettingsImpl settings = SettingsProvider.get(getContext().system());
-  /** Timeout. */
-  private final Timeout timeout = new Timeout(Duration.create(5, "seconds"));
+  /** Notify this actor reference when the connection startup is finished. */
+  private ActorRef notifyStartupComplete = null;
   /** Logging. */
   private final LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
@@ -78,7 +76,9 @@ public class ReplicationActor extends UntypedActor {
     log.debug("Replication actor at path {} started.", cluster.selfAddress());
     id = cluster.selfAddress().toString();
 
-    getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), timeout), "election");
+    getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), settings.TIMEOUT), "election");
+    dbRouter = getContext().actorOf(DataExecutionActor.mkProps(dbCtx).withRouter(
+      new FromConfig()), "dbrouter");
   }
 
   @Override
@@ -97,10 +97,17 @@ public class ReplicationActor extends UntypedActor {
     public void apply(Object msg) throws Exception {
       if (msg instanceof Start) {
         // register yourself as member of this cluster
+        cluster.registerOnMemberUp(new Runnable() {
+          @Override
+          public void run() {
+            if (notifyStartupComplete != null) notifyStartupComplete.tell(true, getSelf());
+          }
+        });
+
         cluster.join(cluster.selfAddress());
       } else if (msg instanceof ConnectionStart) {
         log.info("Incoming connection request");
-        ActorRef connHandler = getContext().actorOf(ConnectionHandlingActor.mkProps(set, dbCtx, timeout));
+        ActorRef connHandler = getContext().actorOf(ConnectionHandlingActor.mkProps(set, dbCtx, settings.TIMEOUT));
         connHandler.forward(msg, getContext());
       } else if (msg instanceof Member) {
         Member newMember = (Member) msg;
@@ -145,10 +152,13 @@ public class ReplicationActor extends UntypedActor {
   public void onReceive(final Object msg) throws Exception {
     if (msg instanceof Start) {
       log.info("Replica set startup command");
+      notifyStartupComplete = getSender();
+
       setState(State.PRIMARY);
       getSelf().forward(msg, getContext());
     } else if (msg instanceof Connect) {
       cluster.join(((Connect) msg).getAddr());
+      notifyStartupComplete = getSender();
 
       cluster.registerOnMemberUp(new Runnable() {
         @Override
@@ -164,17 +174,8 @@ public class ReplicationActor extends UntypedActor {
             .tell(new ConnectionStart(id, settings.VOTING, settings.WEIGHT, dbTimestamps), getSelf());
         }
       });
-    } else if (msg instanceof StatusMessage) {
-      StatusMessage sm = (StatusMessage) msg;
-      log.info("Status: {}", sm);
-
-      if (state == State.PRIMARY) {
-        setState(State.PRIMARY);
-      } else {
-        setState(State.SECONDARY);
-      }
-
-      set.setState(sm.getState());
+    } else if (msg instanceof DatabaseMessage) {
+      dbRouter.forward(msg, getContext());
     } else if (msg instanceof SyncFinished) {
       SyncFinished fin = (SyncFinished) msg;
 
@@ -185,6 +186,7 @@ public class ReplicationActor extends UntypedActor {
       }
 
       setState(State.SECONDARY);
+      if (notifyStartupComplete != null) notifyStartupComplete.tell(true, getSelf());
     } else {
       handleAll(msg);
     }
@@ -242,8 +244,6 @@ public class ReplicationActor extends UntypedActor {
           }
           break;
         case SECONDARY:
-          dbRouter = getContext().actorOf(DataExecutionActor.mkProps(dbCtx).withRouter(
-            new FromConfig()), "dbrouter");
           getContext().become(secondaryProcedure);
           break;
       }

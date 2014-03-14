@@ -1,12 +1,12 @@
 package org.basex.server.replication;
 
 import org.basex.core.Context;
-import org.basex.core.Replication;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
 
@@ -16,126 +16,71 @@ import static org.basex.server.replication.ReplicationExceptions.ReplicationAlre
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
  */
-public class ConnectionTest {
-  @BeforeClass
-  public static void setup() {
-  }
+public class ConnectionTest extends SimpleSandboxTest {
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
 
-  @Before
-  public void startup() {
-  }
+  @Test
+  public void startConnection() throws ReplicationAlreadyRunningException {
+    Context ctx1 = createSandbox();
+    Context ctx2 = createSandbox();
+    assert(ctx1.replication.start(ctx1, "127.0.0.1", 8765));
+    assert(ctx2.replication.connect(ctx2, "127.0.0.1", 8762, "127.0.0.1", 8765));
 
-  @After
-  public void teardown() {
+    ctx1.close();
+    ctx2.close();
   }
 
   @Test
-  public void startConnection() throws Exception, ReplicationAlreadyRunningException {
-    final int MAX_TRIES = 100;
+  public void noConnectAfterStart() throws ReplicationAlreadyRunningException {
+    Context ctx1 = createSandbox();
+    ctx1.replication.start(ctx1, "127.0.0.1", 8765);
 
-    Context ctx1 = new Context();
-    Context ctx2 = new Context();
-    Replication repl1 = ctx1.replication;
-    Replication repl2 = ctx2.replication;
-    repl1.start(ctx1, "127.0.0.1", 8765);
+    thrown.expect(ReplicationAlreadyRunningException.class);
+    ctx1.replication.connect(ctx1, "127.0.0.1", 8762, "127.0.0.1", 8765);
 
-    repl2.connect(ctx2, "127.0.0.1", 8762, "127.0.0.1", 8765);
-
-    boolean infoAvailable = false;
-    int tries = 0;
-    String info = "";
-    while (!infoAvailable && tries < MAX_TRIES) {
-      info = repl1.info();
-      if (info.equals("No information available")) {
-        ++tries;
-        Thread.sleep(100);
-      } else {
-        infoAvailable = true;
-      }
-    }
-
-
-    assert(info.startsWith("State: PRIMARY"));
-
-    Thread.sleep(1000);
-    String repl2Info = repl2.info();
-    assert(repl2Info.startsWith("State: SECONDARY"));
-  }
-
-  @Test
-  public void noConnectAfterStart() throws Exception, ReplicationAlreadyRunningException {
-    Context ctx1 = new Context();
-    Replication repl1 = ctx1.replication;
-    repl1.start(ctx1, "127.0.0.1", 8765);
-
-    ExpectedException.none().expect(ReplicationAlreadyRunningException.class);
-    repl1.connect(ctx1, "127.0.0.1", 8762, "127.0.0.1", 8765);
+    ctx1.close();
   }
 
 
   @Test
-  public void startConnectionThreeMembers() throws Exception, ReplicationAlreadyRunningException {
-    final int MAX_TRIES = 100;
+  public void startConnectionThreeMembers() throws ReplicationAlreadyRunningException {
+    Context ctx1 = createSandbox();
+    Context ctx2 = createSandbox();
+    Context ctx3 = createSandbox();
+    assert(ctx1.replication.start(ctx1, "127.0.0.1", 8765));
+    assert(ctx2.replication.connect(ctx2, "127.0.0.1", 8762, "127.0.0.1", 8765));
+    assert(ctx3.replication.connect(ctx2, "127.0.0.1", 8760, "127.0.0.1", 8765));
 
-    Context ctx1 = new Context();
-    Context ctx2 = new Context();
-    Context ctx3 = new Context();
-    Replication repl1 = ctx1.replication;
-    Replication repl2 = ctx2.replication;
-    Replication repl3 = ctx3.replication;
-    repl1.start(ctx1, "127.0.0.1", 8765);
+    String info = ctx1.replication.info();
+    assert(info.startsWith("State: RUNNING"));
+    assert(info.contains("Number of secondaries: 2"));
 
-    repl2.connect(ctx2, "127.0.0.1", 8762, "127.0.0.1", 8765);
-    repl3.connect(ctx3, "127.0.0.1", 8760, "127.0.0.1", 8765);
-
-    boolean infoAvailable = false;
-    int tries = 0;
-    String info = "";
-    while (!infoAvailable && tries < MAX_TRIES) {
-      info = repl1.info();
-      if (info.equals("No information available")) {
-        ++tries;
-        Thread.sleep(100);
-      } else {
-        infoAvailable = true;
-      }
-    }
-
-    assert(info.startsWith("State: "));
+    ctx1.close();
+    ctx2.close();
+    ctx3.close();
   }
 
   @Test
-  public void startConnectionTwentyMembers() throws Exception, ReplicationAlreadyRunningException {
-    // TODO does not work, only three members connected
-    final int RUNS = 20;
-    final int MAX_TRIES = 100;
+  public void startConnectionTenMembers() throws ReplicationAlreadyRunningException, InterruptedException {
+    Context ctxMain = createSandbox();
+    assert(ctxMain.replication.start(ctxMain, "127.0.0.1", 8765));
 
-    Context ctx1 = new Context();
-    Replication repl1 = ctx1.replication;
-    repl1.start(ctx1, "127.0.0.1", 8765);
-
-    for (int i = 0; i < RUNS; ++i) {
-      Context ctx = new Context();
-      ctx.replication.connect(ctx, "127.0.0.1", 8766 + i, "127.0.0.1", 8765);
+    List<Context> ctxs = new ArrayList<Context>();
+    for (int i = 0; i < 10; ++i) {
+      ctxs.add(createSandbox());
     }
 
-    Thread.sleep(2000);
-
-    boolean infoAvailable = false;
-    int tries = 0;
-    String info = "";
-    while (!infoAvailable && tries < MAX_TRIES) {
-      info = repl1.info();
-      if (info.equals("No information available")) {
-        ++tries;
-        Thread.sleep(300);
-      } else {
-        infoAvailable = true;
-      }
+    for (int i = 0; i < 10; ++i) {
+      final Context c = ctxs.get(i);
+      assert(c.replication.connect(c, "127.0.0.1", 8770 + (i * 2), "127.0.0.1", 8765));
     }
 
-    assert(info.startsWith("State: "));
+    String info = ctxMain.replication.info();
+    assert(info.startsWith("State: RUNNING"));
+    assert(info.contains("Number of secondaries: 10"));
+
+    ctxMain.close();
+    for (Context c : ctxs) c.close();
   }
-
-
 }

@@ -1,20 +1,26 @@
 package org.basex.core.cmd;
 
-import static org.basex.core.Text.*;
-
-import java.io.*;
-
-import org.basex.build.*;
+import org.basex.build.Builder;
+import org.basex.build.DiskBuilder;
+import org.basex.build.Parser;
 import org.basex.core.*;
-import org.basex.core.parse.*;
-import org.basex.core.parse.Commands.*;
-import org.basex.data.*;
-import org.basex.index.*;
-import org.basex.io.*;
-import org.basex.io.serial.*;
-import org.basex.query.value.node.*;
-import org.basex.util.*;
-import org.basex.util.list.*;
+import org.basex.core.parse.CmdBuilder;
+import org.basex.core.parse.Commands.Cmd;
+import org.basex.data.Data;
+import org.basex.data.DiskData;
+import org.basex.data.MetaData;
+import org.basex.index.IndexType;
+import org.basex.io.IO;
+import org.basex.io.IOFile;
+import org.basex.io.serial.BuilderSerializer;
+import org.basex.io.serial.Serializer;
+import org.basex.query.value.node.DBNode;
+import org.basex.util.Util;
+import org.basex.util.list.IntList;
+
+import java.io.IOException;
+
+import static org.basex.core.Text.*;
 
 /**
  * Evaluates the 'optimize all' command and rebuilds all data structures of

@@ -14,6 +14,47 @@ public interface DataMessages {
   public interface DataMessage {
   }
 
+  public class DatabaseMessage implements Serializable, DataMessage {
+    /** Database name. */
+    private final String name;
+
+    private final byte[] tbl;
+    private final byte[] tbli;
+    private final byte[] inf;
+    private final byte[] txt;
+    private final byte[] atv;
+
+    public DatabaseMessage(final String name, final byte[] tbl, final byte[] tbli, final byte[] inf, final byte[] txt,
+                           final byte[] atv) {
+      this.name = name;
+      this.tbl = tbl;
+      this.tbli = tbli;
+      this.inf = inf;
+      this.txt = txt;
+      this.atv = atv;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public byte[] getTbl() { return tbl; }
+
+    public byte[] getTbli() { return tbli; }
+
+    public byte[] getInf() {
+      return inf;
+    }
+
+    public byte[] getTxt() {
+      return txt;
+    }
+
+    public byte[] getAtv() {
+      return atv;
+    }
+  }
+
   /**
    * Add a document to a database.
    */

@@ -6,11 +6,18 @@ import akka.event.Logging;
 import akka.event.LoggingAdapter;
 import akka.util.Timeout;
 import org.basex.core.Context;
+import org.basex.io.IO;
+import org.basex.io.IOFile;
+import org.basex.io.out.ArrayOutput;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Iterator;
 
+import static org.basex.data.DataText.*;
 import static org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
+import static org.basex.server.replication.DataMessages.DatabaseMessage;
 
 /**
  * This actor handles a new incoming member on a primary within a replica set. It must
@@ -23,7 +30,7 @@ public class ConnectionHandlingActor extends UntypedActor {
   /** Replica set. */
   private final ReplicaSet set;
   /** Database context. */
-  private final Context dbContext;
+  private final Context dbCtx;
   /** Timeout. */
   private final Timeout timeout;
   /** Logging. */
@@ -47,8 +54,26 @@ public class ConnectionHandlingActor extends UntypedActor {
    */
   public ConnectionHandlingActor(final ReplicaSet set, final Context dbContext, final Timeout timeout) {
     this.set = set;
-    this.dbContext = dbContext;
+    this.dbCtx = dbContext;
     this.timeout = timeout;
+  }
+
+  private byte[] getData(final IOFile src) {
+    // optimize buffer size
+    final int bsize = (int) Math.max(1, Math.min(src.length(), 1 << 22));
+    final byte[] buf = new byte[bsize];
+
+    final ArrayOutput ao = new ArrayOutput();
+    InputStream fis = null;
+    try {
+      fis = src.inputStream();
+      // copy file buffer by buffer
+      for(int i; (i = fis.read(buf)) != -1;) ao.write(buf, 0, i);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    return ao.toArray();
   }
 
   @Override
@@ -58,16 +83,32 @@ public class ConnectionHandlingActor extends UntypedActor {
       ConnectionStart resp = (ConnectionStart) msg;
       org.basex.server.replication.Member m = new org.basex.server.replication.Member(getSender(), resp.getId(), resp.isVoting());
 
-      for (Iterator<String> it = dbContext.databases.listDBs().iterator(); it.hasNext();) {
+      for (Iterator<String> it = dbCtx.databases.listDBs().iterator(); it.hasNext();) {
         String db = it.next();
 
-        // TODO respect timestamps
-        if (!resp.getDatabases().containsKey(db)) {
-          // todo send actual database content
-          byte [] d = {0x00};
-          log.info("Sync database {} to {}", db, getSender().path());
-          getSender().tell(new ConnectionMessages.SyncDatabase(db, d), getSelf());
+        log.info("Sync database {} to {}", db, getSender().path());
+        final IOFile src = dbCtx.globalopts.dbpath(db);
+        byte[] tbl = new byte[0];
+        byte[] tbli = new byte[0];
+        byte[] inf = new byte[0];
+        byte[] txt = new byte[0];
+        byte[] atv = new byte[0];
+        // file content
+        for(final String file : src.descendants()) {
+          if(file.equals(DATATBL + IO.BASEXSUFFIX)) {
+            tbl = getData(new IOFile(src, file));
+          } else if(file.equals(DATATBL + "i" + IO.BASEXSUFFIX)) {
+            tbli = getData(new IOFile(src, file));
+          } else if(file.equals(DATAINF + IO.BASEXSUFFIX)) {
+            inf = getData(new IOFile(src, file));
+          } else if(file.equals(DATATXT + IO.BASEXSUFFIX)) {
+            txt = getData(new IOFile(src, file));
+          } else if(file.equals(DATAATV + IO.BASEXSUFFIX)) {
+            atv = getData(new IOFile(src, file));
+          }
         }
+
+        getSender().tell(new DatabaseMessage(db, tbl, tbli, inf, txt, atv), getSelf());
       }
 
       log.info("Connection to member {} established, ID: {}", getSender().path(), resp.getId());
