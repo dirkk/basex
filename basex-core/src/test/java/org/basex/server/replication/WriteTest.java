@@ -2,13 +2,8 @@ package org.basex.server.replication;
 
 import org.basex.core.BaseXException;
 import org.basex.core.Context;
-import org.basex.core.GlobalOptions;
-import org.basex.core.Replication;
 import org.basex.core.cmd.*;
-import org.basex.io.IOFile;
 import org.basex.util.Performance;
-import org.basex.util.Prop;
-import org.basex.util.Util;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,7 +12,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * Testing the primary election handling of a replica set.
@@ -25,11 +21,10 @@ import static org.junit.Assert.*;
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
  */
-public class WriteTest {
+public class WriteTest extends SimpleSandboxTest {
   private Context ctx1;
   private Context ctx2;
   private List<Context> repls;
-  private static int sandboxCounter = 0;
 
   @Before
   public void startup() throws Exception, ReplicationAlreadyRunningException {
@@ -48,48 +43,12 @@ public class WriteTest {
     ctx2.close();
   }
 
-  private Context createSandbox() {
-    final IOFile sb =  new IOFile(Prop.TMP, Util.className(WriteTest.class) + sandboxCounter++);
-    sb.delete();
-    assertTrue("Sandbox could not be created.", sb.md());
-    Context ctx = new Context();
-    ctx.globalopts.set(GlobalOptions.DBPATH, sb.path() + "/data");
-    ctx.globalopts.set(GlobalOptions.WEBPATH, sb.path() + "/webapp");
-    ctx.globalopts.set(GlobalOptions.RESTXQPATH, sb.path() + "/webapp");
-    ctx.globalopts.set(GlobalOptions.REPOPATH, sb.path() + "/repo");
-
-    return ctx;
-  }
-
   private void startConnection(List<Context> repls) throws Exception, ReplicationAlreadyRunningException {
-    final int MAX_TRIES = 100;
-
     repls.get(0).replication.start(repls.get(0), "127.0.0.1", 8765);
 
     for (int i = 1; i < repls.size(); ++i) {
       repls.get(i).replication.connect(repls.get(i), "127.0.0.1", 8770 + i * 2, "127.0.0.1", 8765);
     }
-
-    for (Context c : repls) {
-      Replication r = c.replication;
-      boolean infoAvailable = false;
-      int tries = 0;
-      String info;
-      while (!infoAvailable && tries < MAX_TRIES) {
-        info = r.info();
-        if (info.equals("No information available") || info.contains("UNCONNECTED")) {
-          ++tries;
-          Thread.sleep(100);
-        } else {
-          infoAvailable = true;
-        }
-      }
-
-      if (!infoAvailable) throw new Exception("Connection setup failed.");
-    }
-
-    // TODO wait for connection setup...
-    Performance.sleep(1000);
 
     System.out.println("Connection setup completed.");
   }
@@ -109,7 +68,6 @@ public class WriteTest {
       Thread.sleep(1000);
 
       String after = new XQuery("db:open('test')").execute(ctx2);
-      System.out.println("After: " + after);
     }
   }
 
