@@ -8,10 +8,10 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
@@ -27,7 +27,7 @@ public class WriteTest extends SimpleSandboxTest {
   private List<Context> repls;
 
   @Before
-  public void startup() throws Exception, ReplicationAlreadyRunningException {
+  public void startup() throws Exception {
     ctx1 = createSandbox();
     ctx2 = createSandbox();
 
@@ -43,18 +43,21 @@ public class WriteTest extends SimpleSandboxTest {
     ctx2.close();
   }
 
-  private void startConnection(List<Context> repls) throws Exception, ReplicationAlreadyRunningException {
-    repls.get(0).replication.start(repls.get(0), "127.0.0.1", 8765);
+  private void startConnection(List<Context> repls) throws Exception {
+    repls.get(0).replication.start(repls.get(0), new InetSocketAddress("127.0.0.1", 8765),
+      new InetSocketAddress("127.0.0.1", 8766));
 
     for (int i = 1; i < repls.size(); ++i) {
-      repls.get(i).replication.connect(repls.get(i), "127.0.0.1", 8770 + i * 2, "127.0.0.1", 8765);
+      repls.get(0).replication.start(repls.get(i), new InetSocketAddress("127.0.0.1", 8770 + i * 2),
+        new InetSocketAddress("127.0.0.1", 8771 + i * 2 ));
+      repls.get(i).replication.connect(new InetSocketAddress("127.0.0.1", 8765));
     }
 
     System.out.println("Connection setup completed.");
   }
 
   @Test
-  public void add() throws Exception, ReplicationAlreadyRunningException {
+  public void add() throws Exception {
     try {
       new XQuery("db:open('test')").execute(ctx2);
 
@@ -67,12 +70,12 @@ public class WriteTest extends SimpleSandboxTest {
 
       Thread.sleep(1000);
 
-      String after = new XQuery("db:open('test')").execute(ctx2);
+      assertEquals("<A/>", new XQuery("db:open('test')").execute(ctx2));
     }
   }
 
   @Test
-  public void create() throws Exception, ReplicationAlreadyRunningException {
+  public void create() throws Exception {
     try {
       new XQuery("db:open('test')").execute(ctx2);
 
@@ -89,7 +92,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void alter() throws Exception, ReplicationAlreadyRunningException {
+  public void alter() throws Exception {
     try {
       new XQuery("db:open('testNew')").execute(ctx2);
 
@@ -107,7 +110,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void drop() throws Exception, ReplicationAlreadyRunningException {
+  public void drop() throws Exception {
     try {
       new XQuery("db:open('test')").execute(ctx2);
 
@@ -132,7 +135,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void copy() throws Exception, ReplicationAlreadyRunningException {
+  public void copy() throws Exception {
     try {
       new XQuery("db:open('testNew')").execute(ctx2);
 
@@ -151,7 +154,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void delete() throws Exception, ReplicationAlreadyRunningException {
+  public void delete() throws Exception {
     try {
       new XQuery("db:open('test')").execute(ctx2);
 
@@ -173,7 +176,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void rename() throws Exception, ReplicationAlreadyRunningException {
+  public void rename() throws Exception {
     try {
       new XQuery("db:open('test')").execute(ctx2);
 
@@ -195,7 +198,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void update() throws Exception, ReplicationAlreadyRunningException {
+  public void update() throws Exception {
     try {
       new XQuery("db:open('test')").execute(ctx2);
 
@@ -243,7 +246,7 @@ public class WriteTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void performanceTest() throws Exception, ReplicationAlreadyRunningException {
+  public void performanceTest() throws Exception {
     final int TRIES = 100;
 
 /*

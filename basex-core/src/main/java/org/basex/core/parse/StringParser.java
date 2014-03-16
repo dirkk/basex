@@ -147,16 +147,6 @@ public final class StringParser extends CmdParser {
             return new DropEvent(name(cmd));
         }
         break;
-      case REPLICATION:
-        switch(consume(CmdReplication.class, cmd)) {
-          case START:
-            return new ReplicationStart(string(cmd), string(cmd));
-          case CONNECT:
-            return new ReplicationConnect(string(cmd), string(cmd), string(cmd), string(cmd));
-          case STOP:
-            return new ReplicationStop();
-        }
-        break;
       case OPTIMIZE:
         switch(consume(CmdOptimize.class, cmd)) {
           case NULL:

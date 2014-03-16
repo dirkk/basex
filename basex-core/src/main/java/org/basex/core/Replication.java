@@ -12,11 +12,12 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
 import static akka.pattern.Patterns.ask;
 import static org.basex.server.replication.InternalMessages.*;
-import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
 
 /**
  * Replication infrastructure for master/slave of a replica set. A replica
@@ -41,6 +42,11 @@ public class Replication {
   /** Default timeout. */
   private static Timeout TIMEOUT = new Timeout(Duration.create(10, TimeUnit.SECONDS));
 
+  /** Host for incoming client connections. */
+  private InetAddress tcpHost;
+  /** Port for incoming client connections. */
+  private int tcpPort;
+
   /**
    * Constructor.
    */
@@ -49,19 +55,29 @@ public class Replication {
   }
   
   /**
-   * Start the replication and subsequently the akka subsystem.
+   * Start the akka subsystem and a replication actor.
    *
    * @param context context
-   * @param host host name
-   * @param port port
+   * @param akka host and port for akka system
+   * @param server host and port to bind to for client connections
    * @return success
    */
-  public boolean start(final Context context, final String host, final int port) throws ReplicationAlreadyRunningException {
-    systemStart(host, port);
+  public boolean start(final Context context, final InetSocketAddress akka, final InetSocketAddress server) {
+    if (running) {
+      return false;
+    } else {
+      running = true;
+      Config hardConfig = ConfigFactory.parseString(
+        "replication.akka.remote.netty.tcp.host=\"" + akka.getHostString() + "\"," +
+          "replication.akka.remote.netty.tcp.port=" + akka.getPort());
+      Config regularConfig = ConfigFactory.load();
+      Config completeConfig = ConfigFactory.load(hardConfig.withFallback(regularConfig));
+      system = ActorSystem.create(SYSTEM_NAME, completeConfig.getConfig("replication"));
+    }
 
     repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
 
-    Future f = ask(repl,new Start(), TIMEOUT);
+    Future f = ask(repl,new Start(server), TIMEOUT);
     try {
       return (Boolean) Await.result(f, TIMEOUT.duration());
     } catch (Exception e) {
@@ -69,30 +85,11 @@ public class Replication {
     }
   }
 
-  private void systemStart(final String host, final int port) throws ReplicationAlreadyRunningException {
-    if (running) {
-      throw new ReplicationAlreadyRunningException();
-    } else {
-      running = true;
-      Config hardConfig = ConfigFactory.parseString(
-        "replication.akka.remote.netty.tcp.host=\"" + host + "\"," +
-          "replication.akka.remote.netty.tcp.port=" + port);
-      Config regularConfig = ConfigFactory.load();
-      Config completeConfig = ConfigFactory.load(hardConfig.withFallback(regularConfig));
-      system = ActorSystem.create(SYSTEM_NAME, completeConfig.getConfig("replication"));
-    }
-  }
-
   /**
    *
    */
-  public boolean connect(final Context context, final String localHost, final int localPort,
-                      final String remoteHost, final int remotePort) throws ReplicationAlreadyRunningException {
-    systemStart(localHost, localPort);
-
-    Address addr = new Address("akka.tcp", "replBaseX", remoteHost, remotePort);
-    repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
-
+  public boolean connect(final InetSocketAddress socket) {
+    Address addr = new Address("akka.tcp", "replBaseX", socket.getHostName(), socket.getPort());
     Future f = ask(repl,new Connect(addr), TIMEOUT);
     try {
       return (Boolean) Await.result(f, TIMEOUT.duration());
@@ -132,5 +129,13 @@ public class Replication {
 
   public void publish(final DataMessages.DataMessage msg) {
     repl.tell(msg, ActorRef.noSender());
+  }
+
+  public void setTcpPort(int tcpPort) {
+    this.tcpPort = tcpPort;
+  }
+
+  public void setTcpHost(InetAddress tcpHost) {
+    this.tcpHost = tcpHost;
   }
 }

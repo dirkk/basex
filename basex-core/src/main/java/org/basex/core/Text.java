@@ -1429,9 +1429,13 @@ public interface Text {
   // REPLICATION TEXTS ========================================================
 
   /** Replication is already running. */
-  String R_ALREADY_RUNNING = lang("r_already_running");
+  String R_ALREADY_RUNNING = lang("repl_already_running");
   /** Connection to the message broker was refused. */
-  String R_CONNECTION_REFUSED_X = lang("r_connection_refused_%");
+  String R_CONNECTION_REFUSED_X = lang("repl_connection_refused_%");
+  /** Replication system was started. */
+  String R_STARTED_PORT_X_X = lang("repl_started_port_%_%");
+  /** Replication system was stopped. */
+  String R_STOPPED_PORT_X = lang("repl_stopped_port_%");
 
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);

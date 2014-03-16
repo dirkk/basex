@@ -13,6 +13,7 @@ import org.basex.core.cmd.*;
 import org.basex.util.Performance;
 import org.junit.Test;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 
 /**
@@ -41,13 +42,14 @@ public class ReplCmdTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void runQueriesReplicated() throws BaseXException, ReplicationExceptions.ReplicationAlreadyRunningException {
+  public void runQueriesReplicated() throws BaseXException {
     final Context ctx1 = createSandbox();
     final Context ctx2 = createSandbox();
-    new ReplicationStart("127.0.0.1", 8765).execute(ctx1);
+    ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
     Performance.sleep(1000);
 
-    new ReplicationConnect("127.0.0.1", 8800, "127.0.0.1", 8765).execute(ctx2);
+    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
+    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
     Performance.sleep(1000);
 
     new CreateDB("test").execute(ctx1);

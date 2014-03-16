@@ -7,7 +7,8 @@ import org.basex.core.cmd.XQuery;
 import org.basex.util.Performance;
 import org.junit.Test;
 
-import static org.basex.server.replication.ReplicationExceptions.ReplicationAlreadyRunningException;
+import java.net.InetSocketAddress;
+
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -16,13 +17,15 @@ import static org.junit.Assert.assertEquals;
  */
 public class DatabaseReplicationTest extends SimpleSandboxTest {
   @Test
-  public void replicateSimpleDatabase() throws BaseXException, ReplicationAlreadyRunningException {
+  public void replicateSimpleDatabase() throws BaseXException {
     Context ctx1 = createSandbox();
     new CreateDB("databaseTest", "<A><B/></A>").execute(ctx1);
     Context ctx2 = createSandbox();
 
-    ctx1.replication.start(ctx1, "127.0.0.1", 8765);
-    ctx2.replication.connect(ctx2, "127.0.0.1", 8770, "127.0.0.1", 8765);
+    ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
+
+    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
+    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
     assertEquals("<A>\n  <B/>\n</A>", new XQuery("db:open('databaseTest')").execute(ctx1));
     assertEquals("<A>\n  <B/>\n</A>", new XQuery("db:open('databaseTest')").execute(ctx2));
 
@@ -31,13 +34,16 @@ public class DatabaseReplicationTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void replicateSmallDatabase() throws BaseXException, ReplicationAlreadyRunningException {
+  public void replicateSmallDatabase() throws BaseXException {
     Context ctx1 = createSandbox();
     new CreateDB("databaseTest", "basex-core/src/test/resources/test.xml").execute(ctx1);
     Context ctx2 = createSandbox();
 
-    ctx1.replication.start(ctx1, "127.0.0.1", 8765);
-    ctx2.replication.connect(ctx2, "127.0.0.1", 8770, "127.0.0.1", 8765);
+    ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
+
+    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
+    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
+
     assertEquals("text in child", new XQuery("db:open('databaseTest')//childnode/string()").execute(ctx1));
     assertEquals("baz bar blu", new XQuery("db:open('databaseTest')//contextnode/@name/data()").execute(ctx1));
     assertEquals("text in child", new XQuery("db:open('databaseTest')//childnode/string()").execute(ctx2));
@@ -48,13 +54,15 @@ public class DatabaseReplicationTest extends SimpleSandboxTest {
   }
 
   @Test
-  public void replicateBiggerDatabase() throws BaseXException, ReplicationAlreadyRunningException {
+  public void replicateBiggerDatabase() throws BaseXException {
     Context ctx1 = createSandbox();
     new CreateDB("databaseTest", "basex-core/src/test/resources/factbook.zip").execute(ctx1);
     Context ctx2 = createSandbox();
 
-    ctx1.replication.start(ctx1, "127.0.0.1", 8765);
-    ctx2.replication.connect(ctx2, "127.0.0.1", 8770, "127.0.0.1", 8765);
+    ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
+
+    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
+    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
 
     assertEquals(
       "28820672",

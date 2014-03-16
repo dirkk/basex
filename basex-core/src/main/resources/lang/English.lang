@@ -538,5 +538,7 @@ s_server_admin       = Server Administration
 
 # Replication texts
 
-r_already_running        = Replication is already running.
-r_connection_refused_%   = Connection to the message broker at % was not successful.
+repl_already_running        = Replication is already running.
+repl_connection_refused_%   = Connection to the message broker at % was not successful.
+repl_started_port_%_%       = Replication was started at port %. Clients can connect at port %.
+repl_stopped_port_%         = Replication was stopped (port: %)

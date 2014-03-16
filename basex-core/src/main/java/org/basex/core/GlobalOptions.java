@@ -1,12 +1,13 @@
 package org.basex.core;
 
-import static org.basex.util.Prop.*;
-
-import java.util.*;
-
-import org.basex.io.*;
-import org.basex.util.*;
+import org.basex.io.IO;
+import org.basex.io.IOFile;
+import org.basex.util.Prop;
 import org.basex.util.options.*;
+
+import java.util.Random;
+
+import static org.basex.util.Prop.*;
 
 /**
  * This class defines options which are used all around the project.
@@ -85,6 +86,10 @@ public final class GlobalOptions extends Options {
   public static final BooleanOption HTTPLOCAL = new BooleanOption("HTTPLOCAL", false);
   /** Port for stopping the web server. */
   public static final NumberOption STOPPORT = new NumberOption("STOPPORT", 8985);
+
+
+  /** Replication: port, used for binding akka. */
+  public static final NumberOption AKKAPORT = new NumberOption("AKKAPORT", 1988);
 
   /**
    * Constructor, adopting system properties starting with "org.basex.".

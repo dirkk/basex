@@ -154,6 +154,9 @@ public class ReplicationActor extends UntypedActor {
       log.info("Replica set startup command");
       notifyStartupComplete = getSender();
 
+      // start server socket
+      getContext().actorOf(ServerActor.mkProps(getSelf(), ((Start) msg).getTcpSocket()), "server");
+
       setState(State.PRIMARY);
       getSelf().forward(msg, getContext());
     } else if (msg instanceof Connect) {

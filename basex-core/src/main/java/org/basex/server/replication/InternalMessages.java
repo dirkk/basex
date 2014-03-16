@@ -6,6 +6,7 @@ import akka.actor.RootActorPath;
 import org.basex.util.Prop;
 
 import java.io.Serializable;
+import java.net.InetSocketAddress;
 import java.util.Iterator;
 import java.util.List;
 
@@ -65,7 +66,19 @@ public interface InternalMessages {
     }
   }
 
-  public class Start implements Serializable {}
+  public class Start implements Serializable {
+    /** Address for the server to bind to for clients to connect. */
+    private final InetSocketAddress tcpSocket;
+
+    public Start(InetSocketAddress tcpSocket) {
+      this.tcpSocket = tcpSocket;
+    }
+
+    public InetSocketAddress getTcpSocket() {
+      return tcpSocket;
+    }
+  }
+
   public class Connect implements Serializable {
     /** Cluster address to connect to. */
     private final Address addr;

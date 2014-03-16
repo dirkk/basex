@@ -1,5 +1,6 @@
 package org.basex.server.replication;
 
+import org.basex.BaseXMember;
 import org.basex.BaseXServer;
 import org.basex.SandboxTest;
 import org.basex.core.BaseXException;
@@ -17,6 +18,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -87,7 +89,6 @@ public class ReplicationTest extends SandboxTest {
    */
   private void stopAllSlaves() throws IOException {
     for (ReplicaSetNode r : slaves) {
-      r.execute(new ReplicationStop());
       r.stop();
     }
   }
@@ -115,7 +116,6 @@ public class ReplicationTest extends SandboxTest {
             res);
 
     // stop slave
-    r.execute(new ReplicationStop());
     r.stop();
   }
   
@@ -289,37 +289,25 @@ public class ReplicationTest extends SandboxTest {
      */
     public ReplicaSetMaster() throws IOException {
       super();
-      
-      server = createServer(PORT);
-      startSession();
-      startReplication(PORT + 1);
-    }
-    
-    @Override
-    protected BaseXServer createServer(final int port) throws IOException {
+
+      final int port = PORT;
+
       try {
         System.setOut(NULL);
-        final StringList sl = new StringList().add("-z").add("-p" + port).add("-e" + (port -1));
-        final BaseXServer srv = new BaseXServer(sl.toArray());
-        srv.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
-        return srv;
+        final StringList sl = new StringList().add("-z").add("-a" + port + 1).add("-p" + port).add("-e" + (port -1));
+        final BaseXServer member = new BaseXServer(sl.toArray());
+        member.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
       } finally {
         System.setOut(OUT);
       }
+      startSession();
+      startReplication(PORT + 1);
     }
-  
-    /**
-     * Start the replication of this node as master instance.
-     */
-    @Override
-    public void startReplication(final int port) throws IOException {
-      execute(new ReplicationStart(HOST, port));
-    }
-    
+
     @Override
     public void stop() throws IOException {
-      execute(new ReplicationStop());
-      
+      member.context.replication.stop();
+
       super.stop();
     }
     
@@ -354,34 +342,18 @@ public class ReplicationTest extends SandboxTest {
       super();
       
       port = p;
-      server = createServer(p);
-      startSession();
-      startReplication(p + 1);
-    }
+      final int port = PORT;
 
-    @SuppressWarnings("hiding")
-    @Override
-    protected BaseXServer createServer(final int port) throws IOException {
       try {
         System.setOut(NULL);
-        final StringList sl = new StringList().add("-z").add("-p" + port).add("-e" + (port -1));
-        final BaseXServer srv = new BaseXServer(sl.toArray());
-        srv.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-slave" + port).path());
-        return srv;
+        final StringList sl = new StringList().add("-z").add("-a" + port + 1).add("-p" + port).add("-e" + (port -1));
+        member = new BaseXMember(sl.toArray());
+        member.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
       } finally {
         System.setOut(OUT);
       }
-    }
-    
-    /**
-     * Start the replication for this node.
-     *
-     * @param port to start akka system
-     * @throws IOException I/O exception
-     */
-    @Override
-    public void startReplication(final int port) throws IOException {
-      session.execute(new ReplicationConnect(HOST, port, HOST, PORT + 1));
+      startSession();
+      startReplication(p + 1);
     }
     
     @Override
@@ -403,7 +375,7 @@ public class ReplicationTest extends SandboxTest {
    */
   private abstract class ReplicaSetNode {
     /** Server reference. */
-    protected BaseXServer server;
+    protected BaseXMember member;
     /** Session reference. */
     protected Session session;
     
@@ -436,26 +408,19 @@ public class ReplicationTest extends SandboxTest {
         fail(Util.message(ex));
       }
 
-      stopServer(server);
+      member.stop();
     }
     
     /**
      * Starts the client session.
      */
     public abstract void startSession();
-    
-    /** 
-     * Start the replication, either as master or slave.
-     * @throws IOException I/O exception
-     */
-    public abstract void startReplication(final int port) throws IOException;
 
     /**
-     * Creates a new, sandboxed server instance.
-     * @param port port number, event port is port - 1
-     * @return server instance
-     * @throws IOException I/O exception
+     * Start the replication of this node as master instance.
      */
-    protected abstract BaseXServer createServer(final int port) throws IOException;
+    public void startReplication(final int port) throws IOException {
+      member.context.replication.start(member.context, new InetSocketAddress(port), new InetSocketAddress(port + 1));
+    }
   }
 }

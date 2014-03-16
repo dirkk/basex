@@ -1,18 +1,22 @@
 package org.basex.core;
 
-import static org.basex.util.Token.*;
-import static org.junit.Assert.*;
-
-import java.io.*;
-
+import org.basex.SandboxTest;
 import org.basex.core.cmd.*;
-import org.basex.core.parse.Commands.*;
-import org.basex.data.*;
-import org.basex.io.*;
-import org.basex.server.*;
-import org.basex.*;
-import org.basex.util.*;
-import org.junit.*;
+import org.basex.core.parse.Commands.CmdIndex;
+import org.basex.data.Nodes;
+import org.basex.io.IOFile;
+import org.basex.server.LocalSession;
+import org.basex.server.Session;
+import org.basex.util.Util;
+import org.junit.After;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
+import java.io.IOException;
+
+import static org.basex.util.Token.md5;
+import static org.basex.util.Token.token;
+import static org.junit.Assert.*;
 
 /**
  * This class tests the database commands.
@@ -346,9 +350,7 @@ public class CommandTest extends SandboxTest {
   public final void infoReplication() {
     ok(new InfoReplication());
 
-    ok(new ReplicationStart(REPLICATION_HOST, REPLICATION_PORT));
     ok(new InfoReplication());
-    ok(new ReplicationStop());
   }
 
   /** Command test. */
@@ -510,55 +512,6 @@ public class CommandTest extends SandboxTest {
     // reject invalid or missing names
     no(new Store("", "</a>"));
     no(new Store("../x", FILE));
-  }
-  
-  /** Start replication as master. */
-  @Test
-  public final void replicationMaster() {
-    ok(new ReplicationStart(REPLICATION_HOST, REPLICATION_PORT));
-    // already running as master, so second call should fail
-    no(new ReplicationStart(REPLICATION_HOST, REPLICATION_PORT));
-    ok(new ReplicationStop());
-  }
-  
-  /** Tests if the correctness test of an AMQP URI is valid. */
-  @Test
-  public final void replicationAMQP() {
-    // valid addresses
-    /* TODO
-    no(new ReplicationStart("amqp://localhost", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost"));
-    no(new ReplicationStart("localhost", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost"));
-    no(new ReplicationStart("amqp://localhost:1234", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost:1234"));
-    no(new ReplicationStart("amqp://localhost/vhost", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost/vhost"));
-    no(new ReplicationStart("amqp://localhost:1234/vhost", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://localhost:1234/vhost"));
-    no(new ReplicationStart("amqp://user@localhost", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://user@localhost"));
-    no(new ReplicationStart("amqp://user:pass@localhost:1234/vhost", REPL_SET),
-        R_CONNECTION_REFUSED_X.replaceAll("%", "amqp://user:pass@localhost:1234/vhost"));
-    
-    // invalid addresses
-    no(new ReplicationStart("amqp://", REPL_SET), R_INVALID_AMQP_ADDRESS);
-    no(new ReplicationStart("", REPL_SET), R_INVALID_AMQP_ADDRESS);
-    no(new ReplicationStart("amqp://localhost:", REPL_SET), R_INVALID_AMQP_ADDRESS);
-    no(new ReplicationStart("amqp://:1234", REPL_SET), R_INVALID_AMQP_ADDRESS);
-    no(new ReplicationStart("amqp://user:@localhost", REPL_SET), R_INVALID_AMQP_ADDRESS);
-    no(new ReplicationStart("amqp://localhost/", REPL_SET), R_INVALID_AMQP_ADDRESS);
-    */
-  }
-  
-  /** Stop replication instance. */
-  @Test
-  public final void replicationStop() {
-    no(new ReplicationStop());
-
-    // start as master and stop
-    ok(new ReplicationStart(REPLICATION_HOST, REPLICATION_PORT));
-    ok(new ReplicationStop());
   }
 
   /**
