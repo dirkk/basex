@@ -53,6 +53,20 @@ public class Replication {
   protected Replication() {
     running = false;
   }
+
+  private void systemStart(final Context context, final InetSocketAddress akka) {
+    if (running) return;
+
+    running = true;
+    Config hardConfig = ConfigFactory.parseString(
+      "replication.akka.remote.netty.tcp.host=\"" + akka.getHostString() + "\"," +
+        "replication.akka.remote.netty.tcp.port=" + akka.getPort());
+    Config regularConfig = ConfigFactory.load();
+    Config completeConfig = ConfigFactory.load(hardConfig.withFallback(regularConfig));
+    system = ActorSystem.create(SYSTEM_NAME, completeConfig.getConfig("replication"));
+
+    repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
+  }
   
   /**
    * Start the akka subsystem and a replication actor.
@@ -63,21 +77,9 @@ public class Replication {
    * @return success
    */
   public boolean start(final Context context, final InetSocketAddress akka, final InetSocketAddress server) {
-    if (running) {
-      return false;
-    } else {
-      running = true;
-      Config hardConfig = ConfigFactory.parseString(
-        "replication.akka.remote.netty.tcp.host=\"" + akka.getHostString() + "\"," +
-          "replication.akka.remote.netty.tcp.port=" + akka.getPort());
-      Config regularConfig = ConfigFactory.load();
-      Config completeConfig = ConfigFactory.load(hardConfig.withFallback(regularConfig));
-      system = ActorSystem.create(SYSTEM_NAME, completeConfig.getConfig("replication"));
-    }
+    systemStart(context, akka);
 
-    repl = system.actorOf(ReplicationActor.mkProps(context), "replication");
-
-    Future f = ask(repl,new Start(server), TIMEOUT);
+    Future f = ask(repl,new Start(server, null), TIMEOUT);
     try {
       return (Boolean) Await.result(f, TIMEOUT.duration());
     } catch (Exception e) {
@@ -88,9 +90,10 @@ public class Replication {
   /**
    *
    */
-  public boolean connect(final InetSocketAddress socket) {
-    Address addr = new Address("akka.tcp", "replBaseX", socket.getHostName(), socket.getPort());
-    Future f = ask(repl,new Connect(addr), TIMEOUT);
+  public boolean connect(final Context context, final InetSocketAddress akka, final InetSocketAddress server, final InetSocketAddress connect) {
+    systemStart(context, akka);
+    Address addr = new Address("akka.tcp", "replBaseX", connect.getHostString(), connect.getPort());
+    Future f = ask(repl,new Start(server, addr), TIMEOUT);
     try {
       return (Boolean) Await.result(f, TIMEOUT.duration());
     } catch (Exception e) {

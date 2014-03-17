@@ -135,6 +135,11 @@ public class ReplicaSet {
     return votingMembers;
   }
 
+  public void removeAll() {
+    setPrimary(null);
+    secondaries.clear();
+  }
+
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();

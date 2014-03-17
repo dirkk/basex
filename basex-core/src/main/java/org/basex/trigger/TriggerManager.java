@@ -3,10 +3,7 @@ package org.basex.trigger;
 import org.basex.core.BaseXException;
 import org.basex.query.value.node.DBNode;
 
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author BaseX Team 2005-12, BSD License
@@ -83,28 +80,24 @@ public class TriggerManager implements DocumentTrigger, DatabaseTrigger{
    * Unregister a trigger from the database context. Does nothing, if trigger did not
    * exist.
    *
-   * @param trigger trigger to unregister
+   * @param tClass trigger class to remove
    */
-  public void unregister(final Trigger trigger) {
-    if (trigger instanceof DocumentTrigger) {
+  public void unregister(final Class tClass) {
       for (List<DocumentTrigger> l : docTriggers.values()) {
         for (DocumentTrigger t : l) {
-          if (t == trigger) {
+          if (tClass.isInstance(t)) {
             l.remove(t);
           }
         }
       }
-    }
 
-    if (trigger instanceof DatabaseTrigger) {
       for (List<DatabaseTrigger> l : dbTriggers.values()) {
         for (DatabaseTrigger t : l) {
-          if (t == trigger) {
+          if (tClass.isInstance(t)) {
             l.remove(t);
           }
         }
       }
-    }
   }
 
   /**

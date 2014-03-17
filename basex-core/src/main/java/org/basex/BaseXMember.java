@@ -140,10 +140,11 @@ public final class BaseXMember extends Main implements Runnable {
 
   @Override
   public void run() {
-    context.replication.start(context, new InetSocketAddress(host, akkaPort), tcpAddr);
-
-    if (connectTo != null)
-      context.replication.connect(connectTo);
+    if (connectTo == null) {
+      context.replication.start(context, new InetSocketAddress(host, akkaPort), tcpAddr);
+    } else {
+      context.replication.connect(context, new InetSocketAddress(host, akkaPort), tcpAddr, connectTo);
+    }
 
     running = true;
   }
@@ -181,7 +182,7 @@ public final class BaseXMember extends Main implements Runnable {
 
   @Override
   protected void parseArguments(final String... args) throws IOException {
-    final Args arg = new Args(args, this, S_SERVERINFO, Util.info(S_CONSOLE, S_SERVER));
+    final Args arg = new Args(args, this, R_MEMBERINFO, Util.info(S_CONSOLE, R_MEMBER));
     commands = new StringList();
     boolean daemon = false;
 
@@ -214,6 +215,7 @@ public final class BaseXMember extends Main implements Runnable {
             break;
           case 'x': // connect to this akka system, given in the format host:port
             String[] in = arg.string().split(":");
+            if (in.length != 2) throw arg.usage();
             connectTo = new InetSocketAddress(in[0], Integer.valueOf(in[1]));
             break;
           case 'z': // suppress logging

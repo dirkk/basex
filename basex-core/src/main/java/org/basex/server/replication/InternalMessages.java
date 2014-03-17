@@ -68,32 +68,27 @@ public interface InternalMessages {
 
   public class Start implements Serializable {
     /** Address for the server to bind to for clients to connect. */
-    private final InetSocketAddress tcpSocket;
+    private final InetSocketAddress tcpAddr;
+    /** Cluster addres to connect to. */
+    private final Address connectAddr;
 
-    public Start(InetSocketAddress tcpSocket) {
-      this.tcpSocket = tcpSocket;
+    public Start(InetSocketAddress tcpSocket, Address connectAddr) {
+      this.tcpAddr = tcpSocket;
+      this.connectAddr = connectAddr;
     }
 
-    public InetSocketAddress getTcpSocket() {
-      return tcpSocket;
-    }
-  }
-
-  public class Connect implements Serializable {
-    /** Cluster address to connect to. */
-    private final Address addr;
-
-    public Connect(Address addr) {
-      this.addr = addr;
+    public InetSocketAddress getTcpAddr() {
+      return tcpAddr;
     }
 
-    public Address getAddr() {
-      return addr;
+    public Address getConnectAddr() {
+      return connectAddr;
     }
 
-    public ActorPath getPath() {
-      return new RootActorPath(getAddr(), "/user/replication");
+    public ActorPath getConnectPath() {
+      return new RootActorPath(getConnectAddr(), "/user/replication");
     }
   }
+
   public class RequestStatus implements Serializable {}
 }

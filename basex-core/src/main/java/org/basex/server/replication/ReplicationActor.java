@@ -22,7 +22,6 @@ import static org.basex.server.replication.ConnectionMessages.ConnectionStart;
 import static org.basex.server.replication.ConnectionMessages.SyncFinished;
 import static org.basex.server.replication.DataMessages.DataMessage;
 import static org.basex.server.replication.DataMessages.DatabaseMessage;
-import static org.basex.server.replication.InternalMessages.Connect;
 import static org.basex.server.replication.InternalMessages.Start;
 import static org.basex.server.replication.Settings.SettingsProvider;
 
@@ -77,8 +76,6 @@ public class ReplicationActor extends UntypedActor {
     id = cluster.selfAddress().toString();
 
     getContext().actorOf(ElectionActor.mkProps(new ProcessNumber(2, id), getSelf(), settings.TIMEOUT), "election");
-    dbRouter = getContext().actorOf(DataExecutionActor.mkProps(dbCtx).withRouter(
-      new FromConfig()), "dbrouter");
   }
 
   @Override
@@ -133,11 +130,11 @@ public class ReplicationActor extends UntypedActor {
   private Procedure<Object> secondaryProcedure = new Procedure<Object>() {
     @Override
     public void apply(Object msg) throws Exception {
-      if (msg instanceof DataMessage) {
-        dbRouter.forward(msg, getContext());
-      } else {
-        handleAll(msg);
-      }
+    if (msg instanceof DataMessage) {
+      dbRouter.forward(msg, getContext());
+    } else {
+      handleAll(msg);
+    }
     }
   };
 
@@ -148,35 +145,41 @@ public class ReplicationActor extends UntypedActor {
    * @param msg incoming message
    * @throws Exception exception
    */
-  @Override
-  public void onReceive(final Object msg) throws Exception {
+  private Procedure<Object> unconnectedProcedure = new Procedure<Object>() {
+    @Override
+    public void apply(final Object msg) throws Exception {
     if (msg instanceof Start) {
       log.info("Replica set startup command");
       notifyStartupComplete = getSender();
 
       // start server socket
-      getContext().actorOf(ServerActor.mkProps(getSelf(), ((Start) msg).getTcpSocket()), "server");
+      getContext().actorOf(ServerActor.mkProps(getSelf(), ((Start) msg).getTcpAddr()), "server");
+      dbRouter = getContext().actorOf(DataExecutionActor.mkProps(dbCtx).withRouter(
+        new FromConfig()), "dbrouter");
 
-      setState(State.PRIMARY);
-      getSelf().forward(msg, getContext());
-    } else if (msg instanceof Connect) {
-      cluster.join(((Connect) msg).getAddr());
-      notifyStartupComplete = getSender();
 
-      cluster.registerOnMemberUp(new Runnable() {
-        @Override
-        public void run() {
-          log.info("Start a connection process.");
-          Map<String, Integer> dbTimestamps = new HashMap<String, Integer>();
-          for (Iterator<String> it = dbCtx.databases.listDBs().iterator(); it.hasNext(); ) {
-            String db = it.next();
-            dbTimestamps.put(db, 0);
+      if (((Start) msg).getConnectAddr() == null) {
+        setState(State.PRIMARY);
+        getSelf().forward(msg, getContext());
+      } else {
+        log.info("Join the replica set at {}", ((Start) msg).getConnectAddr());
+        cluster.join(((Start) msg).getConnectAddr());
+
+        cluster.registerOnMemberUp(new Runnable() {
+          @Override
+          public void run() {
+            log.info("Start a connection process.");
+            Map<String, Integer> dbTimestamps = new HashMap<String, Integer>();
+            for (Iterator<String> it = dbCtx.databases.listDBs().iterator(); it.hasNext(); ) {
+              String db = it.next();
+              dbTimestamps.put(db, 0);
+            }
+
+            getContext().actorSelection(((Start) msg).getConnectPath().toString())
+              .tell(new ConnectionStart(id, settings.VOTING, settings.WEIGHT, dbTimestamps), getSelf());
           }
-
-          getContext().actorSelection(((Connect) msg).getPath().toString())
-            .tell(new ConnectionStart(id, settings.VOTING, settings.WEIGHT, dbTimestamps), getSelf());
-        }
-      });
+        });
+      }
     } else if (msg instanceof DatabaseMessage) {
       dbRouter.forward(msg, getContext());
     } else if (msg instanceof SyncFinished) {
@@ -193,6 +196,14 @@ public class ReplicationActor extends UntypedActor {
     } else {
       handleAll(msg);
     }
+    }
+  };
+
+
+  @Override
+  public void onReceive(final Object msg) throws Exception {
+    getContext().become(unconnectedProcedure);
+    getSelf().forward(msg, getContext());
   }
 
   /**
@@ -233,7 +244,7 @@ public class ReplicationActor extends UntypedActor {
 
       switch (s) {
         case UNCONNECTED:
-          log.error("Should not change to UNCONNECTED");
+          log.warning("Should not change to UNCONNECTED");
           break;
         case PRIMARY:
           getContext().become(primaryProcedure);

@@ -1437,6 +1437,23 @@ public interface Text {
   /** Replication system was stopped. */
   String R_STOPPED_PORT_X = lang("repl_stopped_port_%");
 
+  /** Server mode. */
+  String R_MEMBER = "Member";
+  /** Server start information. */
+  String R_MEMBERINFO =
+    " [-cdeinpSz] [stop]" + NL +
+      "  stop      Stop running server" + NL +
+      "  -a        Set akka port" + NL +
+      "  -c<cmds>  Execute initial database commands" + NL +
+      "  -d        Activate debugging mode" + NL +
+      "  -e<port>  Set event port" + NL +
+      "  -i        Enter interactive mode" + NL +
+      "  -n<name>  Set host the server is bound to" + NL +
+      "  -p<port>  Set server port" + NL +
+      "  -S        Start as service" + NL +
+      "  -x        Connect to this member. Must be in format host:port" + NL +
+      "  -z        Suppress logging";
+
   /** Dummy string to check if all language strings have been assigned. */
   String DUMMY = lang(null);
 }
