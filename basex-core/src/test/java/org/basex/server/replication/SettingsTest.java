@@ -2,6 +2,7 @@ package org.basex.server.replication;
 
 import akka.actor.ActorSystem;
 import akka.testkit.TestActorRef;
+import akka.util.Timeout;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import org.junit.Test;
@@ -21,38 +22,31 @@ public class SettingsTest extends SimpleSandboxTest {
   @Test
   public void testSettingsPresent() throws Exception {
     Config cfg = ConfigFactory.parseString(
-      "akka.loglevel=ERROR," +
-        "akka.loggers = [\"akka.testkit.TestEventListener\"]," +
-        "akka.actor.provider = \"akka.cluster.ClusterActorRefProvider\"," +
-        "akka.stdout-loglevel=ERROR," +
-        "BaseX.weight = 9," +
-        "BaseX.voting = off," +
-        "BaseX.timeout = 2 seconds"
+      "replication.BaseX.weight = 9," +
+      "replication.BaseX.voting = off," +
+      "replication.BaseX.timeout = 2 seconds"
     );
-    ActorSystem system = ActorSystem.create("testRepl", cfg);
+    Config std = ConfigFactory.load();
+    Config completeConfig = ConfigFactory.load(cfg.withFallback(std)).getConfig("replication");
+    ActorSystem system = ActorSystem.create("testRepl", completeConfig);
 
     TestActorRef<ReplicationActor> ref = TestActorRef.create(system, ReplicationActor.mkProps(createSandbox()));
-    assertEquals(ref.underlyingActor().settings.VOTING, false);
-    assertEquals(ref.underlyingActor().settings.WEIGHT, 9);
-    assertEquals(ref.underlyingActor().settings.TIMEOUT, Duration.create(2000, TimeUnit.MILLISECONDS));
+    assertEquals(false, ref.underlyingActor().settings.VOTING);
+    assertEquals(9, ref.underlyingActor().settings.WEIGHT);
+    assertEquals(new Timeout(Duration.create(2000, TimeUnit.MILLISECONDS)), ref.underlyingActor().settings.TIMEOUT);
 
     system.shutdown();
   }
 
   @Test
   public void testDefaultSettings() throws Exception {
-    Config cfg = ConfigFactory.parseString(
-      "akka.loglevel=ERROR," +
-        "akka.loggers = [\"akka.testkit.TestEventListener\"]," +
-        "akka.actor.provider = \"akka.cluster.ClusterActorRefProvider\"," +
-        "akka.stdout-loglevel=ERROR"
-    );
-    ActorSystem system = ActorSystem.create("testRepl", cfg);
+    Config completeConfig = ConfigFactory.load().getConfig("replication");
+    ActorSystem system = ActorSystem.create("testRepl", completeConfig);
 
     TestActorRef<ReplicationActor> ref = TestActorRef.create(system, ReplicationActor.mkProps(createSandbox()));
-    assertEquals(ref.underlyingActor().settings.VOTING, true);
-    assertEquals(ref.underlyingActor().settings.WEIGHT, 1);
-    assertEquals(ref.underlyingActor().settings.TIMEOUT, Duration.create(5000, TimeUnit.MILLISECONDS));
+    assertEquals(true, ref.underlyingActor().settings.VOTING);
+    assertEquals(1, ref.underlyingActor().settings.WEIGHT);
+    assertEquals(new Timeout(Duration.create(5000, TimeUnit.MILLISECONDS)), ref.underlyingActor().settings.TIMEOUT);
 
     system.shutdown();
   }

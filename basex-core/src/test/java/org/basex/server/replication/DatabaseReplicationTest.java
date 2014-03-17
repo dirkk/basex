@@ -24,8 +24,7 @@ public class DatabaseReplicationTest extends SimpleSandboxTest {
 
     ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
 
-    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
-    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
+    ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768), new InetSocketAddress("127.0.0.1", 8765));
     assertEquals("<A>\n  <B/>\n</A>", new XQuery("db:open('databaseTest')").execute(ctx1));
     assertEquals("<A>\n  <B/>\n</A>", new XQuery("db:open('databaseTest')").execute(ctx2));
 
@@ -41,8 +40,7 @@ public class DatabaseReplicationTest extends SimpleSandboxTest {
 
     ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
 
-    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
-    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
+    ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768), new InetSocketAddress("127.0.0.1", 8765));
 
     assertEquals("text in child", new XQuery("db:open('databaseTest')//childnode/string()").execute(ctx1));
     assertEquals("baz bar blu", new XQuery("db:open('databaseTest')//contextnode/@name/data()").execute(ctx1));
@@ -61,8 +59,7 @@ public class DatabaseReplicationTest extends SimpleSandboxTest {
 
     ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
 
-    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
-    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
+    ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768), new InetSocketAddress("127.0.0.1", 8765));
 
     assertEquals(
       "28820672",

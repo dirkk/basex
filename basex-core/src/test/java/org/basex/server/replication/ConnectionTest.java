@@ -26,8 +26,8 @@ public class ConnectionTest extends SimpleSandboxTest {
 
     assert(ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766)));
 
-    assert(ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768)));
-    assert(ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765)));
+    assert(ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768),
+      new InetSocketAddress("127.0.0.1", 8765)));
 
     ctx1.close();
     ctx2.close();
@@ -41,11 +41,11 @@ public class ConnectionTest extends SimpleSandboxTest {
 
     assert(ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766)));
 
-    assert(ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768)));
-    assert(ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765)));
+    assert(ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768),
+      new InetSocketAddress("127.0.0.1", 8765)));
 
-    assert(ctx3.replication.start(ctx3, new InetSocketAddress("127.0.0.1", 8769), new InetSocketAddress("127.0.0.1", 8770)));
-    assert(ctx3.replication.connect(new InetSocketAddress("127.0.0.1", 8765)));
+    assert(ctx3.replication.connect(ctx3, new InetSocketAddress("127.0.0.1", 8769), new InetSocketAddress("127.0.0.1", 8770),
+      new InetSocketAddress("127.0.0.1", 8765)));
 
     String info = ctx1.replication.info();
     assert(info.startsWith("State: RUNNING"));
@@ -69,8 +69,8 @@ public class ConnectionTest extends SimpleSandboxTest {
 
     for (int i = 0; i < 10; ++i) {
       final Context c = ctxs.get(i);
-      assert(c.replication.start(c, new InetSocketAddress("127.0.0.1", 8770 + i * 2), new InetSocketAddress("127.0.0.1", 8771 + i * 2)));
-      assert(c.replication.connect(new InetSocketAddress("127.0.0.1", 8765)));
+      assert(c.replication.connect(c, new InetSocketAddress("127.0.0.1", 8770 + i * 2), new InetSocketAddress("127.0.0.1", 8771 + i * 2),
+        new InetSocketAddress("127.0.0.1", 8765)));
     }
 
     String info = ctxMain.replication.info();

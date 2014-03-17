@@ -1,7 +1,6 @@
 package org.basex.server.replication;
 
 import org.basex.BaseXMember;
-import org.basex.BaseXServer;
 import org.basex.SandboxTest;
 import org.basex.core.BaseXException;
 import org.basex.core.Command;
@@ -18,7 +17,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -78,7 +76,7 @@ public class ReplicationTest extends SandboxTest {
    */
   private void startSlaves(final int n) throws IOException {
     for (int i = 0; i < n; ++i) {
-      ReplicaSetSlave r = new ReplicaSetSlave(12345 + (i * 2));
+      ReplicaSetSlave r = new ReplicaSetSlave(12345 + (i * 2), PORT);
       slaves.add(r);
     }
   }
@@ -106,7 +104,7 @@ public class ReplicationTest extends SandboxTest {
     master.execute(new Add("testAdd.xml", "<test><ADD/></test>"));
 
     // start a new slave
-    ReplicaSetSlave r = new ReplicaSetSlave(23456);
+    ReplicaSetSlave r = new ReplicaSetSlave(23456, PORT);
     r.startSession();
 
     // check if transfer was successful
@@ -294,19 +292,18 @@ public class ReplicationTest extends SandboxTest {
 
       try {
         System.setOut(NULL);
-        final StringList sl = new StringList().add("-z").add("-a" + port + 1).add("-p" + port).add("-e" + (port -1));
-        final BaseXServer member = new BaseXServer(sl.toArray());
+        final StringList sl = new StringList().add("-z").add("-a" + (port + 1)).add("-p" + port);
+        final BaseXMember member = new BaseXMember(sl.toArray());
         member.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
       } finally {
         System.setOut(OUT);
       }
       startSession();
-      startReplication(PORT + 1);
     }
 
     @Override
     public void stop() throws IOException {
-      member.context.replication.stop();
+      member.stop();
 
       super.stop();
     }
@@ -335,25 +332,24 @@ public class ReplicationTest extends SandboxTest {
     /**
      * Default constructor.
      * 
-     * @param p number to use, event port will be port + 1.
+     * @param p number to use, akka port + 1.
+     * @param connect connect to this akka port
      * @throws IOException I/O exception
      */
-    public ReplicaSetSlave(final int p) throws IOException {
+    public ReplicaSetSlave(final int p, final int connect) throws IOException {
       super();
-      
-      port = p;
-      final int port = PORT;
+
+      port = PORT;
 
       try {
         System.setOut(NULL);
-        final StringList sl = new StringList().add("-z").add("-a" + port + 1).add("-p" + port).add("-e" + (port -1));
+        final StringList sl = new StringList().add("-z").add("-a" + (port + 1)).add("-x 127.0.0.1:" + connect).add("-p" + port);
         member = new BaseXMember(sl.toArray());
         member.context.globalopts.set(GlobalOptions.DBPATH, new IOFile(Prop.TMP, "sandbox-master").path());
       } finally {
         System.setOut(OUT);
       }
       startSession();
-      startReplication(p + 1);
     }
     
     @Override
@@ -415,12 +411,5 @@ public class ReplicationTest extends SandboxTest {
      * Starts the client session.
      */
     public abstract void startSession();
-
-    /**
-     * Start the replication of this node as master instance.
-     */
-    public void startReplication(final int port) throws IOException {
-      member.context.replication.start(member.context, new InetSocketAddress(port), new InetSocketAddress(port + 1));
-    }
   }
 }

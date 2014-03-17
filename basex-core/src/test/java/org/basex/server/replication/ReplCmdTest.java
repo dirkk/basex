@@ -48,8 +48,7 @@ public class ReplCmdTest extends SimpleSandboxTest {
     ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766));
     Performance.sleep(1000);
 
-    ctx2.replication.start(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768));
-    ctx2.replication.connect(new InetSocketAddress("127.0.0.1", 8765));
+    ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768), new InetSocketAddress("127.0.0.1", 8765));
     Performance.sleep(1000);
 
     new CreateDB("test").execute(ctx1);

@@ -9,8 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.net.InetSocketAddress;
-import java.util.LinkedList;
-import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -24,36 +22,22 @@ import static org.junit.Assert.fail;
 public class WriteTest extends SimpleSandboxTest {
   private Context ctx1;
   private Context ctx2;
-  private List<Context> repls;
 
   @Before
   public void startup() throws Exception {
+
     ctx1 = createSandbox();
     ctx2 = createSandbox();
 
-    repls = new LinkedList<Context>();
-    repls.add(ctx1);
-    repls.add(ctx2);
-    startConnection(repls);
+    assert(ctx1.replication.start(ctx1, new InetSocketAddress("127.0.0.1", 8765), new InetSocketAddress("127.0.0.1", 8766)));
+    assert(ctx2.replication.connect(ctx2, new InetSocketAddress("127.0.0.1", 8767), new InetSocketAddress("127.0.0.1", 8768),
+      new InetSocketAddress("127.0.0.1", 8765)));
   }
 
   @After
   public void teardown() throws InterruptedException {
     ctx1.close();
     ctx2.close();
-  }
-
-  private void startConnection(List<Context> repls) throws Exception {
-    repls.get(0).replication.start(repls.get(0), new InetSocketAddress("127.0.0.1", 8765),
-      new InetSocketAddress("127.0.0.1", 8766));
-
-    for (int i = 1; i < repls.size(); ++i) {
-      repls.get(0).replication.start(repls.get(i), new InetSocketAddress("127.0.0.1", 8770 + i * 2),
-        new InetSocketAddress("127.0.0.1", 8771 + i * 2 ));
-      repls.get(i).replication.connect(new InetSocketAddress("127.0.0.1", 8765));
-    }
-
-    System.out.println("Connection setup completed.");
   }
 
   @Test

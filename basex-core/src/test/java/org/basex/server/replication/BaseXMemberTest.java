@@ -13,17 +13,17 @@ import java.io.IOException;
 public class BaseXMemberTest {
   @Test
   public void start() throws IOException {
-    StringList sl = new StringList().add("-z").add("-p9999");
+    StringList sl = new StringList().add("-z").add("-p9999").add("-a5678");
     BaseXMember m = new BaseXMember(sl.toArray());
     m.stop();
   }
 
   @Test
   public void connect() throws IOException {
-    StringList sl1 = new StringList().add("-z").add("-p9999");
+    StringList sl1 = new StringList().add("-z").add("-p9999").add("-a5678");
     BaseXMember m1 = new BaseXMember(sl1.toArray());
 
-    StringList sl2 = new StringList().add("-z").add("-p8999").add("-x127.0.0.1").add("-y10000");
+    StringList sl2 = new StringList().add("-z").add("-p8999").add("-a6678").add("-x127.0.0.1:5678");
     BaseXMember m2 = new BaseXMember(sl2.toArray());
 
     m1.stop();
