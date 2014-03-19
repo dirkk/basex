@@ -12,12 +12,12 @@ import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
 import static akka.pattern.Patterns.ask;
-import static org.basex.server.replication.InternalMessages.*;
+import static org.basex.server.replication.InternalMessages.RequestStatus;
+import static org.basex.server.replication.InternalMessages.Start;
 
 /**
  * Replication infrastructure for master/slave of a replica set. A replica
@@ -41,11 +41,6 @@ public class Replication {
   private ActorRef repl;
   /** Default timeout. */
   private static Timeout TIMEOUT = new Timeout(Duration.create(10, TimeUnit.SECONDS));
-
-  /** Host for incoming client connections. */
-  private InetAddress tcpHost;
-  /** Port for incoming client connections. */
-  private int tcpPort;
 
   /**
    * Constructor.
@@ -92,8 +87,7 @@ public class Replication {
    */
   public boolean connect(final Context context, final InetSocketAddress akka, final InetSocketAddress server, final InetSocketAddress connect) {
     systemStart(context, akka);
-    Address addr = new Address("akka.tcp", "replBaseX", connect.getHostString(), connect.getPort());
-    Future f = ask(repl,new Start(server, addr), TIMEOUT);
+    Future f = ask(repl,new Start(server, new Address("akka.tcp", SYSTEM_NAME, connect.getHostString(), connect.getPort())), TIMEOUT);
     try {
       return (Boolean) Await.result(f, TIMEOUT.duration());
     } catch (Exception e) {
@@ -132,13 +126,5 @@ public class Replication {
 
   public void publish(final DataMessages.DataMessage msg) {
     repl.tell(msg, ActorRef.noSender());
-  }
-
-  public void setTcpPort(int tcpPort) {
-    this.tcpPort = tcpPort;
-  }
-
-  public void setTcpHost(InetAddress tcpHost) {
-    this.tcpHost = tcpHost;
   }
 }

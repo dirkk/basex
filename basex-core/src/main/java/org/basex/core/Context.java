@@ -5,10 +5,7 @@ import org.basex.data.MetaData;
 import org.basex.data.Nodes;
 import org.basex.io.random.TableDiskAccess;
 import org.basex.query.util.pkg.Repo;
-import org.basex.server.ClientBlocker;
-import org.basex.server.ClientListener;
-import org.basex.server.Log;
-import org.basex.server.Sessions;
+import org.basex.server.*;
 import org.basex.trigger.TriggerManager;
 import org.basex.util.Token;
 import org.basex.util.list.StringList;
@@ -27,7 +24,7 @@ import static org.basex.core.Text.S_ADMIN;
  */
 public final class Context {
   /** Client listener. Set to {@code null} in standalone/server mode. */
-  public final ClientListener listener;
+  public final AListener listener;
   /** Blocked clients. */
   public final ClientBlocker blocker;
   /** Options. */
@@ -92,7 +89,7 @@ public final class Context {
    * @param ctx context of the main process
    * @param cl client listener
    */
-  public Context(final Context ctx, final ClientListener cl) {
+  public Context(final Context ctx, final AListener cl) {
     listener = cl;
     globalopts = ctx.globalopts;
     dbs = ctx.dbs;

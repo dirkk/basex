@@ -153,17 +153,17 @@ public class ReplicationActor extends UntypedActor {
       notifyStartupComplete = getSender();
 
       // start server socket
-      getContext().actorOf(ServerActor.mkProps(getSelf(), ((Start) msg).getTcpAddr()), "server");
+      getContext().actorOf(ServerActor.mkProps(dbCtx, getSelf(), ((Start) msg).getTcpAddr()), "server");
       dbRouter = getContext().actorOf(DataExecutionActor.mkProps(dbCtx).withRouter(
         new FromConfig()), "dbrouter");
 
 
-      if (((Start) msg).getConnectAddr() == null) {
+      if (((Start) msg).getRemoteAddr() == null) {
         setState(State.PRIMARY);
         getSelf().forward(msg, getContext());
       } else {
-        log.info("Join the replica set at {}", ((Start) msg).getConnectAddr());
-        cluster.join(((Start) msg).getConnectAddr());
+        log.info("Join the replica set at {}", ((Start) msg).getRemoteAddr());
+        cluster.join(((Start) msg).getRemoteAddr());
 
         cluster.registerOnMemberUp(new Runnable() {
           @Override
@@ -175,7 +175,7 @@ public class ReplicationActor extends UntypedActor {
               dbTimestamps.put(db, 0);
             }
 
-            getContext().actorSelection(((Start) msg).getConnectPath().toString())
+            getContext().actorSelection(((Start) msg).getRemotePath().toString())
               .tell(new ConnectionStart(id, settings.VOTING, settings.WEIGHT, dbTimestamps), getSelf());
           }
         });

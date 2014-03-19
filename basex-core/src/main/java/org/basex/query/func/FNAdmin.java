@@ -1,24 +1,33 @@
 package org.basex.query.func;
 
-import static org.basex.query.func.Function.*;
-import static org.basex.query.util.Err.*;
-
-import java.io.*;
-import java.math.*;
-import java.util.*;
-
-import org.basex.core.*;
-import org.basex.data.*;
-import org.basex.io.*;
-import org.basex.io.in.*;
-import org.basex.query.*;
-import org.basex.query.expr.*;
-import org.basex.query.iter.*;
-import org.basex.query.util.*;
-import org.basex.query.value.node.*;
-import org.basex.server.*;
+import org.basex.core.DBLocking;
+import org.basex.core.User;
+import org.basex.data.Data;
+import org.basex.io.IO;
+import org.basex.io.IOFile;
+import org.basex.io.in.NewlineInput;
+import org.basex.query.QueryContext;
+import org.basex.query.QueryException;
+import org.basex.query.StaticContext;
+import org.basex.query.expr.Expr;
+import org.basex.query.iter.Iter;
+import org.basex.query.iter.ValueBuilder;
+import org.basex.query.util.ASTVisitor;
+import org.basex.query.value.node.FElem;
+import org.basex.server.AListener;
+import org.basex.server.Log;
 import org.basex.server.Log.LogEntry;
-import org.basex.util.*;
+import org.basex.util.InputInfo;
+import org.basex.util.Token;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Locale;
+
+import static org.basex.query.func.Function._ADMIN_SESSIONS;
+import static org.basex.query.func.Function._ADMIN_USERS;
+import static org.basex.query.util.Err.IOERR;
 
 /**
  * Admin functions.
@@ -195,10 +204,10 @@ public final class FNAdmin extends StandardFunc {
   private static Iter sessions(final QueryContext ctx) {
     final ValueBuilder vb = new ValueBuilder();
     synchronized(ctx.context.sessions) {
-      for(final ClientListener sp : ctx.context.sessions) {
-        final String user = sp.context().user.name;
+      for(final AListener sp : ctx.context.sessions) {
+        final String user = sp.dbCtx().user.name;
         final String addr = sp.address();
-        final Data data = sp.context().data();
+        final Data data = sp.dbCtx().data();
         final FElem elem = new FElem(SESSION).add(USER, user).add(ADDRESS, addr);
         if(data != null) elem.add(DATABASE, data.meta.name);
         vb.add(elem);

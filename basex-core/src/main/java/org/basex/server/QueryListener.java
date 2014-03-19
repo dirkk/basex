@@ -22,7 +22,7 @@ import org.basex.util.*;
  * @author Andreas Weiler
  * @author Christian Gruen
  */
-final class QueryListener extends Proc {
+public final class QueryListener extends Proc {
   /** Performance. */
   private final Performance perf = new Performance();
   /** Query string. */
@@ -44,7 +44,7 @@ final class QueryListener extends Proc {
    * @param qu query string
    * @param c database context
    */
-  QueryListener(final String qu, final Context c) {
+  public QueryListener(final String qu, final Context c) {
     query = qu;
     ctx = c;
   }
@@ -56,7 +56,7 @@ final class QueryListener extends Proc {
    * @param t type
    * @throws IOException query exception
    */
-  void bind(final String n, final Object v, final String t) throws IOException {
+  public void bind(final String n, final Object v, final String t) throws IOException {
     try {
       init().bind(n, v, t);
     } catch(final QueryException ex) {
@@ -70,7 +70,7 @@ final class QueryListener extends Proc {
    * @param t type
    * @throws IOException query exception
    */
-  void context(final Object v, final String t) throws IOException {
+  public void context(final Object v, final String t) throws IOException {
     try {
       init().context(v, t);
     } catch(final QueryException ex) {
@@ -82,7 +82,7 @@ final class QueryListener extends Proc {
    * Returns the query info.
    * @return query info
    */
-  String info() {
+  public String info() {
     return info;
   }
 
@@ -91,7 +91,7 @@ final class QueryListener extends Proc {
    * @return serialization parameters
    * @throws IOException I/O Exception
    */
-  String parameters() throws IOException {
+  public String parameters() throws IOException {
     if(parameters == null) parameters = parse().ctx.serParams();
     return parameters.toString();
   }
@@ -101,7 +101,7 @@ final class QueryListener extends Proc {
    * @return updating flag
    * @throws IOException I/O Exception
    */
-  boolean updating() throws IOException {
+  public boolean updating() throws IOException {
     return parse().updating;
   }
 
@@ -113,7 +113,7 @@ final class QueryListener extends Proc {
    * @param full return full type information
    * @throws IOException I/O Exception
    */
-  void execute(final boolean iter, final OutputStream out, final boolean enc, final boolean full)
+  public void execute(final boolean iter, final OutputStream out, final boolean enc, final boolean full)
       throws IOException {
 
     try {

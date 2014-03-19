@@ -155,8 +155,8 @@ public final class BaseXServer extends Main implements Runnable {
           final long ka = context.globalopts.get(GlobalOptions.KEEPALIVE) * 1000L;
           if(ka > 0) {
             final long ms = System.currentTimeMillis();
-            for(final ClientListener cs : context.sessions) {
-              if(ms - cs.last > ka) cs.quit();
+            for(final AListener cs : context.sessions) {
+              if(ms - cs.last() > ka) cs.quit();
             }
           }
           final ClientListener cl = new ClientListener(s, context, this);
@@ -202,7 +202,7 @@ public final class BaseXServer extends Main implements Runnable {
       remove(cs);
       cs.quitAuth();
     }
-    for(final ClientListener cs : context.sessions) {
+    for(final AListener cs : context.sessions) {
       cs.quit();
     }
     super.quit();
@@ -348,10 +348,10 @@ public final class BaseXServer extends Main implements Runnable {
    * Removes an authenticated session.
    * @param client client to be removed
    */
-  public void remove(final ClientListener client) {
+  public void remove(final AListener client) {
     synchronized(auth) {
       auth.remove(client);
-      client.auth.cancel();
+      client.quit();
     }
   }
 
@@ -383,10 +383,12 @@ public final class BaseXServer extends Main implements Runnable {
           }
           final BufferInput bi = new BufferInput(es.getInputStream());
           final long id = Token.toLong(bi.readString());
-          for(final ClientListener s : context.sessions) {
+          for(final AListener s : context.sessions) {
             if(s.getId() == id) {
-              s.register(es);
-              break;
+              if (s instanceof ClientListener) {
+                ((ClientListener) s).register(es);
+                break;
+              }
             }
           }
         } catch(final IOException ex) {

@@ -1,10 +1,16 @@
-package org.basex.server;
+package org.basex.server.replication;
 
-import org.basex.BaseXServer;
+import akka.actor.ActorRef;
+import akka.actor.Props;
+import akka.actor.UntypedActor;
+import akka.io.Tcp;
+import akka.io.TcpMessage;
+import akka.util.ByteIterator;
+import akka.util.ByteString;
+import akka.util.ByteStringBuilder;
 import org.basex.core.BaseXException;
 import org.basex.core.Command;
 import org.basex.core.Context;
-import org.basex.core.GlobalOptions;
 import org.basex.core.cmd.*;
 import org.basex.core.parse.CommandParser;
 import org.basex.io.in.BufferInput;
@@ -12,26 +18,32 @@ import org.basex.io.in.DecodingInput;
 import org.basex.io.out.EncodingOutput;
 import org.basex.io.out.PrintOutput;
 import org.basex.query.QueryException;
+import org.basex.server.AListener;
+import org.basex.server.Log;
+import org.basex.server.QueryListener;
+import org.basex.server.ServerCmd;
 import org.basex.util.Performance;
 import org.basex.util.Util;
 import org.basex.util.list.ByteList;
 
 import java.io.IOException;
-import java.net.Socket;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Timer;
 
-import static org.basex.core.Text.*;
+import static org.basex.core.Text.INTERRUPTED;
+import static org.basex.core.Text.TIMEOUT_EXCEEDED;
 import static org.basex.util.Token.md5;
 
 /**
- * Server-side client session in the client-server architecture.
+ * Server-side client session in the replication architecture.
  *
  * @author BaseX Team 2005-14, BSD License
+ * @authro Dirk Kirsten
  * @author Andreas Weiler
  * @author Christian Gruen
  */
-public final class ClientListener extends Thread implements AListener {
+public final class ClientListenerActor extends UntypedActor implements AListener {
   /** Timer for authentication time out. */
   public final Timer auth = new Timer();
   /** Active queries. */
@@ -41,69 +53,83 @@ public final class ClientListener extends Thread implements AListener {
   private final Performance perf = new Performance();
   /** Database context. */
   private final Context context;
-  /** Server reference. */
-  protected final BaseXServer server;
 
-  /** Socket. */
-  private Socket socket;
-  /** Socket for events. */
-  private Socket esocket;
-  /** Output for events. */
-  private PrintOutput eout;
-  /** Flag for active events. */
-  private boolean events;
-  /** Input stream. */
-  private BufferInput in;
+  /** Write channel. */
+  private ActorRef channel;
+  /** Byte string builder for outgoing messages. */
+  private final ByteStringBuilder bsb;
   /** Output stream. */
   private PrintOutput out;
+  /** Input stream. */
+  private BufferInput in;
   /** Current command. */
   private Command command;
   /** Query id counter. */
   private int id;
 
+  /** Authenticated. */
+  private boolean authOk = false;
+  /** Login timestamp. */
+  private String ts;
   /** Timestamp of last interaction. */
   public long last = 0;
-  /** Indicates if the server thread is running. */
-  boolean running = false;
 
+  /**
+   * Create props for an actor of this type.
+   *
+   * @return Props, can be further configured
+   */
+  public static Props mkProps(final Context c, final ActorRef ch) {
+    return Props.create(ClientListenerActor.class, c, ch);
+  }
   /**
    * Constructor.
-   * @param s socket
    * @param c database context
-   * @param srv server reference
    */
-  public ClientListener(final Socket s, final Context c, final BaseXServer srv) {
-    last = System.currentTimeMillis();
-    socket = s;
-    server = srv;
+  public ClientListenerActor(final Context c, final ActorRef channel) {
     context = new Context(c, this);
-  }
-
-  /**
-   * Sets the standard input and output streams.
-   * @exception IOException I/O exception
-   */
-  protected void setStreams() throws IOException {
-    out = PrintOutput.get(socket.getOutputStream());
-    in = new BufferInput(socket.getInputStream());
-  }
-
-  /**
-   * Returns the host and port of a client.
-   * @return string representation
-   */
-  public String address() {
-    return socket.getInetAddress().getHostAddress() + ':' + socket.getPort();
+    this.channel = channel;
+    bsb = new ByteStringBuilder();
   }
 
   @Override
-  public void run() {
-    if(!authenticate()) return;
+  public void preStart() {
+    ts = Long.toString(System.nanoTime());
+
+    // send {TIMESTAMP}0
+    try {
+      out = PrintOutput.get(bsb.asOutputStream());
+      out.print(ts);
+      send(true);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Override
+  public long getId() {
+    return 0;
+  }
+
+  @Override
+  public String address() {
+    // TODO
+    return null;
+  }
+
+  @Override
+  public void onReceive(final Object msg) throws Exception {
+    final ByteString data = ((Tcp.Received) msg).data();
+
+    InputStream is = new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream();
+    in = new BufferInput(is);
+
+    if(!authOk) {
+      authenticate();
+      return;
+    }
 
     try {
-      running = true;
-      setStreams();
-      while(running) {
         command = null;
         String cmd;
         final ServerCmd sc;
@@ -112,7 +138,7 @@ public final class ClientListener extends Thread implements AListener {
           if(b == -1) {
             // end of stream: exit session
             quit();
-            break;
+            return;
           }
 
           last = System.currentTimeMillis();
@@ -123,10 +149,6 @@ public final class ClientListener extends Thread implements AListener {
             create();
           } else if(sc == ServerCmd.ADD) {
             add();
-          } else if(sc == ServerCmd.WATCH) {
-            watch();
-          } else if(sc == ServerCmd.UNWATCH) {
-            unwatch();
           } else if(sc == ServerCmd.REPLACE) {
             replace();
           } else if(sc == ServerCmd.STORE) {
@@ -140,9 +162,9 @@ public final class ClientListener extends Thread implements AListener {
         } catch(final IOException ex) {
           // this exception may be thrown if a session is stopped
           quit();
-          break;
+          return;
         }
-        if(sc != ServerCmd.COMMAND) continue;
+        if(sc != ServerCmd.COMMAND) return;
 
         // parse input and create command instance
         try {
@@ -150,16 +172,15 @@ public final class ClientListener extends Thread implements AListener {
           log(command, null);
         } catch(final QueryException ex) {
           // log invalid command
-          final String msg = ex.getMessage();
+          final String emsg = ex.getMessage();
           log(cmd, null);
-          log(msg, false);
+          log(emsg, false);
           // send 0 to mark end of potential result
           out.write(0);
           // send {INFO}0
-          out.writeString(msg);
+          out.writeString(emsg);
           // send 1 to mark error
           send(false);
-          continue;
         }
 
         // execute command and send {RESULT}
@@ -185,7 +206,6 @@ public final class ClientListener extends Thread implements AListener {
           command = null;
           quit();
         }
-      }
     } catch(final IOException ex) {
       log(ex, false);
       command = null;
@@ -201,44 +221,33 @@ public final class ClientListener extends Thread implements AListener {
    */
   private boolean authenticate() {
     try {
-      final String ts = Long.toString(System.nanoTime());
-      final byte[] address = socket.getInetAddress().getAddress();
-
-      // send {TIMESTAMP}0
-      out = PrintOutput.get(socket.getOutputStream());
-      out.print(ts);
-      send(true);
-
       // evaluate login data
-      in = new BufferInput(socket.getInputStream());
       // receive {USER}0{PASSWORD}0
       final String us = in.readString();
       final String pw = in.readString();
       context.user = context.users.get(us);
-      running = context.user != null && md5(context.user.password + ts).equals(pw);
+      authOk = context.user != null && md5(context.user.password + ts).equals(pw);
 
       // write log information
-      if(running) {
+      if(authOk) {
         // send {OK}
         send(true);
-        context.blocker.remove(address);
+        //context.blocker.remove(address);
         context.sessions.add(this);
       } else {
-        if(!us.isEmpty()) log(ACCESS_DENIED, false);
+        // if(!us.isEmpty()) log(ACCESS_DENIED, false);
         // delay users with wrong passwords
-        for(int d = context.blocker.delay(address); d > 0; d--) Performance.sleep(1000);
+        //for(int d = context.blocker.delay(address); d > 0; d--) Performance.sleep(1000);
         send(false);
       }
     } catch(final IOException ex) {
-      if(running) {
-        Util.stack(ex);
-        log(ex, false);
-        running = false;
-      }
+      Util.stack(ex);
+      log(ex, false);
+      authOk = false;
     }
 
-    server.remove(this);
-    return running;
+    // server.remove(this);
+    return authOk;
   }
 
   /**
@@ -261,7 +270,7 @@ public final class ClientListener extends Thread implements AListener {
    */
   public synchronized void quitAuth() {
     try {
-      socket.close();
+      // TODO terminate this actor
       log(TIMEOUT_EXCEEDED, false);
     } catch(final Throwable ex) {
       log(ex, false);
@@ -273,78 +282,42 @@ public final class ClientListener extends Thread implements AListener {
    */
   @Override
   public synchronized void quit() {
-    if(!running) return;
-    running = false;
-
     // wait until running command was stopped
     if(command != null) {
       command.stop();
       do Performance.sleep(50); while(command != null);
     }
-    context.sessions.remove(this);
+//    context.sessions.remove(this);
 
     try {
-      new Close().run(context);
-      socket.close();
-      if(events) {
-        esocket.close();
-        // remove this session from all events in pool
-        for(final Sessions s : context.events.values()) s.remove(this);
-      }
+      if (context != null) new Close().run(context);
+      // TODO terminate this actor
     } catch(final Throwable ex) {
       log(ex, false);
       Util.stack(ex);
     }
   }
 
-  /**
-   * Returns the context of this session.
-   * @return user reference
-   */
+  @Override
   public Context dbCtx() {
     return context;
   }
 
   @Override
   public long last() {
-    return last;
+    return 0;
   }
 
-  /**
-   * Registers the event socket.
-   * @param s socket
-   * @throws IOException I/O exception
-   */
-  public synchronized void register(final Socket s) throws IOException {
-    esocket = s;
-    eout = PrintOutput.get(s.getOutputStream());
-    eout.write(0);
-    eout.flush();
-  }
-
-  /**
-   * Sends a notification to the client.
-   * @param name event name
-   * @param msg event message
-   * @throws IOException I/O exception
-   */
   @Override
-  public synchronized void notify(final byte[] name, final byte[] msg) throws IOException {
-    last = System.currentTimeMillis();
-    eout.print(name);
-    eout.write(0);
-    eout.print(msg);
-    eout.write(0);
-    eout.flush();
+  public void notify(byte[] name, byte[] msg) throws IOException {
+
   }
-
-
 
   // PRIVATE METHODS ==========================================================
 
   /**
    * Creates a database.
-   * @throws IOException I/O exception
+   * @throws java.io.IOException I/O exception
    */
   private void create() throws IOException {
     execute(new CreateDB(in.readString()));
@@ -352,7 +325,7 @@ public final class ClientListener extends Thread implements AListener {
 
   /**
    * Adds a document to a database.
-   * @throws IOException I/O exception
+   * @throws java.io.IOException I/O exception
    */
   private void add() throws IOException {
     execute(new Add(in.readString()));
@@ -360,7 +333,7 @@ public final class ClientListener extends Thread implements AListener {
 
   /**
    * Replace a document in a database.
-   * @throws IOException I/O exception
+   * @throws java.io.IOException I/O exception
    */
   private void replace() throws IOException {
     execute(new Replace(in.readString()));
@@ -368,7 +341,7 @@ public final class ClientListener extends Thread implements AListener {
 
   /**
    * Stores raw data in a database.
-   * @throws IOException I/O exception
+   * @throws java.io.IOException I/O exception
    */
   private void store() throws IOException {
     execute(new Store(in.readString()));
@@ -377,7 +350,7 @@ public final class ClientListener extends Thread implements AListener {
   /**
    * Executes the specified command.
    * @param cmd command to be executed
-   * @throws IOException I/O exception
+   * @throws java.io.IOException I/O exception
    */
   private void execute(final Command cmd) throws IOException {
     log(cmd + " [...]", null);
@@ -385,68 +358,17 @@ public final class ClientListener extends Thread implements AListener {
     try {
       cmd.setInput(di);
       cmd.execute(context);
-      success(cmd.info());
+      // success(cmd.info());
     } catch(final BaseXException ex) {
       di.flush();
-      error(ex.getMessage());
+      //error(ex.getMessage());
     }
-  }
-
-  /**
-   * Watches an event.
-   * @throws IOException I/O exception
-   */
-  private void watch() throws IOException {
-    server.initEvents();
-
-    // initialize server-based event handling
-    if(!events) {
-      out.writeString(Integer.toString(context.globalopts.get(GlobalOptions.EVENTPORT)));
-      out.writeString(Long.toString(getId()));
-      out.flush();
-      events = true;
-    }
-    final String name = in.readString();
-    final Sessions s = context.events.get(name);
-    final boolean ok = s != null && !s.contains(this);
-    final String message;
-    if(ok) {
-      s.add(this);
-      message = WATCHING_EVENT_X;
-    } else if(s == null) {
-      message = EVENT_UNKNOWN_X;
-    } else {
-      message = EVENT_WATCHED_X;
-    }
-    info(Util.info(message, name), ok);
-  }
-
-  /**
-   * Unwatches an event.
-   * @throws IOException I/O exception
-   */
-  private void unwatch() throws IOException {
-    final String name = in.readString();
-
-    final Sessions s = context.events.get(name);
-    final boolean ok = s != null && s.contains(this);
-    final String message;
-    if(ok) {
-      s.remove(this);
-      message = UNWATCHING_EVENT_X;
-    } else if(s == null) {
-      message = EVENT_UNKNOWN_X;
-    } else {
-      message = EVENT_NOT_WATCHED_X;
-    }
-    info(Util.info(message, name), ok);
-    out.flush();
   }
 
   /**
    * Processes the query iterator.
    * @param sc server command
-   * @throws IOException I/O exception
+   * @throws java.io.IOException I/O exception
    */
   private void query(final ServerCmd sc) throws IOException {
     // iterator argument (query or identifier)
@@ -540,31 +462,6 @@ public final class ClientListener extends Thread implements AListener {
             new Object[] { address(), user, null, info });
   }
 
-  @Override
-  public String toString() {
-    final StringBuilder sb = new StringBuilder("[").append(address()).append(']');
-    if(context.data() != null) sb.append(COLS).append(context.data().meta.name);
-    return sb.toString();
-  }
-
-  /**
-   * Returns error feedback.
-   * @param info error string
-   * @throws IOException I/O exception
-   */
-  protected void error(final String info) throws IOException {
-    info(info, false);
-  }
-
-  /**
-   * Returns user feedback.
-   * @param info information string
-   * @throws IOException I/O exception
-   */
-  protected void success(final String info) throws IOException {
-    info(info, true);
-  }
-
   /**
    * Returns user feedback.
    * @param info information string
@@ -587,5 +484,8 @@ public final class ClientListener extends Thread implements AListener {
   protected void send(final boolean ok) throws IOException {
     out.write(ok ? 0 : 1);
     out.flush();
+
+    channel.tell(TcpMessage.write(bsb.result()), getSelf());
+    bsb.clear();
   }
 }

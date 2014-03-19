@@ -69,24 +69,24 @@ public interface InternalMessages {
   public class Start implements Serializable {
     /** Address for the server to bind to for clients to connect. */
     private final InetSocketAddress tcpAddr;
-    /** Cluster addres to connect to. */
-    private final Address connectAddr;
+    /** Connect address for remote akka system. {@code null}, if no connect. */
+    private final Address remote;
 
-    public Start(InetSocketAddress tcpSocket, Address connectAddr) {
+    public Start(final InetSocketAddress tcpSocket, Address remote) {
       this.tcpAddr = tcpSocket;
-      this.connectAddr = connectAddr;
+      this.remote = remote;
     }
 
     public InetSocketAddress getTcpAddr() {
       return tcpAddr;
     }
 
-    public Address getConnectAddr() {
-      return connectAddr;
+    public Address getRemoteAddr() {
+      return remote;
     }
 
-    public ActorPath getConnectPath() {
-      return new RootActorPath(getConnectAddr(), "/user/replication");
+    public ActorPath getRemotePath() {
+      return new RootActorPath(getRemoteAddr(), "/user/replication");
     }
   }
 

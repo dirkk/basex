@@ -1,16 +1,22 @@
 package org.basex.core;
 
-import static org.basex.core.Text.*;
-import static org.basex.util.Token.*;
-
-import java.io.*;
-import java.util.*;
-
-import org.basex.io.*;
+import org.basex.io.IO;
+import org.basex.io.IOFile;
 import org.basex.io.in.DataInput;
 import org.basex.io.out.DataOutput;
-import org.basex.server.*;
-import org.basex.util.*;
+import org.basex.server.AListener;
+import org.basex.server.Sessions;
+import org.basex.util.Prop;
+import org.basex.util.TokenBuilder;
+import org.basex.util.Util;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+
+import static org.basex.core.Text.*;
+import static org.basex.util.Token.string;
+import static org.basex.util.Token.token;
 
 /**
  * This class organizes all known events.
@@ -105,7 +111,7 @@ public final class Events extends HashMap<String, Sessions> {
     if(sess == null) return false;
 
     // refresh timestamp for last interaction
-    for(final ClientListener srv : sess) {
+    for(final AListener srv : sess) {
       // ignore active client
       if(srv == ctx.listener) continue;
       try {

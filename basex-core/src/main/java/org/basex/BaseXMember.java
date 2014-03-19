@@ -90,7 +90,7 @@ public final class BaseXMember extends Main implements Runnable {
     akkaPort = gopts.get(GlobalOptions.AKKAPORT);
 
     host = gopts.get(GlobalOptions.SERVERHOST);
-    tcpAddr = host.isEmpty() ? null : new InetSocketAddress(host, port);
+    tcpAddr = new InetSocketAddress(host, port);
 
     if(service) {
       start(port, args);
@@ -240,8 +240,8 @@ public final class BaseXMember extends Main implements Runnable {
    */
   public void stop() throws IOException {
     final GlobalOptions gopts = context.globalopts;
-    stop(gopts.get(GlobalOptions.SERVERPORT));
     context.replication.stop();
+    stop(gopts.get(GlobalOptions.SERVERPORT));
   }
 
   // STATIC METHODS ===========================================================
