@@ -31,6 +31,8 @@ import static org.basex.server.replication.InternalMessages.Start;
  * @author Dirk Kirsten
  */
 public class Replication {
+  public static final int PROTOCOL_V1 = 0x00;
+  public static final int HASH_MD5 = 0x00;
   /** BaseX replication system name. */
   public static String SYSTEM_NAME = "replBaseX";
   /** running? . */

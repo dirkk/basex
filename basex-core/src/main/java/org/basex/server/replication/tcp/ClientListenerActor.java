@@ -1,16 +1,18 @@
-package org.basex.server.replication;
+package org.basex.server.replication.tcp;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.io.Tcp;
 import akka.io.TcpMessage;
+import akka.japi.Procedure;
 import akka.util.ByteIterator;
 import akka.util.ByteString;
 import akka.util.ByteStringBuilder;
 import org.basex.core.BaseXException;
 import org.basex.core.Command;
 import org.basex.core.Context;
+import org.basex.core.Replication;
 import org.basex.core.cmd.*;
 import org.basex.core.parse.CommandParser;
 import org.basex.io.in.BufferInput;
@@ -56,6 +58,8 @@ public final class ClientListenerActor extends UntypedActor implements AListener
 
   /** Write channel. */
   private ActorRef channel;
+  /** Replication actor. */
+  private ActorRef replication;
   /** Byte string builder for outgoing messages. */
   private final ByteStringBuilder bsb;
   /** Output stream. */
@@ -79,31 +83,24 @@ public final class ClientListenerActor extends UntypedActor implements AListener
    *
    * @return Props, can be further configured
    */
-  public static Props mkProps(final Context c, final ActorRef ch) {
-    return Props.create(ClientListenerActor.class, c, ch);
+  public static Props mkProps(final Context c, final ActorRef ch, final ActorRef r) {
+    return Props.create(ClientListenerActor.class, c, ch, r);
   }
+
   /**
    * Constructor.
    * @param c database context
    */
-  public ClientListenerActor(final Context c, final ActorRef channel) {
+  public ClientListenerActor(final Context c, final ActorRef ch, final ActorRef r) {
     context = new Context(c, this);
-    this.channel = channel;
+    channel = ch;
+    replication = r;
     bsb = new ByteStringBuilder();
   }
 
   @Override
   public void preStart() {
-    ts = Long.toString(System.nanoTime());
 
-    // send {TIMESTAMP}0
-    try {
-      out = PrintOutput.get(bsb.asOutputStream());
-      out.print(ts);
-      send(true);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
   }
 
   @Override
@@ -119,136 +116,183 @@ public final class ClientListenerActor extends UntypedActor implements AListener
 
   @Override
   public void onReceive(final Object msg) throws Exception {
-    final ByteString data = ((Tcp.Received) msg).data();
+    // not authenticated
+    if (msg instanceof Tcp.Received) {
+      ByteString data = ((Tcp.Received) msg).data();
+      InputStream is = new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream();
+      in = new BufferInput(is);
+      out = PrintOutput.get(bsb.asOutputStream());
 
-    InputStream is = new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream();
-    in = new BufferInput(is);
-
-    if(!authOk) {
-      authenticate();
-      return;
+      // receive {PROTOCOL}{USER}{OPTIONS}
+      final int protocol = in.read();
+      // apply strategy pattern
+      switch (protocol) {
+        case Replication.PROTOCOL_V1:
+          authProtocolV1(in);
+          break;
+        default:
+          sendAuthError(0);
+      }
+    } else {
+      unhandled(msg);
     }
+  }
 
-    try {
-        command = null;
-        String cmd;
-        final ServerCmd sc;
+  private void authProtocolV1(final BufferInput bi) throws IOException {
+    final String us = in.readString();
+    final String[] options = readArray(in);
+    System.out.println("Options to server: " + options);
+
+    out.write(0); // OK
+    ts = Long.toString(System.nanoTime());
+    out.writeString(ts);
+    out.write(Replication.HASH_MD5); // at the moment all passwords are md5 encrypted
+    out.write(0); // TODO options array
+
+    send();
+    getContext().become(new Procedure<Object>() {
+      @Override
+      public void apply(Object msg) throws Exception {
+        if (msg instanceof Tcp.Received) {
+          ByteString data = ((Tcp.Received) msg).data();
+          InputStream is = new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream();
+          in = new BufferInput(is);
+
+          final String pw = in.readString();
+          context.user = context.users.get(us);
+          authOk = context.user != null && md5(context.user.password + ts).equals(pw);
+
+          if (authOk) {
+            out.write(0); // authentication successful
+            out.write(0); // no options
+            send();
+            getContext().become(authenticated);
+          } else {
+            out.write(1); // authentication failed)
+            out.write(0); // error code 0 = incorrect credentials
+            out.write(0); // no options
+          }
+        } else {
+          unhandled(msg);
+        }
+      }
+    });
+  }
+
+  private void sendAuthError(final int errorCode) throws IOException {
+    out.write(1);
+    out.write(errorCode);
+    out.write(0);
+  }
+
+  private String[] readArray(final BufferInput in) throws IOException {
+    final int l = in.read();
+    final String[] arr = new String[l];
+    for (int i = 0; i < l; ++i) arr[i] = in.readString();
+    return arr;
+  }
+
+  private Procedure<Object> authenticated = new Procedure<Object>() {
+    /**
+     * Parse and process incoming data from a socket after successful authentication.
+     * @param msg
+     */
+    @Override
+    public void apply(Object msg) throws Exception {
+      if (msg instanceof Tcp.Received) {
+        ByteString data = ((Tcp.Received) msg).data();
+        InputStream is = new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream();
+        in = new BufferInput(is);
+        out = PrintOutput.get(bsb.asOutputStream());
+
         try {
-          final int b = in.read();
-          if(b == -1) {
-            // end of stream: exit session
+          command = null;
+          String cmd;
+          final ServerCmd sc;
+          try {
+            final int b = in.read();
+            if(b == -1) {
+              // end of stream: exit session
+              quit();
+              return;
+            }
+
+            last = System.currentTimeMillis();
+            perf.time();
+            sc = ServerCmd.get(b);
+            cmd = null;
+            if(sc == ServerCmd.CREATE) {
+              create();
+            } else if(sc == ServerCmd.ADD) {
+              add();
+            } else if(sc == ServerCmd.REPLACE) {
+              replace();
+            } else if(sc == ServerCmd.STORE) {
+              store();
+            } else if(sc != ServerCmd.COMMAND) {
+              query(sc);
+            } else {
+              // database command
+              cmd = new ByteList().add(b).add(in.readBytes()).toString();
+            }
+          } catch(final IOException ex) {
+            // this exception may be thrown if a session is stopped
             quit();
             return;
           }
+          if(sc != ServerCmd.COMMAND) return;
 
-          last = System.currentTimeMillis();
-          perf.time();
-          sc = ServerCmd.get(b);
-          cmd = null;
-          if(sc == ServerCmd.CREATE) {
-            create();
-          } else if(sc == ServerCmd.ADD) {
-            add();
-          } else if(sc == ServerCmd.REPLACE) {
-            replace();
-          } else if(sc == ServerCmd.STORE) {
-            store();
-          } else if(sc != ServerCmd.COMMAND) {
-            query(sc);
-          } else {
-            // database command
-            cmd = new ByteList().add(b).add(in.readBytes()).toString();
+          // parse input and create command instance
+          try {
+            command = new CommandParser(cmd, context).parseSingle();
+            log(command, null);
+          } catch(final QueryException ex) {
+            // log invalid command
+            final String emsg = ex.getMessage();
+            log(cmd, null);
+            log(emsg, false);
+            // send 0 to mark end of potential result
+            out.write(0);
+            // send {INFO}0
+            out.writeString(emsg);
+            // send 1 to mark error
+            send(false);
+          }
+
+          // execute command and send {RESULT}
+          boolean ok = true;
+          String info;
+          try {
+            // run command
+            command.execute(context, new EncodingOutput(out));
+            info = command.info();
+          } catch(final BaseXException ex) {
+            ok = false;
+            info = ex.getMessage();
+            if(info.startsWith(INTERRUPTED)) info = TIMEOUT_EXCEEDED;
+          }
+
+          // send 0 to mark end of result
+          out.write(0);
+          // send info
+          info(info, ok);
+
+          // stop console
+          if(command instanceof Exit) {
+            command = null;
+            quit();
           }
         } catch(final IOException ex) {
-          // this exception may be thrown if a session is stopped
-          quit();
-          return;
-        }
-        if(sc != ServerCmd.COMMAND) return;
-
-        // parse input and create command instance
-        try {
-          command = new CommandParser(cmd, context).parseSingle();
-          log(command, null);
-        } catch(final QueryException ex) {
-          // log invalid command
-          final String emsg = ex.getMessage();
-          log(cmd, null);
-          log(emsg, false);
-          // send 0 to mark end of potential result
-          out.write(0);
-          // send {INFO}0
-          out.writeString(emsg);
-          // send 1 to mark error
-          send(false);
-        }
-
-        // execute command and send {RESULT}
-        boolean ok = true;
-        String info;
-        try {
-          // run command
-          command.execute(context, new EncodingOutput(out));
-          info = command.info();
-        } catch(final BaseXException ex) {
-          ok = false;
-          info = ex.getMessage();
-          if(info.startsWith(INTERRUPTED)) info = TIMEOUT_EXCEEDED;
-        }
-
-        // send 0 to mark end of result
-        out.write(0);
-        // send info
-        info(info, ok);
-
-        // stop console
-        if(command instanceof Exit) {
+          log(ex, false);
           command = null;
           quit();
         }
-    } catch(final IOException ex) {
-      log(ex, false);
-      command = null;
-      quit();
-    }
-    command = null;
-  }
-
-
-  /**
-   * Initializes a session via cram-md5.
-   * @return success flag
-   */
-  private boolean authenticate() {
-    try {
-      // evaluate login data
-      // receive {USER}0{PASSWORD}0
-      final String us = in.readString();
-      final String pw = in.readString();
-      context.user = context.users.get(us);
-      authOk = context.user != null && md5(context.user.password + ts).equals(pw);
-
-      // write log information
-      if(authOk) {
-        // send {OK}
-        send(true);
-        //context.blocker.remove(address);
-        context.sessions.add(this);
+        command = null;
       } else {
-        // if(!us.isEmpty()) log(ACCESS_DENIED, false);
-        // delay users with wrong passwords
-        //for(int d = context.blocker.delay(address); d > 0; d--) Performance.sleep(1000);
-        send(false);
+      unhandled(msg);
       }
-    } catch(final IOException ex) {
-      Util.stack(ex);
-      log(ex, false);
-      authOk = false;
     }
-
-    // server.remove(this);
-    return authOk;
-  }
+  };
 
   /**
    * Checks, whether this connection is timed out. If it is inactive, the connection
@@ -483,9 +527,21 @@ public final class ClientListenerActor extends UntypedActor implements AListener
    */
   protected void send(final boolean ok) throws IOException {
     out.write(ok ? 0 : 1);
+    send();
+  }
+
+  protected void send() throws IOException {
     out.flush();
 
     channel.tell(TcpMessage.write(bsb.result()), getSelf());
     bsb.clear();
+  }
+
+  protected Tcp.Command getOutput() throws IOException {
+    out.flush();
+
+    Tcp.Command cmd = TcpMessage.write(bsb.result());
+    bsb.clear();
+    return cmd;
   }
 }

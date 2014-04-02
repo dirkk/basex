@@ -1,6 +1,7 @@
 package org.basex.server.replication;
 
 import akka.actor.ActorPath;
+import akka.actor.ActorRef;
 import akka.actor.Address;
 import akka.actor.RootActorPath;
 import org.basex.util.Prop;
@@ -13,7 +14,7 @@ import java.util.List;
 import static org.basex.server.replication.ReplicaSet.ReplicaSetState;
 
 /**
- * Replica set messages.
+ * Replica set messages for internal communication..
  *
  * @author BaseX Team 2005-12, BSD License
  * @author Dirk Kirsten
@@ -28,7 +29,8 @@ public interface InternalMessages {
     private final List<Member> secondaries;
 
     /**
-     * Replica set status message
+     * Replica set status message. Contains the current state and members of the replica set.
+     *
      * @param state state of the cluster
      * @param primary primary, if any
      * @param secondaries all secondaries
@@ -37,6 +39,17 @@ public interface InternalMessages {
       this.state = state;
       this.primary = primary;
       this.secondaries = secondaries;
+    }
+
+    /**
+     * Replica set status message. Contains the current state and members of the replica set.
+     *
+     * @param set replica set
+     */
+    public StatusMessage(ReplicaSet set) {
+      this.state = set.getState();
+      this.primary = set.getPrimary();
+      this.secondaries = set.getSecondaries();
     }
 
     public ReplicaSetState getState() {
@@ -91,4 +104,20 @@ public interface InternalMessages {
   }
 
   public class RequestStatus implements Serializable {}
+
+  /**
+   * Start the authentication process with a client.
+   */
+  public class StartAuthentication implements Serializable {
+    /** TCP channel. */
+    private final ActorRef channel;
+
+    public StartAuthentication(ActorRef channel) {
+      this.channel = channel;
+    }
+
+    public ActorRef getChannel() {
+      return channel;
+    }
+  }
 }

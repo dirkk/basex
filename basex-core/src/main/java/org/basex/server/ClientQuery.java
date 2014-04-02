@@ -1,9 +1,7 @@
 package org.basex.server;
 
-import java.io.*;
-
-import org.basex.core.*;
-import org.basex.io.in.*;
+import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * This class defines all methods for iteratively evaluating queries with the
@@ -15,7 +13,7 @@ import org.basex.io.in.*;
  */
 public class ClientQuery extends Query {
   /** Client session. */
-  protected final ClientSession cs;
+  protected final RemoteSession cs;
   /** Query id. */
   protected final String id;
 
@@ -26,7 +24,7 @@ public class ClientQuery extends Query {
    * @param os output stream
    * @throws IOException I/O exception
    */
-  public ClientQuery(final String query, final ClientSession session, final OutputStream os)
+  public ClientQuery(final String query, final RemoteSession session, final OutputStream os)
       throws IOException {
 
     cs = session;
@@ -73,11 +71,6 @@ public class ClientQuery extends Query {
 
   @Override
   protected void cache() throws IOException {
-    cs.sout.write(ServerCmd.RESULTS.code);
-    cs.send(id);
-    cs.sout.flush();
-    final BufferInput bi = new BufferInput(cs.sin);
-    cache(bi);
-    if(!ClientSession.ok(bi)) throw new BaseXException(bi.readString());
+    cs.execCache(ServerCmd.RESULTS, id, this);
   }
 }

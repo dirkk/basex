@@ -1,4 +1,4 @@
-package org.basex.server.replication;
+package org.basex.server.replication.tcp;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
@@ -55,7 +55,7 @@ public class ServerActor extends UntypedActor {
   @Override
   public void onReceive(Object msg) throws Exception {
     if (msg instanceof Bound) {
-      //manager.tell(msg, getSelf());
+      manager.tell(msg, getSelf());
       log.info("Server bound on {}", ((Bound) msg).localAddress());
     } else if (msg instanceof CommandFailed) {
       getContext().stop(getSelf());
@@ -63,7 +63,7 @@ public class ServerActor extends UntypedActor {
       final Connected conn = (Connected) msg;
       log.info("Incoming connection from {}", conn.remoteAddress());
       //manager.tell(conn, getSelf());
-      final ActorRef handler = getContext().actorOf(ClientListenerActor.mkProps(dbCtx, getSender()));
+      final ActorRef handler = getContext().actorOf(ClientListenerActor.mkProps(dbCtx, getSender(), manager));
       getSender().tell(TcpMessage.register(handler), getSelf());
     }
   }

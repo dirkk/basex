@@ -84,6 +84,14 @@ public class Member implements Serializable {
     return ReplicationActor.State.SECONDARY;
   }
 
+  public String getHost() {
+    return actor.path().address().host().isEmpty() ? "" : actor.path().address().host().get();
+  }
+
+  public int getPort() {
+    return actor.path().address().port().isEmpty() ? 0 : (Integer) actor.path().address().port().get();
+  }
+
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();

@@ -6,6 +6,7 @@ import akka.actor.UntypedActor;
 import akka.cluster.Cluster;
 import akka.event.Logging;
 import akka.event.LoggingAdapter;
+import akka.io.Tcp;
 import akka.japi.Procedure;
 import akka.routing.FromConfig;
 import org.basex.core.BaseXException;
@@ -13,6 +14,7 @@ import org.basex.core.Context;
 import org.basex.server.election.ElectionActor;
 import org.basex.server.election.ProcessNumber;
 import org.basex.server.replication.InternalMessages.RequestStatus;
+import org.basex.server.replication.tcp.ServerActor;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -31,9 +33,7 @@ import static org.basex.server.replication.Settings.SettingsProvider;
  */
 public class ReplicationActor extends UntypedActor {
   /** Replication states. */
-  public enum State {
-    UNCONNECTED, PRIMARY, SECONDARY
-  }
+  public enum State { UNCONNECTED, PRIMARY, SECONDARY }
   /** Finite State Machine. */
   private State state = State.UNCONNECTED;
   /** Replica set. */
@@ -46,10 +46,10 @@ public class ReplicationActor extends UntypedActor {
   private Cluster cluster = Cluster.get(getContext().system());
   /** Router for database operations, just relevant for a Secondary. */
   private ActorRef dbRouter;
+  /** Handles the notification for startup of the replication system. */
+  private final Notifier notifier;
   /** Settings from the application.conf. */
   public final SettingsImpl settings = SettingsProvider.get(getContext().system());
-  /** Notify this actor reference when the connection startup is finished. */
-  private ActorRef notifyStartupComplete = null;
   /** Logging. */
   private final LoggingAdapter log = Logging.getLogger(getContext().system(), this);
 
@@ -68,6 +68,7 @@ public class ReplicationActor extends UntypedActor {
    */
   public ReplicationActor(final Context dbContext) {
     this.dbCtx = dbContext;
+    notifier = new Notifier();
   }
 
   @Override
@@ -97,7 +98,11 @@ public class ReplicationActor extends UntypedActor {
         cluster.registerOnMemberUp(new Runnable() {
           @Override
           public void run() {
-            if (notifyStartupComplete != null) notifyStartupComplete.tell(true, getSelf());
+            try {
+              notifier.setSync(true);
+            } catch (BaseXException e) {
+              log.error("Could not notify the process of successful connection attempt.");
+            }
           }
         });
 
@@ -149,8 +154,7 @@ public class ReplicationActor extends UntypedActor {
     @Override
     public void apply(final Object msg) throws Exception {
     if (msg instanceof Start) {
-      log.info("Replica set startup command");
-      notifyStartupComplete = getSender();
+      notifier.setActor(getSender());
 
       // start server socket
       getContext().actorOf(ServerActor.mkProps(dbCtx, getSelf(), ((Start) msg).getTcpAddr()), "server");
@@ -192,7 +196,7 @@ public class ReplicationActor extends UntypedActor {
       }
 
       setState(State.SECONDARY);
-      if (notifyStartupComplete != null) notifyStartupComplete.tell(true, getSelf());
+      notifier.setSync(true);
     } else {
       handleAll(msg);
     }
@@ -212,7 +216,14 @@ public class ReplicationActor extends UntypedActor {
    */
   private void handleAll(Object msg) {
     if (msg instanceof RequestStatus) {
-      getSender().tell(toString(), getSelf());
+      System.out.println(set);
+      getSender().tell(new InternalMessages.StatusMessage(set.getState(), set.getPrimary(), set.getSecondaries()), getSelf());
+    } else if (msg instanceof Tcp.Bound) {
+      try {
+        notifier.setServer(true);
+      } catch (BaseXException e) {
+        log.error("Could not notify the process of successful connection attempt.");
+      }
     } else {
       unhandled(msg);
     }
@@ -267,5 +278,40 @@ public class ReplicationActor extends UntypedActor {
   @Override
   public String toString() {
     return set.toString();
+  }
+
+  private class Notifier {
+    /** Notify this actor reference when the connection startup is finished. */
+    private ActorRef actor;
+    /** TCP server bound. */
+    private boolean server = false;
+    /** Sync finished. */
+    private boolean sync = false;
+    /** Already notified? */
+    private boolean notified = false;
+
+    public void setActor(ActorRef actor) throws BaseXException {
+      this.actor = actor;
+      tell(true);
+    }
+
+    public void setServer(boolean server) throws BaseXException {
+      this.server = server;
+      tell(true);
+    }
+
+    public void setSync(boolean sync) throws BaseXException {
+      this.sync = sync;
+      tell(true);
+    }
+
+    private void tell(final boolean result) throws BaseXException {
+      if (notified) throw new BaseXException("Notification already sent.");
+
+      if (server && sync && actor != null) {
+        notified = true;
+        actor.tell(result, getSelf());
+      }
+    }
   }
 }
