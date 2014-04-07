@@ -5,6 +5,7 @@ import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.io.Tcp;
 import akka.io.TcpMessage;
+import akka.japi.JavaPartialFunction;
 import akka.japi.Procedure;
 import akka.util.ByteIterator;
 import akka.util.ByteString;
@@ -192,6 +193,20 @@ public final class ClientListenerActor extends UntypedActor implements AListener
     return arr;
   }
 
+  private final byte[] readBytes(final ByteIterator bit) throws IOException {
+    return  bit.takeWhile(new JavaPartialFunction<Object, Object>() {
+      @Override
+      public Object apply(Object o, boolean b) throws Exception {
+        if ((Byte) o == 0x00) return false;
+        return true;
+      }
+    }).toByteString().toArray();
+  }
+
+  private final String readString(final ByteIterator bit) throws IOException {
+    return new String(readBytes(bit));
+  }
+
   private Procedure<Object> authenticated = new Procedure<Object>() {
     /**
      * Parse and process incoming data from a socket after successful authentication.
@@ -201,8 +216,7 @@ public final class ClientListenerActor extends UntypedActor implements AListener
     public void apply(Object msg) throws Exception {
       if (msg instanceof Tcp.Received) {
         ByteString data = ((Tcp.Received) msg).data();
-        InputStream is = new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream();
-        in = new BufferInput(is);
+        in = new BufferInput(new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream());
         out = PrintOutput.get(bsb.asOutputStream());
 
         try {
@@ -211,11 +225,6 @@ public final class ClientListenerActor extends UntypedActor implements AListener
           final ServerCmd sc;
           try {
             final int b = in.read();
-            if(b == -1) {
-              // end of stream: exit session
-              quit();
-              return;
-            }
 
             last = System.currentTimeMillis();
             perf.time();
@@ -365,6 +374,10 @@ public final class ClientListenerActor extends UntypedActor implements AListener
    */
   private void create() throws IOException {
     execute(new CreateDB(in.readString()));
+
+    out.write(0); // no info
+    out.write(0); // success flag
+    send();
   }
 
   /**

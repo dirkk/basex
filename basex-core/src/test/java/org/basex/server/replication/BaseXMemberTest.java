@@ -2,6 +2,8 @@ package org.basex.server.replication;
 
 import org.basex.BaseXMember;
 import org.basex.core.cmd.Info;
+import org.basex.core.cmd.XQuery;
+import org.basex.io.in.ArrayInput;
 import org.basex.server.LoginException;
 import org.basex.server.MemberSession;
 import org.basex.util.list.StringList;
@@ -46,10 +48,14 @@ public class BaseXMemberTest {
   @Test
   public void clientConnect() throws IOException {
     StringList sl1 = new StringList().add("-z").add("-p" + PORT).add("-a" + AKKAPORT);
+    System.setProperty("org.basex.DBPATH", "/tmp/BaseXMemberTest");
     BaseXMember m1 = new BaseXMember(sl1.toArray());
 
     MemberSession cs = new MemberSession("127.0.0.1", PORT, "admin", "admin", true);
-    System.out.println(cs.execute(new Info()));
+    cs.execute(new Info());
+    cs.create("test", new ArrayInput("<a><b/></a>"));
+    String result = cs.execute(new XQuery("db:open('test')//a"));
+    assert(result.equals("<a>\n  <b/>\n</a>"));
 
     m1.stop();
   }
