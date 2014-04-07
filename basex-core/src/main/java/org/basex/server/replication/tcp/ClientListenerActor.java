@@ -4,6 +4,8 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.dispatch.OnComplete;
+import akka.dispatch.OnFailure;
+import akka.dispatch.OnSuccess;
 import akka.io.Tcp;
 import akka.io.TcpMessage;
 import akka.japi.Procedure;
@@ -20,7 +22,6 @@ import org.basex.io.in.BufferInput;
 import org.basex.io.in.DecodingInput;
 import org.basex.io.out.EncodingOutput;
 import org.basex.io.out.PrintOutput;
-import org.basex.query.QueryException;
 import org.basex.server.AListener;
 import org.basex.server.Log;
 import org.basex.server.QueryListener;
@@ -28,6 +29,7 @@ import org.basex.server.ServerCmd;
 import org.basex.util.Performance;
 import org.basex.util.Util;
 import org.basex.util.list.ByteList;
+import scala.concurrent.Future;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -207,46 +209,51 @@ public final class ClientListenerActor extends UntypedActor implements AListener
         in = new BufferInput(new ByteIterator.ByteArrayIterator(data.toArray(), 0, data.length()).asInputStream());
         out = PrintOutput.get(bsb.asOutputStream());
 
+        command = null;
+        String cmd;
+        final ServerCmd sc;
         try {
-          command = null;
-          String cmd;
-          final ServerCmd sc;
-          try {
-            final int b = in.read();
+          final int b = in.read();
 
-            last = System.currentTimeMillis();
-            perf.time();
-            sc = ServerCmd.get(b);
-            cmd = null;
-            if(sc == ServerCmd.CREATE) {
-              create();
-            } else if(sc == ServerCmd.ADD) {
-              add();
-            } else if(sc == ServerCmd.REPLACE) {
-              replace();
-            } else if(sc == ServerCmd.STORE) {
-              store();
-            } else if(sc != ServerCmd.COMMAND) {
-              query(sc);
-            } else {
-              // database command
-              cmd = new ByteList().add(b).add(in.readBytes()).toString();
-            }
-          } catch(final IOException ex) {
-            // this exception may be thrown if a session is stopped
-            quit();
-            return;
+          last = System.currentTimeMillis();
+          perf.time();
+          sc = ServerCmd.get(b);
+          cmd = null;
+          if(sc == ServerCmd.CREATE) {
+            create();
+          } else if(sc == ServerCmd.ADD) {
+            add();
+          } else if(sc == ServerCmd.REPLACE) {
+            replace();
+          } else if(sc == ServerCmd.STORE) {
+            store();
+          } else if(sc != ServerCmd.COMMAND) {
+            query(sc);
+          } else {
+            // database command
+            cmd = new ByteList().add(b).add(in.readBytes()).toString();
           }
-          if(sc != ServerCmd.COMMAND) return;
+        } catch(final IOException ex) {
+          // this exception may be thrown if a session is stopped
+          quit();
+          return;
+        }
+        if(sc != ServerCmd.COMMAND) return;
 
-          // parse input and create command instance
-          try {
-            command = new CommandParser(cmd, context).parseSingle();
-            log(command, null);
-          } catch(final QueryException ex) {
+        // parse input and create command instance in a future as it could be blocking
+        final String finalCmd = cmd;
+        Future<Command> f = future(new Callable<Command>() {
+          @Override
+          public Command call() throws Exception {
+            return new CommandParser(finalCmd, context).parseSingle();
+          }
+        }, context().dispatcher());
+        f.onFailure(new OnFailure() {
+          @Override
+          public void onFailure(Throwable ex) throws Throwable {
             // log invalid command
             final String emsg = ex.getMessage();
-            log(cmd, null);
+            log(finalCmd, null);
             log(emsg, false);
             // send 0 to mark end of potential result
             out.write(0);
@@ -255,38 +262,60 @@ public final class ClientListenerActor extends UntypedActor implements AListener
             // send 1 to mark error
             send(false);
           }
+        }, context().dispatcher());
+        f.onSuccess(new OnSuccess<Command>() {
+          @Override
+          public void onSuccess(Command c) throws Throwable {
+            command = c;
+            log(command, null);
 
-          // execute command and send {RESULT}
-          boolean ok = true;
-          String info;
-          try {
-            // run command
-            command.execute(context, new EncodingOutput(out));
-            info = command.info();
-          } catch(final BaseXException ex) {
-            ok = false;
-            info = ex.getMessage();
-            if(info.startsWith(INTERRUPTED)) info = TIMEOUT_EXCEEDED;
+            // execute command and send {RESULT}
+            Future<Object> f = future(new Callable<Object>() {
+              @Override
+              public Object call() throws Exception {
+                // run command
+                command.execute(context, new EncodingOutput(out));
+                return null;
+              }
+            }, context().dispatcher());
+            f.onComplete(new OnComplete<Object>() {
+              @Override
+              public void onComplete(Throwable ex, Object o) throws Throwable {
+                boolean ok = true;
+                String info = command.info();
+
+                if (ex != null) {
+                  if (ex instanceof BaseXException) {
+                    ok = false;
+                    info = ex.getMessage();
+                    if(info.startsWith(INTERRUPTED)) info = TIMEOUT_EXCEEDED;
+                  } else if (ex instanceof IOException) {
+                    log(ex, false);
+                    command = null;
+                    quit();
+                  } else {
+                    log(ex, false);
+                  }
+                }
+
+                // send 0 to mark end of result
+                out.write(0);
+                // send info
+                info(info, ok);
+
+                // stop console
+                if(command instanceof Exit) {
+                  command = null;
+                  quit();
+                }
+              }
+            }, context().dispatcher());
           }
+        }, context().dispatcher());
 
-          // send 0 to mark end of result
-          out.write(0);
-          // send info
-          info(info, ok);
-
-          // stop console
-          if(command instanceof Exit) {
-            command = null;
-            quit();
-          }
-        } catch(final IOException ex) {
-          log(ex, false);
-          command = null;
-          quit();
-        }
         command = null;
       } else {
-      unhandled(msg);
+        unhandled(msg);
       }
     }
   };
@@ -429,78 +458,141 @@ public final class ClientListenerActor extends UntypedActor implements AListener
     // iterator argument (query or identifier)
     String arg = in.readString();
 
-    String err = null;
-    try {
-      final QueryListener qp;
-      final StringBuilder info = new StringBuilder();
-      if(sc == ServerCmd.QUERY) {
-        final String query = arg;
-        qp = new QueryListener(query, context);
-        arg = Integer.toString(id++);
-        queries.put(arg, qp);
-        // send {ID}0
-        out.writeString(arg);
-        // write log file
-        info.append(query);
-      } else {
-        // find query process
-        qp = queries.get(arg);
-        // ID has already been removed
-        if(qp == null) {
-          if(sc != ServerCmd.CLOSE) throw new IOException("Unknown Query ID: " + arg);
-        } else if(sc == ServerCmd.BIND) {
-          final String key = in.readString();
-          final String val = in.readString();
-          final String typ = in.readString();
-          qp.bind(key, val, typ);
-          info.append(key).append('=').append(val);
-          if(!typ.isEmpty()) info.append(" as ").append(typ);
-        } else if(sc == ServerCmd.CONTEXT) {
-          final String val = in.readString();
-          final String typ = in.readString();
-          qp.context(val, typ);
-          info.append(val);
-          if(!typ.isEmpty()) info.append(" as ").append(typ);
-        } else if(sc == ServerCmd.RESULTS) {
-          qp.execute(true, out, true, false);
-        } else if(sc == ServerCmd.EXEC) {
-          qp.execute(false, out, true, false);
-        } else if(sc == ServerCmd.FULL) {
-          qp.execute(true, out, true, true);
-        } else if(sc == ServerCmd.INFO) {
-          out.print(qp.info());
-        } else if(sc == ServerCmd.OPTIONS) {
-          out.print(qp.parameters());
-        } else if(sc == ServerCmd.UPDATING) {
-          out.print(Boolean.toString(qp.updating()));
-        } else if(sc == ServerCmd.CLOSE) {
-          queries.remove(arg);
-        } else if(sc == ServerCmd.NEXT) {
-          throw new Exception("Protocol for query iteration is out-of-date.");
-        }
-        // send 0 as end marker
-        out.write(0);
-      }
+    final QueryListener qp;
+    final StringBuilder info = new StringBuilder();
+    if(sc == ServerCmd.QUERY) {
+      final String query = arg;
+      qp = new QueryListener(query, context);
+      arg = Integer.toString(id++);
+      queries.put(arg, qp);
+      // send {ID}0
+      out.writeString(arg);
+      // write log file
+      info.append(query);
       // send 0 as success flag
       out.write(0);
       // write log file
       log(new StringBuilder(sc.toString()).append('[').
-          append(arg).append("] ").append(info), true);
+        append(arg).append("] ").append(info), true);
+      out.flush();
+    } else {
+      // find query process
+      qp = queries.get(arg);
+      // ID has already been removed
+      if(qp == null) {
+        if(sc != ServerCmd.CLOSE) throw new IOException("Unknown Query ID: " + arg);
+      } else if(sc == ServerCmd.BIND) {
+        final String key = in.readString();
+        final String val = in.readString();
+        final String typ = in.readString();
+        qp.bind(key, val, typ);
+        info.append(key).append('=').append(val);
+        if(!typ.isEmpty()) info.append(" as ").append(typ);
 
-    } catch(final Throwable ex) {
-      // log exception (static or runtime)
-      err = Util.message(ex);
-      log(sc + "[" + arg + ']', null);
-      log(err, false);
-      queries.remove(arg);
+        // send 0 as end marker
+        out.write(0);
+        // send 0 as success flag
+        out.write(0);
+        // write log file
+        log(new StringBuilder(sc.toString()).append('[').
+          append(arg).append("] ").append(info), true);
+        out.flush();
+      } else if(sc == ServerCmd.CONTEXT) {
+        final String val = in.readString();
+        final String typ = in.readString();
+        qp.context(val, typ);
+        info.append(val);
+        if(!typ.isEmpty()) info.append(" as ").append(typ);
+
+        // send 0 as end marker
+        out.write(0);
+        // send 0 as success flag
+        out.write(0);
+        // write log file
+        log(new StringBuilder(sc.toString()).append('[').
+          append(arg).append("] ").append(info), true);
+        out.flush();
+      } else if(sc == ServerCmd.RESULTS) {
+        qp.execute(true, out, true, false);
+      } else if(sc == ServerCmd.EXEC) {
+        Future<Object> f = future(new Callable<Object>() {
+          @Override
+          public Object call() throws Exception {
+            qp.execute(false, out, true, false);
+            return null;
+          }
+        }, context().dispatcher());
+        final String finalArg = arg;
+        f.onFailure(new OnFailure() {
+          @Override
+          public void onFailure(Throwable ex) throws Throwable {
+            // log exception (static or runtime)
+            final String err = Util.message(ex);
+            log(sc + "[" + finalArg + ']', null);
+            log(err, false);
+            queries.remove(finalArg);
+
+            // send 0 as end marker, 1 as error flag, and {MSG}0
+            out.write(0);
+            out.write(1);
+            out.writeString(err);
+          }
+        }, context().dispatcher());
+      } else if(sc == ServerCmd.FULL) {
+        qp.execute(true, out, true, true);
+      } else if(sc == ServerCmd.INFO) {
+        out.print(qp.info());
+        // send 0 as end marker
+        out.write(0);
+        // send 0 as success flag
+        out.write(0);
+        // write log file
+        log(new StringBuilder(sc.toString()).append('[').
+          append(arg).append("] ").append(info), true);
+        out.flush();
+      } else if(sc == ServerCmd.OPTIONS) {
+        out.print(qp.parameters());
+        // send 0 as end marker
+        out.write(0);
+        // send 0 as success flag
+        out.write(0);
+        // write log file
+        log(new StringBuilder(sc.toString()).append('[').
+          append(arg).append("] ").append(info), true);
+        out.flush();
+      } else if(sc == ServerCmd.UPDATING) {
+        out.print(Boolean.toString(qp.updating()));
+        // send 0 as end marker
+        out.write(0);
+        // send 0 as success flag
+        out.write(0);
+        // write log file
+        log(new StringBuilder(sc.toString()).append('[').
+          append(arg).append("] ").append(info), true);
+        out.flush();
+      } else if(sc == ServerCmd.CLOSE) {
+        queries.remove(arg);
+        // send 0 as end marker
+        out.write(0);
+        // send 0 as success flag
+        out.write(0);
+        // write log file
+        log(new StringBuilder(sc.toString()).append('[').
+          append(arg).append("] ").append(info), true);
+        out.flush();
+      } else if(sc == ServerCmd.NEXT) {
+        // log exception (static or runtime)
+        final String err = "Protocol for query iteration is out-of-date.";
+        log(sc + "[" + arg + ']', null);
+        log(err, false);
+        queries.remove(arg);
+
+        // send 0 as end marker, 1 as error flag, and {MSG}0
+        out.write(0);
+        out.write(1);
+        out.writeString(err);
+      }
     }
-    if(err != null) {
-      // send 0 as end marker, 1 as error flag, and {MSG}0
-      out.write(0);
-      out.write(1);
-      out.writeString(err);
-    }
-    out.flush();
   }
 
   /**
