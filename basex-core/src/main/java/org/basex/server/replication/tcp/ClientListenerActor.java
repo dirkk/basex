@@ -3,9 +3,9 @@ package org.basex.server.replication.tcp;
 import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.actor.UntypedActor;
+import akka.dispatch.OnComplete;
 import akka.io.Tcp;
 import akka.io.TcpMessage;
-import akka.japi.JavaPartialFunction;
 import akka.japi.Procedure;
 import akka.util.ByteIterator;
 import akka.util.ByteString;
@@ -33,7 +33,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Timer;
+import java.util.concurrent.Callable;
 
+import static akka.dispatch.Futures.future;
 import static org.basex.core.Text.INTERRUPTED;
 import static org.basex.core.Text.TIMEOUT_EXCEEDED;
 import static org.basex.util.Token.md5;
@@ -191,20 +193,6 @@ public final class ClientListenerActor extends UntypedActor implements AListener
     final String[] arr = new String[l];
     for (int i = 0; i < l; ++i) arr[i] = in.readString();
     return arr;
-  }
-
-  private final byte[] readBytes(final ByteIterator bit) throws IOException {
-    return  bit.takeWhile(new JavaPartialFunction<Object, Object>() {
-      @Override
-      public Object apply(Object o, boolean b) throws Exception {
-        if ((Byte) o == 0x00) return false;
-        return true;
-      }
-    }).toByteString().toArray();
-  }
-
-  private final String readString(final ByteIterator bit) throws IOException {
-    return new String(readBytes(bit));
   }
 
   private Procedure<Object> authenticated = new Procedure<Object>() {
@@ -408,14 +396,28 @@ public final class ClientListenerActor extends UntypedActor implements AListener
   private void execute(final Command cmd) throws IOException {
     log(cmd + " [...]", null);
     final DecodingInput di = new DecodingInput(in);
-    try {
-      cmd.setInput(di);
-      cmd.execute(context);
-      success(cmd.info());
-    } catch(final BaseXException ex) {
-      di.flush();
-      error(ex.getMessage());
-    }
+    cmd.setInput(di);
+
+    // run the database execution in a future as it is a blocking operation
+    scala.concurrent.Future<String> f = future(new Callable<String>() {
+      @Override
+      public String call() throws Exception {
+        cmd.execute(context);
+        return cmd.info();
+      }
+    }, context().dispatcher());
+
+    f.onComplete(new OnComplete<String>() {
+      @Override
+      public void onComplete(Throwable throwable, String s) throws Throwable {
+        if (throwable != null) {
+          di.flush();
+          error(throwable.getMessage());
+        } else {
+          success(s);
+        }
+      }
+    }, context().dispatcher());
   }
 
   /**
