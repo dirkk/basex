@@ -374,10 +374,6 @@ public final class ClientListenerActor extends UntypedActor implements AListener
    */
   private void create() throws IOException {
     execute(new CreateDB(in.readString()));
-
-    out.write(0); // no info
-    out.write(0); // success flag
-    send();
   }
 
   /**
@@ -415,10 +411,10 @@ public final class ClientListenerActor extends UntypedActor implements AListener
     try {
       cmd.setInput(di);
       cmd.execute(context);
-      // success(cmd.info());
+      success(cmd.info());
     } catch(final BaseXException ex) {
       di.flush();
-      //error(ex.getMessage());
+      error(ex.getMessage());
     }
   }
 
@@ -531,6 +527,24 @@ public final class ClientListenerActor extends UntypedActor implements AListener
     // send {MSG}0 and (0|1) as (success|error) flag
     out.writeString(info);
     send(ok);
+  }
+
+  /**
+   * Returns error feedback.
+   * @param info error string
+   * @throws IOException I/O exception
+   */
+  protected void error(final String info) throws IOException {
+    info(info, false);
+  }
+
+  /**
+   * Returns user feedback.
+   * @param info information string
+   * @throws IOException I/O exception
+   */
+  protected void success(final String info) throws IOException {
+    info(info, true);
   }
 
   /**
